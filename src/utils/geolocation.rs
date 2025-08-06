@@ -1,4 +1,3 @@
-#![no_std]
 use core::f64;
 use core::f64::consts::PI;
 use libm::{atan, atan2, cos, log, sin, sqrt, tan};
@@ -89,8 +88,8 @@ impl GeoLocationTrait for GeoLocation {
         let minor_semi_axis = 6356752.3142;
         let f = 1.0 / 298.257223563; // WGS-84 ellipsoid
         let l = (location.longitude - self.longitude).to_radians();
-        let u1 = atan(((1.0 - f) * tan(self.latitude.to_radians())));
-        let u2 = atan(((1.0 - f) * tan(location.latitude.to_radians())));
+        let u1 = atan((1.0 - f) * tan(self.latitude.to_radians()));
+        let u2 = atan((1.0 - f) * tan(location.latitude.to_radians()));
         let sin_u1 = sin(u1);
         let cos_u1 = cos(u1);
         let sin_u2 = sin(u2);

@@ -149,8 +149,8 @@ impl NOAACalculatorTrait for NOAACalculator {
         let m = self.get_sun_geometric_mean_anomaly(julian_centuries);
         let m_rad = m.to_radians();
         let sin_m = sin(m_rad);
-        let sin_2m = sin((m_rad * 2.0));
-        let sin_3m = sin((m_rad * 3.0));
+        let sin_2m = sin(m_rad * 2.0);
+        let sin_3m = sin(m_rad * 3.0);
 
         sin_m * (1.914602 - julian_centuries * (0.004817 + 0.000014 * julian_centuries))
             + sin_2m * (0.019993 - 0.000101 * julian_centuries)
@@ -204,10 +204,10 @@ impl NOAACalculatorTrait for NOAACalculator {
         let mut y = tan(epsilon.to_radians() / 2.0);
         y *= y;
 
-        let sin_2l0 = sin((2.0 * geom_mean_long_sun.to_radians()));
+        let sin_2l0 = sin(2.0 * geom_mean_long_sun.to_radians());
         let sin_m = sin(geom_mean_anomaly_sun.to_radians());
-        let cos_2l0 = cos((2.0 * geom_mean_long_sun.to_radians()));
-        let sin_4l0 = sin((4.0 * geom_mean_long_sun.to_radians()));
+        let cos_2l0 = cos(2.0 * geom_mean_long_sun.to_radians());
+        let sin_4l0 = sin(4.0 * geom_mean_long_sun.to_radians());
         let sin_2m = sin(2.0 * geom_mean_anomaly_sun.to_radians());
 
         let equation_of_time = y * sin_2l0 - 2.0 * eccentricity_earth_orbit * sin_m
