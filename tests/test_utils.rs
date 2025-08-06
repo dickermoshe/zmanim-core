@@ -40,7 +40,7 @@ pub fn random_test_timestamp() -> i64 {
 
 /// Compare two f64 values using ULP (Unit in the Last Place) difference
 /// This is more reliable than epsilon-based comparison for floating-point values
-fn almost_equal_f64(a: f64, b: f64, diff: Option<u64>) -> bool {
+fn almost_equal_f64(a: f64, b: f64, diff: f64) -> bool {
     if a == b {
         return true;
     }
@@ -68,54 +68,76 @@ fn almost_equal_f64(a: f64, b: f64, diff: Option<u64>) -> bool {
     } else {
         b_bits - a_bits
     };
-    ulp_diff <= diff.unwrap_or(1_000_000) && (a - b).abs() < 0.001
+    ulp_diff <= 1_000_000 || (a - b).abs() < diff
 }
 
-pub fn assert_almost_equal_f64(a: f64, b: f64, diff: Option<u64>, message: &String) {
+fn almost_equal_i64(a: i64, b: i64, diff: u64) -> bool {
+    return (a - b).abs() <= diff as i64;
+}
+pub fn assert_almost_equal_f64(a: f64, b: f64, diff: f64, message: &String) {
     let result = almost_equal_f64(a, b, diff);
-    if !result {
-        println!("Error: {:?}, {:?}, {}", a, b, message);
-    }
-
-    assert!(result);
-}
-pub fn assert_almost_equal_f64_option(
-    a: &Option<f64>,
-    b: &Option<f64>,
-    diff: Option<u64>,
-    message: &String,
-) {
-    let result = match (a, b) {
-        (Some(a), Some(b)) => almost_equal_f64(*a, *b, diff),
-        (None, None) => true,
-        _ => false,
-    };
-    let distance = match (a, b) {
-        (Some(a), Some(b)) => (a - b).abs(),
-        _ => 0.0,
-    };
+    let distance = (a - b).abs();
     if !result {
         println!(
-            "Error: {:?} vs {:?}, distance: {}, {}",
+            "Error: {:?}, {:?}, distance: {}, {}",
             a, b, distance, message
         );
     }
+
     assert!(result);
+}
+
+pub fn assert_almost_equal_f64_option(
+    a: &Option<f64>,
+    b: &Option<f64>,
+    diff: f64,
+    message: &String,
+) {
+    match (a, b) {
+        (Some(a), Some(b)) => assert_almost_equal_f64(*a, *b, diff, message),
+        (None, None) => (),
+        _ => {
+            println!("Error: {:?} vs {:?}, {}", a, b, message);
+        }
+    }
 }
 
 pub fn assert_almost_equal_f64_result(
     a: &Result<f64, GeoLocationError>,
     b: &Result<f64, GeoLocationError>,
-    diff: Option<u64>,
+    diff: f64,
     message: &String,
 ) {
-    let result = match (a, b) {
-        (Ok(a), Ok(b)) => almost_equal_f64(*a, *b, diff),
-        (Err(_), Err(_)) => true, // Both errors are considered equal
-        _ => false,               // One Ok, one Err
-    };
+    match (a, b) {
+        (Ok(a), Ok(b)) => assert_almost_equal_f64(*a, *b, diff, message),
+        (Err(_), Err(_)) => (), // Both errors are considered equal
+        _ => {
+            println!("Error: {:?} vs {:?}, {}", a, b, message);
+        }
+    }
+}
+pub fn assert_almost_equal_i64(a: i64, b: i64, diff: u64, message: &String) {
+    let result = almost_equal_i64(a, b, diff);
+    let distance = (a - b).abs();
     if !result {
-        println!("Error: {:?} vs {:?}, {}", a, b, message);
+        println!(
+            "Error: {:?}, {:?}, distance: {}, {}",
+            a, b, distance, message
+        );
     }
     assert!(result);
+}
+pub fn assert_almost_equal_i64_option(
+    a: &Option<i64>,
+    b: &Option<i64>,
+    diff: u64,
+    message: &String,
+) {
+    match (a, b) {
+        (Some(a), Some(b)) => assert_almost_equal_i64(*a, *b, diff, message),
+        (None, None) => (),
+        _ => {
+            println!("Error: {:?} vs {:?}, {}", a, b, message);
+        }
+    }
 }

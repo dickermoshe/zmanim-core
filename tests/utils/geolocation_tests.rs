@@ -14,7 +14,7 @@ fn test_geolocation() {
     let jvm = create_jvm();
 
     // Test with shuffled locations
-    for _ in 0..10000 {
+    for _ in 0..10_000 {
         let test_geo = random_test_geolocation();
         let other_test_geo = random_test_geolocation();
 
@@ -35,7 +35,6 @@ fn test_geolocation() {
             test_geo, other_test_geo
         );
 
-        // Compare values between Rust and Java implementations
         assert_eq!(
             java_geolocation.get_latitude(),
             rust_geolocation.get_latitude(),
@@ -58,32 +57,33 @@ fn test_geolocation() {
         assert_almost_equal_f64_result(
             &java_geolocation.geodesic_initial_bearing(&rust_other_geolocation),
             &rust_geolocation.geodesic_initial_bearing(&rust_other_geolocation),
-            None,
+            0.00000001,
             &message,
         );
         assert_almost_equal_f64_result(
             &java_geolocation.geodesic_final_bearing(&rust_other_geolocation),
             &rust_geolocation.geodesic_final_bearing(&rust_other_geolocation),
-            None,
+            0.00000001,
             &message,
         );
         assert_almost_equal_f64_result(
             &java_geolocation.geodesic_distance(&rust_other_geolocation),
             &rust_geolocation.geodesic_distance(&rust_other_geolocation),
-            None,
+            0.00000001,
             &message,
         );
         assert_almost_equal_f64(
             java_geolocation.rhumb_line_bearing(&rust_other_geolocation),
             rust_geolocation.rhumb_line_bearing(&rust_other_geolocation),
-            None,
+            0.00000001,
             &message,
         );
         assert_almost_equal_f64(
             java_geolocation.rhumb_line_distance(&rust_other_geolocation),
             rust_geolocation.rhumb_line_distance(&rust_other_geolocation),
-            None,
+            0.00000001,
             &message,
         );
+        drop(java_geolocation.instance);
     }
 }

@@ -164,7 +164,7 @@ impl<'a> NOAACalculatorTrait for JavaNOAACalculator<'a> {
             .jvm
             .invoke_static(
                 "com.kosherjava.zmanim.util.NOAACalculator",
-                "getEquationOfTime",
+                "getSunDeclination",
                 &[InvocationArg::try_from(julian_centuries)
                     .unwrap()
                     .into_primitive()
