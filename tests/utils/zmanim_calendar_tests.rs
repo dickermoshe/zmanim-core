@@ -213,9 +213,10 @@ fn test_zmanim_calendar() {
             );
 
             // Test sof zman shma variants
-            let rust_sof_zman_shma = zmanim_calendar.get_sof_zman_shma(sunrise, Some(sunset), true);
+            let rust_sof_zman_shma =
+                zmanim_calendar._get_sof_zman_shma(sunrise, Some(sunset), true);
             let java_sof_zman_shma =
-                java_zmanim_calendar.get_sof_zman_shma(sunrise, Some(sunset), true);
+                java_zmanim_calendar._get_sof_zman_shma(sunrise, Some(sunset), true);
             assert_almost_equal_f64_option(
                 &rust_sof_zman_shma,
                 &java_sof_zman_shma,
@@ -236,9 +237,9 @@ fn test_zmanim_calendar() {
 
             // Test sof zman tfila variants
             let rust_sof_zman_tfila =
-                zmanim_calendar.get_sof_zman_tfila(sunrise, Some(sunset), true);
+                zmanim_calendar._get_sof_zman_tfila(sunrise, Some(sunset), true);
             let java_sof_zman_tfila =
-                java_zmanim_calendar.get_sof_zman_tfila(sunrise, Some(sunset), true);
+                java_zmanim_calendar._get_sof_zman_tfila(sunrise, Some(sunset), true);
             assert_almost_equal_f64_option(
                 &rust_sof_zman_tfila,
                 &java_sof_zman_tfila,
@@ -258,9 +259,10 @@ fn test_zmanim_calendar() {
             );
 
             // Test mincha gedola variants
-            let rust_mincha_gedola = zmanim_calendar.get_mincha_gedola(Some(sunrise), sunset, true);
+            let rust_mincha_gedola =
+                zmanim_calendar._get_mincha_gedola(Some(sunrise), sunset, true);
             let java_mincha_gedola =
-                java_zmanim_calendar.get_mincha_gedola(Some(sunrise), sunset, true);
+                java_zmanim_calendar._get_mincha_gedola(Some(sunrise), sunset, true);
             assert_almost_equal_f64_option(&rust_mincha_gedola, &java_mincha_gedola, 1.0, &message);
 
             let rust_mincha_gedola_simple =
@@ -276,9 +278,9 @@ fn test_zmanim_calendar() {
 
             // Test samuch le mincha ketana variants
             let rust_samuch_mincha =
-                zmanim_calendar.get_samuch_le_mincha_ketana(Some(sunrise), sunset, true);
+                zmanim_calendar._get_samuch_le_mincha_ketana(Some(sunrise), sunset, true);
             let java_samuch_mincha =
-                java_zmanim_calendar.get_samuch_le_mincha_ketana(Some(sunrise), sunset, true);
+                java_zmanim_calendar._get_samuch_le_mincha_ketana(Some(sunrise), sunset, true);
             assert_almost_equal_f64_option(
                 &rust_samuch_mincha,
                 &java_samuch_mincha,
@@ -298,9 +300,10 @@ fn test_zmanim_calendar() {
             );
 
             // Test mincha ketana variants
-            let rust_mincha_ketana = zmanim_calendar.get_mincha_ketana(Some(sunrise), sunset, true);
+            let rust_mincha_ketana =
+                zmanim_calendar._get_mincha_ketana(Some(sunrise), sunset, true);
             let java_mincha_ketana =
-                java_zmanim_calendar.get_mincha_ketana(Some(sunrise), sunset, true);
+                java_zmanim_calendar._get_mincha_ketana(Some(sunrise), sunset, true);
             assert_almost_equal_f64_option(&rust_mincha_ketana, &java_mincha_ketana, 1.0, &message);
 
             let rust_mincha_ketana_simple =
@@ -315,9 +318,10 @@ fn test_zmanim_calendar() {
             );
 
             // Test plag hamincha variants
-            let rust_plag_hamincha = zmanim_calendar.get_plag_hamincha(Some(sunrise), sunset, true);
+            let rust_plag_hamincha =
+                zmanim_calendar._get_plag_hamincha(Some(sunrise), sunset, true);
             let java_plag_hamincha =
-                java_zmanim_calendar.get_plag_hamincha(Some(sunrise), sunset, true);
+                java_zmanim_calendar._get_plag_hamincha(Some(sunrise), sunset, true);
             assert_almost_equal_f64_option(&rust_plag_hamincha, &java_plag_hamincha, 1.0, &message);
 
             let rust_plag_hamincha_simple =

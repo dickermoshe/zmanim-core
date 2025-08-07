@@ -255,7 +255,7 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma(
+    fn _get_sof_zman_shma(
         &self,
         start_of_day: f64,
         end_of_day: Option<f64>,
@@ -344,7 +344,7 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila(
+    fn _get_sof_zman_tfila(
         &self,
         start_of_day: f64,
         end_of_day: Option<f64>,
@@ -413,7 +413,7 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_mincha_gedola(
+    fn _get_mincha_gedola(
         &self,
         start_of_day: Option<f64>,
         end_of_day: f64,
@@ -472,7 +472,7 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_samuch_le_mincha_ketana(
+    fn _get_samuch_le_mincha_ketana(
         &self,
         start_of_day: Option<f64>,
         end_of_day: f64,
@@ -527,7 +527,7 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_mincha_ketana(
+    fn _get_mincha_ketana(
         &self,
         start_of_day: Option<f64>,
         end_of_day: f64,
@@ -583,7 +583,7 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_plag_hamincha(
+    fn _get_plag_hamincha(
         &self,
         start_of_day: Option<f64>,
         end_of_day: f64,

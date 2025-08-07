@@ -39,7 +39,7 @@ pub trait ZmanimCalendarTrait {
         end_of_day: f64,
         hours: f64,
     ) -> Option<f64>;
-    fn get_sof_zman_shma(
+    fn _get_sof_zman_shma(
         &self,
         start_of_day: f64,
         end_of_day: Option<f64>,
@@ -50,7 +50,7 @@ pub trait ZmanimCalendarTrait {
     fn get_sof_zman_shma_mga(&self) -> Option<f64>;
     fn get_tzais72(&self) -> Option<f64>;
     fn get_candle_lighting(&self) -> Option<f64>;
-    fn get_sof_zman_tfila(
+    fn _get_sof_zman_tfila(
         &self,
         start_of_day: f64,
         end_of_day: Option<f64>,
@@ -59,7 +59,7 @@ pub trait ZmanimCalendarTrait {
     fn get_sof_zman_tfila_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64>;
     fn get_sof_zman_tfila_gra(&self) -> Option<f64>;
     fn get_sof_zman_tfila_mga(&self) -> Option<f64>;
-    fn get_mincha_gedola(
+    fn _get_mincha_gedola(
         &self,
         start_of_day: Option<f64>,
         end_of_day: f64,
@@ -67,7 +67,7 @@ pub trait ZmanimCalendarTrait {
     ) -> Option<f64>;
     fn get_mincha_gedola_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64>;
     fn get_mincha_gedola_default(&self) -> Option<f64>;
-    fn get_samuch_le_mincha_ketana(
+    fn _get_samuch_le_mincha_ketana(
         &self,
         start_of_day: Option<f64>,
         end_of_day: f64,
@@ -75,7 +75,7 @@ pub trait ZmanimCalendarTrait {
     ) -> Option<f64>;
     fn get_samuch_le_mincha_ketana_simple(&self, start_of_day: f64, end_of_day: f64)
     -> Option<f64>;
-    fn get_mincha_ketana(
+    fn _get_mincha_ketana(
         &self,
         start_of_day: Option<f64>,
         end_of_day: f64,
@@ -83,7 +83,7 @@ pub trait ZmanimCalendarTrait {
     ) -> Option<f64>;
     fn get_mincha_ketana_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64>;
     fn get_mincha_ketana_default(&self) -> Option<f64>;
-    fn get_plag_hamincha(
+    fn _get_plag_hamincha(
         &self,
         start_of_day: Option<f64>,
         end_of_day: f64,
@@ -211,7 +211,7 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
         Some(start_of_day + (shaah_zmanis as f64 * hours))
     }
 
-    fn get_sof_zman_shma(
+    fn _get_sof_zman_shma(
         &self,
         start_of_day: f64,
         end_of_day: Option<f64>,
@@ -225,11 +225,11 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
     }
 
     fn get_sof_zman_shma_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
-        self.get_sof_zman_shma(start_of_day, Some(end_of_day), false)
+        self._get_sof_zman_shma(start_of_day, Some(end_of_day), false)
     }
 
     fn get_sof_zman_shma_gra(&self) -> Option<f64> {
-        self.get_sof_zman_shma(
+        self._get_sof_zman_shma(
             self.astronomical_calendar.get_sunrise()?,
             self.astronomical_calendar.get_sunset(),
             true,
@@ -237,7 +237,7 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
     }
 
     fn get_sof_zman_shma_mga(&self) -> Option<f64> {
-        self.get_sof_zman_shma(self.get_alos72()?, self.get_tzais72(), true)
+        self._get_sof_zman_shma(self.get_alos72()?, self.get_tzais72(), true)
     }
 
     fn get_tzais72(&self) -> Option<f64> {
@@ -252,7 +252,7 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
             .map(|sunset| sunset - self.candle_lighting_offset * MINUTE_MILLIS as f64)
     }
 
-    fn get_sof_zman_tfila(
+    fn _get_sof_zman_tfila(
         &self,
         start_of_day: f64,
         end_of_day: Option<f64>,
@@ -266,11 +266,11 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
     }
 
     fn get_sof_zman_tfila_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
-        self.get_sof_zman_tfila(start_of_day, Some(end_of_day), false)
+        self._get_sof_zman_tfila(start_of_day, Some(end_of_day), false)
     }
 
     fn get_sof_zman_tfila_gra(&self) -> Option<f64> {
-        self.get_sof_zman_tfila(
+        self._get_sof_zman_tfila(
             self.astronomical_calendar.get_sunrise()?,
             self.astronomical_calendar.get_sunset(),
             true,
@@ -278,10 +278,10 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
     }
 
     fn get_sof_zman_tfila_mga(&self) -> Option<f64> {
-        self.get_sof_zman_tfila(self.get_alos72()?, self.get_tzais72(), true)
+        self._get_sof_zman_tfila(self.get_alos72()?, self.get_tzais72(), true)
     }
 
-    fn get_mincha_gedola(
+    fn _get_mincha_gedola(
         &self,
         start_of_day: Option<f64>,
         end_of_day: f64,
@@ -295,18 +295,18 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
     }
 
     fn get_mincha_gedola_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
-        self.get_mincha_gedola(Some(start_of_day), end_of_day, false)
+        self._get_mincha_gedola(Some(start_of_day), end_of_day, false)
     }
 
     fn get_mincha_gedola_default(&self) -> Option<f64> {
-        self.get_mincha_gedola(
+        self._get_mincha_gedola(
             self.astronomical_calendar.get_sunrise(),
             self.astronomical_calendar.get_sunset()?,
             true,
         )
     }
 
-    fn get_samuch_le_mincha_ketana(
+    fn _get_samuch_le_mincha_ketana(
         &self,
         start_of_day: Option<f64>,
         end_of_day: f64,
@@ -324,10 +324,10 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
         start_of_day: f64,
         end_of_day: f64,
     ) -> Option<f64> {
-        self.get_samuch_le_mincha_ketana(Some(start_of_day), end_of_day, false)
+        self._get_samuch_le_mincha_ketana(Some(start_of_day), end_of_day, false)
     }
 
-    fn get_mincha_ketana(
+    fn _get_mincha_ketana(
         &self,
         start_of_day: Option<f64>,
         end_of_day: f64,
@@ -341,18 +341,18 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
     }
 
     fn get_mincha_ketana_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
-        self.get_mincha_ketana(Some(start_of_day), end_of_day, false)
+        self._get_mincha_ketana(Some(start_of_day), end_of_day, false)
     }
 
     fn get_mincha_ketana_default(&self) -> Option<f64> {
-        self.get_mincha_ketana(
+        self._get_mincha_ketana(
             self.astronomical_calendar.get_sunrise(),
             self.astronomical_calendar.get_sunset()?,
             true,
         )
     }
 
-    fn get_plag_hamincha(
+    fn _get_plag_hamincha(
         &self,
         start_of_day: Option<f64>,
         end_of_day: f64,
@@ -366,11 +366,11 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
     }
 
     fn get_plag_hamincha_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
-        self.get_plag_hamincha(Some(start_of_day), end_of_day, false)
+        self._get_plag_hamincha(Some(start_of_day), end_of_day, false)
     }
 
     fn get_plag_hamincha_default(&self) -> Option<f64> {
-        self.get_plag_hamincha(
+        self._get_plag_hamincha(
             self.astronomical_calendar.get_sunrise(),
             self.astronomical_calendar.get_sunset()?,
             true,

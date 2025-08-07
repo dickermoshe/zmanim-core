@@ -5,6 +5,7 @@ use libm::{atan, atan2, cos, log, sin, sqrt, tan};
 /// A struct that contains location information such as latitude and longitude required for astronomical calculations.
 /// The elevation field may not be used by some calculation engines and would be ignored if set.
 #[derive(Debug, Clone, PartialEq)]
+
 pub struct GeoLocation {
     /// The latitude, for example 40.096 for Lakewood, NJ.
     pub latitude: f64,

@@ -14,5 +14,12 @@
     "rust-analyzer.check.allTargets": false,
     "rust-analyzer.check.extraArgs": [
         "--bins"
-    ]
+    ],
+    "files.associations": {
+        "*.dart": "dart",
+        "*.zig": "zig",
+        "initializer_list": "cpp",
+        "xstring": "cpp",
+        "xutility": "cpp"
+    }
 }
