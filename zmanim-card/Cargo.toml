@@ -17,34 +17,16 @@ version = "0.1.0"
 # test = false
 
 [[bin]]
-name = "bitfield"
-path = "src/bin/bitfield.rs"
+name = "a"
+path = "src/bin/a.rs"
 test = false
 
-[[bin]]
-name = "format"
-path = "src/bin/format.rs"
-test = false
 
 [[bin]]
 name = "hello"
 path = "src/bin/hello.rs"
 test = false
 
-[[bin]]
-name = "levels"
-path = "src/bin/levels.rs"
-test = false
-
-[[bin]]
-name = "overflow"
-path = "src/bin/overflow.rs"
-test = false
-
-[[bin]]
-name = "panic"
-path = "src/bin/panic.rs"
-test = false
 
 [lib]
 harness = false
@@ -62,7 +44,7 @@ defmt-rtt = "1.0"
 panic-probe = { version = "1.0", features = ["print-defmt"] }
 cortex-m-semihosting = "0.5.0"
 zmanim-core = { path = "../" }
-feather_m4 = { version = "0.17.2", features = ["usb", "dma"] }
+feather_m4 = { version = "0.17.2", features = ["usb", "dma", "async"] }
 usbd-serial = "0.2.2"
 usb-device = "0.3.2"
 cty = "0.2"
@@ -71,6 +53,14 @@ nmea = { version = "0.7.0", default-features = false }
 heapless = "0.8.0"
 libm = "0.2.8"
 chrono = { version = "0.4.41", default-features = false }
+embassy-executor = { version = "0.8.0", features = [
+    "arch-cortex-m",
+    "executor-thread",
+    "executor-interrupt",
+] }
+embassy-time = { version = "0.4.0" }
+embedded-hal-async = "1.0.0"
+embedded-io-async = "0.6.1"
 
 
 [dev-dependencies]

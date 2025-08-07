@@ -23,6 +23,7 @@ use cortex_m::peripheral::NVIC;
 #[entry]
 fn main() -> ! {
     let mut peripherals = Peripherals::take().unwrap();
+
     let mut core = CorePeripherals::take().unwrap();
     let mut clocks = GenericClockController::with_external_32kosc(
         peripherals.gclk,
@@ -31,6 +32,7 @@ fn main() -> ! {
         &mut peripherals.oscctrl,
         &mut peripherals.nvmctrl,
     );
+
     let pins = bsp::Pins::new(peripherals.port);
     let mut red_led: bsp::RedLed = pins.d13.into();
 
