@@ -10,6 +10,10 @@ libm = "0.2.15"
 version = "0.4.41"
 default-features = false
 
+[dependencies.portable-atomic]
+version = "1.11.1"
+features = ["critical-section"]
+
 [dev-dependencies]
 j4rs = "0.22.0"
 rand = "0.9.2"
@@ -20,8 +24,5 @@ version = "1.0"
 features = ["derive"]
 
 [workspace]
-members = [
-    "zmanim-card",
-    # "zmanim_card",
-]
+members = ["zmanim-card"]
 resolver = "3"

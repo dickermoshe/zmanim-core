@@ -23,5 +23,6 @@
         "xutility": "cpp"
     },
     "rust-analyzer.numThreads": 2,
-    "rust-analyzer.showUnlinkedFileNotification": false
+    "rust-analyzer.showUnlinkedFileNotification": false,
+    "rust-analyzer.cargo.target": "thumbv6m-none-eabi",
 }
