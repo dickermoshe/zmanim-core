@@ -473,6 +473,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
+name = "esp-backtrace"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f270a29a3c4e492399b13e157b10151a7616cba69c4d554076ea93ed1bd2916"
+dependencies = [
+ "cfg-if",
+ "defmt 1.0.1",
+ "esp-config",
+ "esp-println",
+ "heapless",
+]
+
+[[package]]
 name = "esp-bootloader-esp-idf"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -615,6 +628,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "esp-println"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e7e3ab41e96093d7fd307e93bfc88bd646a8ff23036ebf809e116b18869f719"
+dependencies = [
+ "critical-section",
+ "defmt 1.0.1",
+ "document-features",
+ "esp-metadata-generated",
+ "log",
+ "portable-atomic",
+]
+
+[[package]]
 name = "esp-riscv-rt"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -634,6 +661,18 @@ dependencies = [
  "cfg-if",
  "document-features",
  "esp-metadata-generated",
+]
+
+[[package]]
+name = "esp-storage"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f276ad8a3bdc6b47cd92a3e91013f2e42dce9b3fc5023392063387a1ce2ed69a"
+dependencies = [
+ "critical-section",
+ "document-features",
+ "embedded-storage",
+ "esp-rom-sys",
 ]
 
 [[package]]
@@ -885,6 +924,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bfb9eb618601c89945a70e254898da93b13be0388091d42117462b265bb3fad"
 dependencies = [
+ "defmt 0.3.100",
  "hash32",
  "stable_deref_trait",
 ]
@@ -1791,6 +1831,31 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.104",
+]
+
+[[package]]
+name = "zmanim-card10"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "critical-section",
+ "defmt 1.0.1",
+ "embassy-executor",
+ "embassy-sync 0.7.1",
+ "embassy-time",
+ "embedded-io-async",
+ "embedded-storage",
+ "esp-backtrace",
+ "esp-bootloader-esp-idf",
+ "esp-hal",
+ "esp-hal-embassy",
+ "esp-println",
+ "esp-storage",
+ "heapless",
+ "nmea",
+ "static_cell",
+ "zmanim-core",
 ]
 
 [[package]]
