@@ -2,19 +2,18 @@ use defmt::info;
 use embassy_executor::Spawner;
 use embassy_sync::{
     blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex},
-    channel::Channel,
     mutex::Mutex,
-    pubsub::{PubSubChannel, WaitResult},
+    pubsub::PubSubChannel,
     signal::Signal,
 };
 use esp_hal::{
     gpio::{Level, Output, OutputConfig, OutputPin},
-    rtc_cntl::{Rtc, RtcClock},
+    rtc_cntl::Rtc,
 };
 
 use esp_hal::{
     gpio::interconnect::{PeripheralInput, PeripheralOutput},
-    uart::{Config, Instance, RxConfig, Uart, UartRx, UartTx},
+    uart::{Config, Instance, RxConfig, Uart, UartRx},
     Async,
 };
 use heapless::{String as HString, Vec as HVec};

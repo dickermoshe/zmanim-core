@@ -7,21 +7,15 @@
 )]
 use defmt::info;
 use embassy_executor::Spawner;
-use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
-use embassy_sync::mutex::Mutex;
 use embassy_sync::pubsub::WaitResult;
 use embassy_time::{Duration, Timer};
-use embedded_io_async::Read;
-use embedded_storage::nor_flash::ReadNorFlash;
-use esp_hal::analog::adc::{self, Adc, AdcConfig, AdcPin, Attenuation};
+use esp_hal::analog::adc::{Adc, AdcConfig, AdcPin, Attenuation};
 use esp_hal::clock::CpuClock;
-use esp_hal::gpio::{Input, InputConfig, Output, OutputConfig};
+use esp_hal::gpio::{Output, OutputConfig};
 use esp_hal::peripherals::{ADC1, GPIO1};
-use esp_hal::rtc_cntl::{Rtc, RtcClock};
+use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::systimer::SystemTimer;
 
-
-use esp_hal::uart::{Config, Uart};
 
 use esp_hal::Async;
 use esp_storage::FlashStorage;
@@ -29,7 +23,6 @@ use static_cell::StaticCell;
 use zmanim_card10::gps::{init_gps, GpsDataChannelType, GpsState, GPS_STATE, RTC};
 use zmanim_card10::gps_data::GpsData;
 
-use zmanim_card10::string_from_buffer;
 use {esp_backtrace as _, esp_println as _};
 
 // This creates a default app-descriptor required by the esp-idf bootloader.
@@ -81,7 +74,6 @@ async fn main(spawner: Spawner) {
 
     info!("Starting main loop with LED blinking");
     let flash = FlashStorage::new();
-    flash.
 
     let gps_data = wait_for_fix(gps_data_channel).await;
 

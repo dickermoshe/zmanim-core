@@ -1,6 +1,5 @@
 use chrono::Datelike;
 use core::fmt::Write as _;
-use defmt::info;
 use nmea::{sentences::FixType, Nmea};
 /// Structure to hold all GPS data, with fields that can be updated independently
 #[derive(Debug, Clone)]
