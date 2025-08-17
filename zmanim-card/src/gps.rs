@@ -1,15 +1,159 @@
 use embassy_rp::uart::BufferedUartRx;
+use embassy_rp::uart::BufferedUartTx;
+use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
+use embassy_sync::channel::Channel;
+use embassy_sync::pubsub::PubSubBehavior;
+use embassy_sync::pubsub::PubSubChannel;
+use embassy_sync::pubsub::WaitResult;
+use embassy_time::with_timeout;
 use embassy_time::Duration;
 use embassy_time::Ticker;
 use heapless::Vec;
+
 use nmea::sentences::FixType;
 use nmea::Nmea;
 pub const MAXLINELENGTH: usize = 150;
-use core::fmt::Write;
+use core::fmt::Write as _;
+use core::u8;
 use embedded_io_async::Read;
-use heapless::String as HString;
+use embedded_io_async::Write;
 
-use crate::GPS;
+type String = heapless::String<MAXLINELENGTH>;
+
+// The listen_gps task publishes lines to the NEW_LINE_CHANNEL
+// The process_gps task subscribes to the NEW_LINE_CHANNEL and publishes GPS data to the GPS_DATA_CHANNEL
+// Any call to wait_for_sentence will also register and quickly unregister the subscriber to the NEW_LINE_CHANNEL
+// Becuase both taksks need to receive the same lines, we use a pubsub channel
+static INCOMING_LINE_CHANNEL: PubSubChannel<ThreadModeRawMutex, String, 64, 2, 64> =
+    PubSubChannel::new();
+
+// The process_gps task publishes GPS data to the GPS_DATA_CHANNEL
+// Other tasks can subscribe to the GPS_DATA_CHANNEL to get the latest GPS data
+// Again, we use a pubsub channel so that multiple tasks can subscribe to the same channel
+pub static GPS_DATA_CHANNEL: PubSubChannel<ThreadModeRawMutex, GpsData, 64, 1, 64> =
+    PubSubChannel::new();
+
+// The write_gps task subscribes to the OUTGOING_LINE_CHANNEL and writes the lines to the UART
+// Becuase there is only a single subscriber, we use a simple channel
+static OUTGOING_LINE_CHANNEL: Channel<ThreadModeRawMutex, String, 64> = Channel::new();
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum GpsState {
+    Enabled,
+    Disabled,
+}
+
+pub static GPS_STATE_CHANNEL: Channel<ThreadModeRawMutex, GpsState, 1> = Channel::new();
+
+/// The listen_gps task reads from the UART and publishes lines to the NEW_LINE_CHANNEL
+#[embassy_executor::task]
+pub async fn listen_gps_task(mut rx: BufferedUartRx) {
+    let mut ticker = Ticker::every(Duration::from_millis(50));
+    let mut line_buffer: String = String::new();
+
+    loop {
+        // Read bytes first without holding the mutex.
+        let mut buf = [0u8; 512];
+        let n = rx.read(&mut buf).await.unwrap_or(0);
+        if n > 0 {
+            for &b in &buf[..n] {
+                // Ignore carriage return, we'll handle it with the newline
+                if b == b'\r' {
+                    continue;
+                }
+                // If we have a newline, send the line buffer to the channel
+                // and clear the line buffer
+                if b == b'\n' {
+                    INCOMING_LINE_CHANNEL.publish_immediate(line_buffer.clone());
+                    line_buffer.clear();
+                    continue;
+                }
+                // Otherwise, add the byte to the line buffer
+                line_buffer.push(b as char).unwrap();
+            }
+        }
+
+        // Yield periodically to keep system responsive even if GPS is very chatty.
+        ticker.next().await;
+    }
+}
+
+/// The write_gps task subscribes to the OUTGOING_LINE_CHANNEL and writes the lines to the UART
+#[embassy_executor::task]
+pub async fn write_gps_task(mut tx: BufferedUartTx) {
+    loop {
+        let line = OUTGOING_LINE_CHANNEL.receive().await;
+        log::info!("Writing line: {:?}", line);
+        tx.write(line.as_bytes()).await.unwrap();
+    }
+}
+
+#[embassy_executor::task]
+pub async fn gps_state_task() {
+    loop {
+        let state = GPS_STATE_CHANNEL.receive().await;
+        match state {
+            GpsState::Enabled => {
+                log::info!("Enabling GPS");
+                // Send a newline to the GPS to wake it up
+                send_sentence(heapless::String::try_from("\r\n").unwrap()).await;
+
+                log::info!("GPS enabled");
+            }
+            GpsState::Disabled => {
+                log::info!("Disabling GPS");
+                // Send a command to the GPS to disable the GPS
+                send_sentence(heapless::String::try_from(PMTK_STANDBY).unwrap()).await;
+                log::info!("GPS disabled");
+            }
+        }
+    }
+}
+
+/// The process_gps task subscribes to the INCOMING_LINE_CHANNEL and publishes GPS data to the GPS_DATA_CHANNEL
+#[embassy_executor::task]
+pub async fn process_gps_task() {
+    let mut latest_gps_data = GpsData::default();
+    let mut subscriber = INCOMING_LINE_CHANNEL.subscriber().unwrap();
+    let publisher = GPS_DATA_CHANNEL.publisher().unwrap();
+    loop {
+        let line = match subscriber.next_message().await {
+            WaitResult::Message(line) => line,
+            WaitResult::Lagged(_) => continue,
+        };
+        let mut nmea_parser = Nmea::default();
+        let result = nmea_parser.parse(&line);
+        match result {
+            Ok(_) => {
+                latest_gps_data.update_from_nmea(&nmea_parser);
+                publisher.publish(latest_gps_data.clone()).await;
+            }
+            Err(e) => {
+                log::info!("Parse Error: {:?} | Line: {:?}", e, line);
+            }
+        }
+    }
+}
+
+pub async fn send_sentence(sentence: String) {
+    OUTGOING_LINE_CHANNEL.send(sentence).await
+}
+
+pub async fn wait_for_sentence(sentence: String) {
+    let mut subscriber = INCOMING_LINE_CHANNEL.subscriber().unwrap();
+    loop {
+        let line = match subscriber.next_message().await {
+            WaitResult::Message(line) => line,
+            WaitResult::Lagged(_) => continue,
+        };
+        if line == sentence {
+            log::info!("Sentence received: {:?}", line);
+            return;
+        } else {
+            log::info!("Sentence not received: {:?} != {:?}", line, sentence);
+        }
+    }
+}
 
 /// Structure to hold all GPS data, with fields that can be updated independently
 #[derive(Debug, Clone)]
@@ -26,7 +170,6 @@ pub struct GpsData {
     pub vdop: Option<f32>,
     pub pdop: Option<f32>,
     pub geoid_separation: Option<f32>,
-    pub last_update_tick: Option<u32>,
 }
 
 impl Default for GpsData {
@@ -44,14 +187,13 @@ impl Default for GpsData {
             vdop: None,
             pdop: None,
             geoid_separation: None,
-            last_update_tick: None,
         }
     }
 }
 
 impl GpsData {
     /// Update GPS data fields only if the new data is better (not None and potentially more recent)
-    pub fn update_from_nmea(&mut self, nmea: &Nmea, current_tick: u32) -> bool {
+    pub fn update_from_nmea(&mut self, nmea: &Nmea) -> bool {
         let mut changed = false;
         // Update position data if we have new valid data
         if let Some(lat) = nmea.latitude {
@@ -119,8 +261,6 @@ impl GpsData {
             changed = true;
         }
 
-        // Update the last update tick
-        self.last_update_tick = Some(current_tick);
         changed
     }
 
@@ -132,17 +272,13 @@ impl GpsData {
     }
 
     /// Get the age of the data in ticks
-    pub fn data_age(&self, current_tick: u32) -> Option<u32> {
-        self.last_update_tick
-            .map(|last| current_tick.saturating_sub(last))
-    }
 
     /// Pretty print the GPS data for logging
     ///
     /// Example output:
     /// "📍 Position: 40.712800°N, -74.006000°E | Altitude: 10.5m | Speed: 25.3km/h | Fix: Gps | Sats: 8 | HDOP: 1.2 | VDOP: 1.8 | PDOP: 2.1 | Time: 14:30:25 | Date: 2024-01-15 | Age: 150ms"
-    pub fn pretty_print(&self) -> HString<256> {
-        let mut output = HString::new();
+    pub fn pretty_print(&self) -> heapless::String<256> {
+        let mut output = heapless::String::new();
 
         // Position information
         if let (Some(lat), Some(lon)) = (self.latitude, self.longitude) {
@@ -190,147 +326,10 @@ impl GpsData {
             let _ = write!(output, " | Date: {}", date);
         }
 
-        // Data age
-        if let Some(age) = self.data_age(self.last_update_tick.unwrap_or(0)) {
-            let _ = write!(output, " | Age: {}ms", age * 50); // Assuming 50ms tick rate
-        }
-
         output
     }
 }
-
-pub struct Gps {
-    /// The buffer for the current line as it is being built
-    line_buffer: Vec<u8, MAXLINELENGTH>,
-    /// The index of the current character in the line buffer
-    line_idx: usize,
-    /// The tick count when the first character of the current line was received
-    first_char_time: Option<u32>,
-    /// How many ticks have passed since the last update
-    tick_count: u32,
-    /// The accumulated GPS data
-    gps_data: GpsData,
-    /// The last time a complete line was received
-    last_update: Option<u32>,
-}
-
-#[embassy_executor::task]
-pub async fn run_gps(mut rx: BufferedUartRx) {
-    let mut ticker = Ticker::every(Duration::from_millis(50));
-    loop {
-        // Read whatever bytes are currently available (at least 1) from UART without holding the GPS lock.
-        let mut buf = [0u8; 64];
-        if let Ok(n) = rx.read(&mut buf).await {
-            // Briefly lock GPS only to process the received bytes.
-            let mut gps_lock = GPS.lock().await;
-            if let Some(gps) = &mut *gps_lock {
-                for &b in &buf[..n] {
-                    gps.process_char(b);
-                }
-            }
-        }
-        // Yield periodically to keep system responsive even if GPS is very chatty.
-        ticker.next().await;
-    }
-}
-
-impl Gps {
-    pub fn new() -> Gps {
-        Gps {
-            line_buffer: Vec::new(),
-            line_idx: 0,
-            first_char_time: None,
-            tick_count: 0,
-            gps_data: GpsData::default(),
-            last_update: None,
-        }
-    }
-
-    // fn _write_byte(&mut self, c: u8) {
-    //     let _ = self.tx.write(c);
-    // }
-
-    pub fn process_char(&mut self, c: u8) {
-        let arr = [c];
-        let c_str = core::str::from_utf8(&arr);
-        if let Ok(c_str) = c_str {
-            // Ignore carriage return, we'll handle it with the newline
-            if c_str == "\r" {
-                return;
-            }
-            // If this is the first character of a line, record the tick count
-            if self.first_char_time.is_none() {
-                self.first_char_time = Some(self.tick_count);
-            }
-
-            // Add the character to the line buffer if we have space
-            if self.line_idx < MAXLINELENGTH - 1 {
-                if let Ok(_) = self.line_buffer.push(c) {
-                    self.line_idx += 1;
-                }
-            }
-
-            // If we have a complete line, process it
-            if c == b'\n' {
-                self.process_complete_line(self.tick_count);
-            }
-        }
-    }
-    fn process_complete_line(&mut self, current_time: u32) {
-        // Convert buffer to string, handling potential UTF-8 issues
-        if let Ok(line_str) = core::str::from_utf8(&self.line_buffer) {
-            // Strip the "\r\n" from the end of the line
-            let line_str = line_str.trim_end();
-
-            // Create a new parser for this sentence
-            let mut nmea_parser = Nmea::default();
-
-            // Parse the NMEA sentence using the nmea crate
-            let result = nmea_parser.parse(line_str);
-
-            match result {
-                Ok(parsed) => {
-                    log::info!("Parse Result: {:?}", parsed);
-                }
-                Err(e) => {
-                    log::info!("Parse Error: {:?}", e);
-                }
-            }
-            log::info!("Raw NMEA: {:?}", line_str);
-
-            // Record this tick as the last update time
-            self.last_update = Some(current_time);
-
-            // Update GPS data from the parsed NMEA sentence
-            let changed = self.gps_data.update_from_nmea(&nmea_parser, current_time);
-
-            // Log the latest complete GPS data
-            if changed {
-                log::info!("GPS Data: {}", self.gps_data.pretty_print());
-            }
-
-            // Reset for next line
-            self.line_buffer.clear();
-            self.line_idx = 0;
-            self.first_char_time = None;
-        }
-    }
-    // fn send_command(&mut self, command: &str) {
-    //     for c in command.as_bytes().iter() {
-    //         self._write_byte(*c);
-    //     }
-    //     // Send newline
-    //     self._write_byte(b'\r');
-    //     self._write_byte(b'\n');
-    // }
-
-    /// Get a reference to the current GPS data
-    pub fn get_gps_data(&self) -> &GpsData {
-        &self.gps_data
-    }
-
-    /// Get a mutable reference to the GPS data
-    pub fn get_gps_data_mut(&mut self) -> &mut GpsData {
-        &mut self.gps_data
-    }
-}
+// Standby Command and boot successful message
+const PMTK_STANDBY: &str = "$PMTK161,0*28";
+// const PMTK_STANDBY_SUCCESS: &str = "$PMTK001,161,3*36";
+const PMTK_AWAKE: &str = "$PMTK010,002*2D";
