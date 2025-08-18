@@ -1,9 +1,10 @@
+use chrono::Datelike;
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_sync::{
     blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex},
     mutex::Mutex,
-    pubsub::PubSubChannel,
+    pubsub::{PubSubChannel, WaitResult},
     signal::Signal,
 };
 use esp_hal::{
@@ -16,6 +17,7 @@ use esp_hal::{
     uart::{Config, Instance, RxConfig, Uart, UartRx},
     Async,
 };
+use esp_println::println;
 use heapless::{String as HString, Vec as HVec};
 
 use nmea::Nmea;
@@ -73,6 +75,7 @@ pub fn init_gps(
 
     spawner.spawn(gps_task(rx, gps_data_channel)).ok();
     spawner.spawn(handle_gps_state(gps_enable_pin)).ok();
+    // spawner.spawn(gps_data_logger(gps_data_channel)).ok();
     gps_data_channel
 }
 
@@ -82,11 +85,11 @@ async fn handle_gps_state(gps_enable_pin: &'static mut Output<'static>) {
         let state = GPS_STATE.wait().await;
         match state {
             GpsState::On => {
-                info!("GPS enabled");
+                println!("GPS enabled");
                 gps_enable_pin.set_low();
             }
             GpsState::Off => {
-                info!("GPS disabled");
+                println!("GPS disabled");
                 gps_enable_pin.set_high();
             }
         }
@@ -105,39 +108,79 @@ async fn gps_task(mut rx: UartRx<'static, Async>, gps_data_channel: &'static Gps
         match result {
             Ok(len) => {
                 if len > 0 {
-                    info!("Read {} bytes from UART", len);
                     for &b in &buf[..len] {
                         // Ignore carriage return, we'll handle it with the newline
                         if b == b'\r' {
                             continue;
                         }
                         if b == b'\n' {
-                            if !main_buffer.is_empty() {
-                                let line_str = core::str::from_utf8(&main_buffer).unwrap_or("");
-                                let mut line: HString<LINE_BUF_CAPACITY> = HString::new();
-                                let _ = line.push_str(line_str);
-                                let mut nmea = Nmea::default();
-                                let _ = nmea.parse(line.as_str());
-                                let data = GpsData {
-                                    latitude: nmea.latitude,
-                                    longitude: nmea.longitude,
-                                    altitude: nmea.altitude,
-                                    speed_over_ground: nmea.speed_over_ground,
-                                    fix_time: nmea.fix_time,
-                                    fix_date: nmea.fix_date,
-                                    fix_type: nmea.fix_type,
-                                    num_of_fix_satellites: nmea.num_of_fix_satellites,
-                                    hdop: nmea.hdop,
-                                    vdop: nmea.vdop,
-                                    pdop: nmea.pdop,
-                                    geoid_separation: nmea.geoid_separation,
-                                };
-                                info!("Publishing line: {}", line.as_str());
+                            // Parse the line as a string
+                            let copied_buffer = main_buffer.clone();
+                            main_buffer.clear();
 
-                                info!("Publishing GPS data: {}", data.pretty_print().as_str());
-                                publisher.publish(data).await;
-                                main_buffer.clear();
+                            let parsed_str_result = core::str::from_utf8(&copied_buffer);
+                            if parsed_str_result.is_err() {
+                                println!("Error parsing string: {:?}", parsed_str_result);
+                                continue;
                             }
+                            let parsed_str = parsed_str_result.unwrap();
+
+                            // Parse the line as an NMEA sentence
+                            let mut line: HString<LINE_BUF_CAPACITY> = HString::new();
+                            let _ = line.push_str(parsed_str);
+                            let mut nmea = Nmea::default();
+                            let parse_result = nmea.parse(line.as_str());
+
+                            // If the line is not a valid NMEA sentence, continue
+                            if parse_result.is_err() {
+                                println!("Error parsing NMEA sentence: {:?}", parse_result);
+                                continue;
+                            }
+
+                            // Get the timestamp from the NMEA sentence
+                            let timestamp = {
+                                match (nmea.fix_time, nmea.fix_date) {
+                                    (Some(fix_time), Some(fix_date)) => {
+                                        // If the year is 2080 or higher, the GPS is probably
+                                        // not valid, so we'll return None
+                                        if fix_date.year() >= 2080 {
+                                            None
+                                        } else {
+                                            Some(
+                                                chrono::NaiveDateTime::new(fix_date, fix_time)
+                                                    .and_utc()
+                                                    .timestamp_millis(),
+                                            )
+                                        }
+                                    }
+                                    _ => None,
+                                }
+                            };
+                            if let Some(timestamp) = timestamp {
+                                {
+                                    let rtc_guard = RTC.lock().await;
+                                    let rtc = rtc_guard.as_ref().unwrap();
+                                    rtc.set_current_time_us((timestamp * 1000) as u64);
+                                }
+                            }
+
+                            // Create the GPS data
+                            let data = GpsData {
+                                latitude: nmea.latitude,
+                                longitude: nmea.longitude,
+                                altitude: nmea.altitude,
+                                speed_over_ground: nmea.speed_over_ground,
+                                timestamp,
+                                num_of_fix_satellites: nmea.num_of_fix_satellites,
+                                hdop: nmea.hdop,
+                                vdop: nmea.vdop,
+                                pdop: nmea.pdop,
+                                geoid_separation: nmea.geoid_separation,
+                            };
+                            println!("Publishing GPS data: {:?}", data);
+
+                            // Publish the GPS data
+                            publisher.publish_immediate(data);
                         } else {
                             // Otherwise, add the byte to the line buffer
                             let _ = main_buffer.push(b);
@@ -146,8 +189,23 @@ async fn gps_task(mut rx: UartRx<'static, Async>, gps_data_channel: &'static Gps
                 }
             }
             Err(e) => {
-                info!("UART read error: {:?}", e);
+                println!("UART read error: {:?}", e);
             }
+        }
+    }
+}
+
+/// GPS data logger task that listens to GPS data and prints it to the screen
+#[embassy_executor::task]
+async fn gps_data_logger(gps_data_channel: &'static GpsDataChannelType) {
+    let mut subscriber = gps_data_channel.subscriber().unwrap();
+    loop {
+        let gps_data = subscriber.next_message().await;
+        match gps_data {
+            WaitResult::Message(data) => {
+                println!("GPS Data: {:?}", data);
+            }
+            WaitResult::Lagged(_) => continue,
         }
     }
 }

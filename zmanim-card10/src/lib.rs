@@ -2,7 +2,9 @@
 
 pub mod gps;
 pub mod gps_data;
+pub mod storage;
 
+pub mod display;
 use heapless::String;
 
 pub fn string_from_buffer<const N: usize>(buffer: &[u8]) -> String<N> {
