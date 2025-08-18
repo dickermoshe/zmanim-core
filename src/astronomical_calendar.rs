@@ -2,10 +2,10 @@ use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 
 use crate::{GeoLocationTrait, NOAACalculatorTrait, SolarEvent};
 
-pub struct AstronomicalCalendar<'a> {
+pub struct AstronomicalCalendar<'a, T: NOAACalculatorTrait> {
     timestamp: i64,
     geo_location: &'a dyn GeoLocationTrait,
-    noaa_calculator: &'a dyn NOAACalculatorTrait,
+    noaa_calculator: T,
 }
 
 pub const GEOMETRIC_ZENITH: f64 = 90.0;
@@ -50,12 +50,8 @@ pub trait AstronomicalCalendarTrait {
     ) -> Option<f64>;
 }
 
-impl<'a> AstronomicalCalendar<'a> {
-    pub fn new(
-        timestamp: i64,
-        geo_location: &'a dyn GeoLocationTrait,
-        noaa_calculator: &'a dyn NOAACalculatorTrait,
-    ) -> Self {
+impl<'a, T: NOAACalculatorTrait> AstronomicalCalendar<'a, T> {
+    pub fn new(timestamp: i64, geo_location: &'a dyn GeoLocationTrait, noaa_calculator: T) -> Self {
         Self {
             timestamp,
             geo_location,
@@ -121,7 +117,7 @@ impl<'a> AstronomicalCalendar<'a> {
     }
 }
 
-impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
+impl<'a, T: NOAACalculatorTrait> AstronomicalCalendarTrait for AstronomicalCalendar<'a, T> {
     fn get_utc_sunset(&self, zenith: f64) -> f64 {
         self.noaa_calculator
             .get_utc_sunset(self.timestamp, self.geo_location, zenith, true)

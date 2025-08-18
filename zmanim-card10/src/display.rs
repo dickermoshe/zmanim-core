@@ -1,22 +1,44 @@
 use core::fmt::Write;
-use embedded_hal_bus::spi::ExclusiveDevice;
-use esp_hal::peripherals::SPI2;
-
 use display_interface_spi::SPIInterface;
+use embedded_graphics::mono_font::MonoTextStyle;
+use embedded_graphics::prelude::Point;
+use embedded_graphics::text::renderer::TextRenderer;
+use embedded_graphics::text::Text;
+use embedded_graphics::text::TextStyle;
+use embedded_graphics::Drawable;
+use embedded_hal_bus::spi::ExclusiveDevice;
 use esp_hal::gpio::Input;
 use esp_hal::gpio::Level;
 use esp_hal::gpio::{InputConfig, Pull};
 use esp_hal::gpio::{Output, OutputConfig};
+use esp_hal::peripherals::SPI2;
 use esp_hal::peripherals::*;
 use esp_hal::spi::master::{Config, Spi};
 use esp_hal::spi::Mode;
 use esp_hal::time::Rate;
 use esp_hal::Async;
 use esp_println::println;
+use profont::PROFONT_18_POINT;
 use weact_studio_epd::{
     graphics::Display290TriColor, DisplayDriver, TriColor, WeActStudio290TriColorDriver,
 };
-pub type Driver = DisplayDriver<
+
+pub struct Display {
+    driver: DriverType,
+    display: DisplayType,
+}
+impl Display {
+    pub async fn draw_text<S>(&mut self, text: &str, position: Point, character_style: S)
+    where
+        S: TextRenderer<Color = TriColor>,
+    {
+        let _ = Text::with_text_style(text, position, character_style, TextStyle::default())
+            .draw(&mut self.display);
+        self.driver.full_update(&self.display).await.unwrap();
+    }
+}
+
+type DriverType = DisplayDriver<
     SPIInterface<
         ExclusiveDevice<Spi<'static, Async>, Output<'static>, embassy_time::Delay>,
         Output<'static>,
@@ -29,7 +51,7 @@ pub type Driver = DisplayDriver<
     296,
     TriColor,
 >;
-pub type Display = Display290TriColor;
+type DisplayType = Display290TriColor;
 
 pub async fn init_display(
     sda_mosi: GPIO18<'static>,
@@ -39,7 +61,7 @@ pub async fn init_display(
     busy: GPIO21<'static>,
     rst: GPIO2<'static>,
     spi2: SPI2<'static>,
-) -> (Driver, Display) {
+) -> Display {
     let spi_bus = Spi::new(
         spi2,
         Config::default()
@@ -62,7 +84,8 @@ pub async fn init_display(
     let mut driver =
         WeActStudio290TriColorDriver::new(spi_interface, busy, rst, embassy_time::Delay);
     let mut display = Display290TriColor::new();
-    display.set_rotation(weact_studio_epd::graphics::DisplayRotation::Rotate90);
+    display.set_rotation(weact_studio_epd::graphics::DisplayRotation::Rotate0);
     driver.init().await.unwrap();
-    return (driver, display);
+
+    return Display { driver, display };
 }

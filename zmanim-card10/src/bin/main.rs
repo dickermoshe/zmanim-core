@@ -7,7 +7,6 @@
 )]
 use chrono::DateTime;
 use core::fmt::Write;
-use defmt::{info, Debug2Format};
 use embassy_executor::Spawner;
 use embassy_sync::pubsub::WaitResult;
 use embassy_time::{Duration, Timer};
@@ -17,49 +16,27 @@ use embedded_graphics::{
     text::{Text, TextStyle},
     Drawable,
 };
-use profont::{PROFONT_18_POINT, PROFONT_24_POINT};
+use profont::{PROFONT_10_POINT, PROFONT_18_POINT};
 
-use embedded_hal_bus::spi::ExclusiveDevice;
-use embedded_storage::nor_flash::{NorFlash, ReadNorFlash};
-use embedded_storage::nor_flash::{NorFlashError, NorFlashErrorKind};
-
-use display_interface_spi::SPIInterface;
-use esp_bootloader_esp_idf::partitions;
+use esp_hal::analog::adc::{Adc, AdcConfig, AdcPin, Attenuation};
+use esp_hal::clock::CpuClock;
 use esp_hal::peripherals::{ADC1, GPIO1};
 use esp_hal::rtc_cntl::Rtc;
-use esp_hal::spi::master::{Config, Spi};
-use esp_hal::spi::Mode;
-use esp_hal::time::Rate;
 use esp_hal::timer::systimer::SystemTimer;
-use esp_hal::{
-    analog::adc::{Adc, AdcConfig, AdcPin, Attenuation},
-    gpio::Level,
-};
-use esp_hal::{clock::CpuClock, gpio::Input};
-use esp_hal::{
-    delay::Delay,
-    gpio::{Output, OutputConfig},
-};
-use esp_hal::{
-    dma::{DmaRxBuf, DmaTxBuf},
-    gpio::{InputConfig, Pull},
-};
-use esp_hal::{dma_buffers, Async};
+use esp_hal::Async;
 use esp_println::println;
-use esp_storage::FlashStorage;
-use heapless::Vec;
 use static_cell::StaticCell;
-use weact_studio_epd::{
-    graphics::{Display290BlackWhite, Display290TriColor},
-    Color, TriColor, WeActStudio290BlackWhiteDriver, WeActStudio290TriColorDriver,
-};
-use zmanim_card10::gps_data::GpsData;
+use weact_studio_epd::TriColor;
 use zmanim_card10::storage::{ConfigStorage, ZmanimConfig};
 use zmanim_card10::{
     display::init_display,
     gps::{init_gps, GpsDataChannelType, GpsState, GPS_STATE, RTC},
 };
-use zmanim_core::zmanim_calendar::{ZmanimCalendar, ZmanimCalendarTrait};
+use zmanim_card10::{display::Display, gps_data::GpsData};
+use zmanim_core::{
+    astronomical_calendar::AstronomicalCalendarTrait,
+    zmanim_calendar::{ZmanimCalendar, ZmanimCalendarTrait},
+};
 use zmanim_core::{geolocation::GeoLocation, NOAACalculator};
 
 use {esp_backtrace as _, esp_println as _};
@@ -112,60 +89,42 @@ async fn main(spawner: Spawner) {
         WaitFor::LocationAndTimeFix
     };
     println!("Waiting for GPS data: {:?}", wait_for);
-    let gps_data = wait_for_gps(gps_data_channel, wait_for).await;
-    println!("Updated GPS data: {:?}", gps_data);
-    config_storage.write_config(
-        &config_option
-            .unwrap_or(ZmanimConfig::new())
-            .with_location(gps_data.clone()),
-    );
+    // let gps_data = wait_for_gps(gps_data_channel, wait_for).await;
+    let config = config_option.unwrap();
+    let gps_data = config.location.as_ref().unwrap().clone();
 
-    // Disable the GPS once we have the data
+    println!("Updated GPS data: {:?}", gps_data);
+    config_storage.write_config(&config.with_location(gps_data.clone()));
+
+    // Disable the GPS once we have the user's location and time
     GPS_STATE.signal(GpsState::Off);
 
-    let sda_mosi = peripherals.GPIO18;
-    let scl_sck = peripherals.GPIO19;
-    let cs = peripherals.GPIO22;
-    let dc = peripherals.GPIO23;
-    let busy = peripherals.GPIO21;
-    let rst = peripherals.GPIO2;
-
-    let style = MonoTextStyle::new(&PROFONT_18_POINT, TriColor::Black);
-    let timestamp = {
-        let rtc_guard = RTC.lock().await;
-        let rtc = rtc_guard.as_ref().unwrap();
-        rtc.current_time_us() as i64 / 1000
-    };
-    println!("Timestamp: {}", timestamp);
-    let location = GeoLocation::new(
-        gps_data.latitude.unwrap().clone(),
-        gps_data.longitude.unwrap().clone(),
-        0.0,
+    let mut display = init_display(
+        peripherals.GPIO18,
+        peripherals.GPIO19,
+        peripherals.GPIO22,
+        peripherals.GPIO23,
+        peripherals.GPIO21,
+        peripherals.GPIO2,
+        peripherals.SPI2,
     )
-    .unwrap();
-    let noaa_calculator = NOAACalculator::new();
-    let calendar = ZmanimCalendar::new(timestamp, &location, &noaa_calculator, true, true, 18.0);
+    .await;
 
-    let alos = calendar.get_alos_hashachar().unwrap();
-    println!("Alos: {}", alos);
-    let datetime = DateTime::from_timestamp_millis(alos as i64 - (1000 * 60 * 60 * 4)).unwrap();
-    let mut line: heapless::String<64> = heapless::String::new();
-    line.push_str("Alos:").unwrap();
-    let _ = write!(line, "{:?}", datetime);
-    println!("Line: {}", line);
+    // let timestamp = {
+    //     let rtc_guard = RTC.lock().await;
+    //     let rtc = rtc_guard.as_ref().unwrap();
+    //     rtc.current_time_us() as i64 / 1000
+    // };
 
-    let (mut driver, mut display) =
-        init_display(sda_mosi, scl_sck, cs, dc, busy, rst, peripherals.SPI2).await;
+    println!("Latitude: {:?}", gps_data.latitude);
+    println!("Longitude: {:?}", gps_data.longitude);
+    println!("Timestamp: {:?}", gps_data.timestamp);
 
-    let _ = Text::with_text_style(
-        line.as_str(),
-        Point::new(8, 68),
-        style,
-        TextStyle::default(),
-    )
-    .draw(&mut display);
+    let lat = gps_data.latitude.clone().unwrap();
+    let lon = gps_data.longitude.clone().unwrap();
+    let timestamp = gps_data.timestamp.clone().unwrap();
 
-    driver.full_update(&display).await.unwrap();
+    draw_zmanim(&mut display, timestamp, lat, lon).await;
 
     // // Configure GPIO2 as LED output for blinking
     // let mut led = Output::new(
@@ -233,4 +192,97 @@ async fn wait_for_gps(gps_data_channel: &'static GpsDataChannelType, wait_for: W
             _ => {}
         }
     }
+}
+
+fn format_time(timestamp: Option<f64>, name: &str) -> heapless::String<64> {
+    let mut line: heapless::String<64> = heapless::String::new();
+    line.push_str(name).unwrap();
+    line.push_str(": ").unwrap();
+
+    let datetime = timestamp
+        .map(|timestamp| DateTime::from_timestamp_millis(timestamp as i64))
+        .flatten();
+
+    if let Some(datetime) = datetime {
+        let _ = write!(line, "{:?}", datetime);
+    } else {
+        line.push_str("N/A").unwrap();
+    }
+
+    line
+}
+
+async fn draw_zmanim(display: &mut Display, timestamp: i64, latitude: f64, longitude: f64) {
+    let location = GeoLocation::new(latitude, longitude, 0.0).unwrap();
+    let calendar = ZmanimCalendar::new(
+        timestamp,
+        &location,
+        NOAACalculator::new(),
+        true,
+        true,
+        18.0,
+    );
+    let alos = format_time(calendar.get_alos_hashachar(), "Alos");
+    let alos72 = format_time(calendar.get_alos72(), "Alos72");
+    let sunrise = format_time(
+        calendar.get_astronomical_calendar().get_sunrise(),
+        "Sunrise",
+    );
+    let sof_zman_shma_gra = format_time(calendar.get_sof_zman_shma_gra(), "Sof Zman Shma Gra");
+    let sof_zman_shma_mga = format_time(calendar.get_sof_zman_shma_mga(), "Sof Zman Shma MGA");
+    let sof_zman_tfila_gra = format_time(calendar.get_sof_zman_tfila_gra(), "Sof Zman Tfila Gra");
+    let sof_zman_tfila_mga = format_time(calendar.get_sof_zman_tfila_mga(), "Sof Zman Tfila MGA");
+    let mincha_gedola = format_time(calendar.get_chatzos(), "Chatzos");
+    let mincha_gedola_default = format_time(calendar.get_mincha_gedola_default(), "Mincha Gedola ");
+    let mincha_ketana = format_time(calendar.get_mincha_ketana_default(), "Mincha Ketana");
+    let plag_hamincha = format_time(
+        calendar.get_plag_hamincha_default(),
+        "Plag Hamincha Default",
+    );
+    let sunset = format_time(calendar.get_astronomical_calendar().get_sunset(), "Sunset");
+    let tzais = format_time(calendar.get_tzais(), "Tzais");
+    let tzais72 = format_time(calendar.get_tzais72(), "Tzais72");
+    let style = MonoTextStyle::new(&PROFONT_10_POINT, TriColor::Black);
+    display
+        .draw_text(alos.as_str(), Point::new(0, 10), style)
+        .await;
+    display
+        .draw_text(alos72.as_str(), Point::new(0, 20), style)
+        .await;
+    display
+        .draw_text(sunrise.as_str(), Point::new(0, 30), style)
+        .await;
+    display
+        .draw_text(sof_zman_shma_gra.as_str(), Point::new(0, 40), style)
+        .await;
+    display
+        .draw_text(sof_zman_shma_mga.as_str(), Point::new(0, 50), style)
+        .await;
+    display
+        .draw_text(sof_zman_tfila_gra.as_str(), Point::new(0, 60), style)
+        .await;
+    display
+        .draw_text(sof_zman_tfila_mga.as_str(), Point::new(0, 70), style)
+        .await;
+    display
+        .draw_text(mincha_gedola.as_str(), Point::new(0, 80), style)
+        .await;
+    display
+        .draw_text(mincha_gedola_default.as_str(), Point::new(0, 90), style)
+        .await;
+    display
+        .draw_text(mincha_ketana.as_str(), Point::new(0, 100), style)
+        .await;
+    display
+        .draw_text(plag_hamincha.as_str(), Point::new(0, 110), style)
+        .await;
+    display
+        .draw_text(sunset.as_str(), Point::new(0, 120), style)
+        .await;
+    display
+        .draw_text(tzais.as_str(), Point::new(0, 130), style)
+        .await;
+    display
+        .draw_text(tzais72.as_str(), Point::new(0, 140), style)
+        .await;
 }
