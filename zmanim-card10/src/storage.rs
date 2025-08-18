@@ -6,19 +6,24 @@ use esp_storage::FlashStorage;
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ZmanimConfig {
-    pub location: Option<GpsData>,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
 }
 
 impl ZmanimConfig {
     pub fn new() -> Self {
-        Self { location: None }
+        Self {
+            latitude: None,
+            longitude: None,
+        }
     }
     pub fn has_location(&self) -> bool {
-        self.location.is_some() && self.location.as_ref().unwrap().has_position_fix()
+        self.latitude.is_some() && self.longitude.is_some()
     }
-    pub fn with_location(&self, location: GpsData) -> Self {
+    pub fn with_location(&self, latitude: f64, longitude: f64) -> Self {
         Self {
-            location: Some(location),
+            latitude: Some(latitude),
+            longitude: Some(longitude),
         }
     }
 }

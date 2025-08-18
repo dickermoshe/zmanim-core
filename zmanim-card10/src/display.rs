@@ -32,9 +32,21 @@ impl Display {
     where
         S: TextRenderer<Color = TriColor>,
     {
+        println!("SCREEN: Registering text: {}", text);
         let _ = Text::with_text_style(text, position, character_style, TextStyle::default())
             .draw(&mut self.display);
+        println!("SCREEN: Text registered");
+    }
+    pub async fn clear(&mut self) {
+        println!("SCREEN: Clearing");
+        self.driver.clear_red_buffer().await.unwrap();
+        self.driver.clear_bw_buffer().await.unwrap();
+        println!("SCREEN: Cleared");
+    }
+    pub async fn go(&mut self) {
+        println!("SCREEN: Going");
         self.driver.full_update(&self.display).await.unwrap();
+        println!("SCREEN: Updated");
     }
 }
 

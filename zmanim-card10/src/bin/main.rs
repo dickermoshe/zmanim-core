@@ -5,39 +5,39 @@
     reason = "mem::forget is generally not safe to do with esp_hal types, especially those \
     holding buffers for the duration of a data transfer."
 )]
-use chrono::DateTime;
-use core::fmt::Write;
+use chrono::{DateTime, Timelike};
+use core::{fmt::Write, time};
 use embassy_executor::Spawner;
 use embassy_sync::pubsub::WaitResult;
 use embassy_time::{Duration, Timer};
 use embedded_graphics::{
+    Drawable,
     geometry::Point,
     mono_font::MonoTextStyle,
     text::{Text, TextStyle},
-    Drawable,
 };
-use profont::{PROFONT_10_POINT, PROFONT_18_POINT};
+use profont::{PROFONT_9_POINT, PROFONT_10_POINT, PROFONT_18_POINT};
 
+use esp_hal::Async;
 use esp_hal::analog::adc::{Adc, AdcConfig, AdcPin, Attenuation};
 use esp_hal::clock::CpuClock;
 use esp_hal::peripherals::{ADC1, GPIO1};
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::systimer::SystemTimer;
-use esp_hal::Async;
 use esp_println::println;
 use static_cell::StaticCell;
 use weact_studio_epd::TriColor;
 use zmanim_card10::storage::{ConfigStorage, ZmanimConfig};
+use zmanim_card10::{display::Display, gps_data::GpsData};
 use zmanim_card10::{
     display::init_display,
-    gps::{init_gps, GpsDataChannelType, GpsState, GPS_STATE, RTC},
+    gps::{GPS_STATE, GpsDataChannelType, GpsState, init_gps},
 };
-use zmanim_card10::{display::Display, gps_data::GpsData};
+use zmanim_core::{NOAACalculator, geolocation::GeoLocation};
 use zmanim_core::{
     astronomical_calendar::AstronomicalCalendarTrait,
     zmanim_calendar::{ZmanimCalendar, ZmanimCalendarTrait},
 };
-use zmanim_core::{geolocation::GeoLocation, NOAACalculator};
 
 use {esp_backtrace as _, esp_println as _};
 // This creates a default app-descriptor required by the esp-idf bootloader.
@@ -52,12 +52,6 @@ async fn main(spawner: Spawner) {
 
     esp_hal_embassy::init(timer0.alarm0);
     println!("Embassy initialized!");
-
-    let rtc = Rtc::new(peripherals.LPWR);
-    {
-        *(RTC.lock().await) = Some(rtc);
-    }
-    println!("RTC initialized!");
 
     let gps_data_channel = init_gps(
         peripherals.GPIO16,
@@ -83,18 +77,30 @@ async fn main(spawner: Spawner) {
     let config_storage = ConfigStorage::new();
     let config_option = config_storage.read_config();
     println!("Config read from storage: {:?}", config_option);
-    let wait_for = if config_option.is_some() && config_option.as_ref().unwrap().has_location() {
-        WaitFor::TimeFix
-    } else {
-        WaitFor::LocationAndTimeFix
-    };
-    println!("Waiting for GPS data: {:?}", wait_for);
-    // let gps_data = wait_for_gps(gps_data_channel, wait_for).await;
-    let config = config_option.unwrap();
-    let gps_data = config.location.as_ref().unwrap().clone();
 
-    println!("Updated GPS data: {:?}", gps_data);
-    config_storage.write_config(&config.with_location(gps_data.clone()));
+    // let timestamp = 1755548752000;
+    // let latitude = 40.085521663953486;
+    // let longitude = -74.20940519301038;
+    let latitude: f64;
+    let longitude: f64;
+    let timestamp: i64;
+
+    if let Some(config) = config_option.as_ref()
+        && config.has_location()
+    {
+        timestamp = wait_for_gps(gps_data_channel, WaitFor::TimeFix)
+            .await
+            .timestamp
+            .unwrap();
+        latitude = config.latitude.unwrap();
+        longitude = config.longitude.unwrap();
+    } else {
+        let gps_data = wait_for_gps(gps_data_channel, WaitFor::LocationAndTimeFix).await;
+        timestamp = gps_data.timestamp.unwrap();
+        latitude = gps_data.latitude.unwrap();
+        longitude = gps_data.longitude.unwrap();
+        config_storage.write_config(&ZmanimConfig::new().with_location(latitude, longitude));
+    };
 
     // Disable the GPS once we have the user's location and time
     GPS_STATE.signal(GpsState::Off);
@@ -110,21 +116,11 @@ async fn main(spawner: Spawner) {
     )
     .await;
 
-    // let timestamp = {
-    //     let rtc_guard = RTC.lock().await;
-    //     let rtc = rtc_guard.as_ref().unwrap();
-    //     rtc.current_time_us() as i64 / 1000
-    // };
+    println!("Timestamp: {}", timestamp);
 
-    println!("Latitude: {:?}", gps_data.latitude);
-    println!("Longitude: {:?}", gps_data.longitude);
-    println!("Timestamp: {:?}", gps_data.timestamp);
-
-    let lat = gps_data.latitude.clone().unwrap();
-    let lon = gps_data.longitude.clone().unwrap();
-    let timestamp = gps_data.timestamp.clone().unwrap();
-
-    draw_zmanim(&mut display, timestamp, lat, lon).await;
+    let tz_offset = -4.0 * 60.0 * 60.0 * 1000.0;
+    println!("Drawing zmanim");
+    draw_zmanim(&mut display, timestamp, latitude, longitude, tz_offset).await;
 
     // // Configure GPIO2 as LED output for blinking
     // let mut led = Output::new(
@@ -194,17 +190,25 @@ async fn wait_for_gps(gps_data_channel: &'static GpsDataChannelType, wait_for: W
     }
 }
 
-fn format_time(timestamp: Option<f64>, name: &str) -> heapless::String<64> {
+fn format_time(timestamp: Option<f64>, name: &str, tz_offset: f64) -> heapless::String<64> {
     let mut line: heapless::String<64> = heapless::String::new();
     line.push_str(name).unwrap();
     line.push_str(": ").unwrap();
 
     let datetime = timestamp
-        .map(|timestamp| DateTime::from_timestamp_millis(timestamp as i64))
+        .map(|timestamp| DateTime::from_timestamp_millis((timestamp + tz_offset) as i64))
         .flatten();
 
     if let Some(datetime) = datetime {
-        let _ = write!(line, "{:?}", datetime);
+        let (is_pm, hours) = datetime.hour12();
+        let minute = datetime.minute();
+        let _ = write!(
+            line,
+            "{:01}:{:02} {}",
+            hours,
+            minute,
+            if is_pm { "PM" } else { "AM" }
+        );
     } else {
         line.push_str("N/A").unwrap();
     }
@@ -212,7 +216,13 @@ fn format_time(timestamp: Option<f64>, name: &str) -> heapless::String<64> {
     line
 }
 
-async fn draw_zmanim(display: &mut Display, timestamp: i64, latitude: f64, longitude: f64) {
+async fn draw_zmanim(
+    display: &mut Display,
+    timestamp: i64,
+    latitude: f64,
+    longitude: f64,
+    tz_offset: f64,
+) {
     let location = GeoLocation::new(latitude, longitude, 0.0).unwrap();
     let calendar = ZmanimCalendar::new(
         timestamp,
@@ -222,27 +232,56 @@ async fn draw_zmanim(display: &mut Display, timestamp: i64, latitude: f64, longi
         true,
         18.0,
     );
-    let alos = format_time(calendar.get_alos_hashachar(), "Alos");
-    let alos72 = format_time(calendar.get_alos72(), "Alos72");
+    let alos = format_time(calendar.get_alos_hashachar(), "Alos", tz_offset);
+
+    let alos72 = format_time(calendar.get_alos72(), "Alos72", tz_offset);
+
     let sunrise = format_time(
         calendar.get_astronomical_calendar().get_sunrise(),
         "Sunrise",
+        tz_offset,
     );
-    let sof_zman_shma_gra = format_time(calendar.get_sof_zman_shma_gra(), "Sof Zman Shma Gra");
-    let sof_zman_shma_mga = format_time(calendar.get_sof_zman_shma_mga(), "Sof Zman Shma MGA");
-    let sof_zman_tfila_gra = format_time(calendar.get_sof_zman_tfila_gra(), "Sof Zman Tfila Gra");
-    let sof_zman_tfila_mga = format_time(calendar.get_sof_zman_tfila_mga(), "Sof Zman Tfila MGA");
-    let mincha_gedola = format_time(calendar.get_chatzos(), "Chatzos");
-    let mincha_gedola_default = format_time(calendar.get_mincha_gedola_default(), "Mincha Gedola ");
-    let mincha_ketana = format_time(calendar.get_mincha_ketana_default(), "Mincha Ketana");
-    let plag_hamincha = format_time(
-        calendar.get_plag_hamincha_default(),
-        "Plag Hamincha Default",
+    let sof_zman_shma_gra = format_time(calendar.get_sof_zman_shma_gra(), "Shma GRA", tz_offset);
+    let sof_zman_shma_mga = format_time(calendar.get_sof_zman_shma_mga(), "Shma MGA", tz_offset);
+    let sof_zman_tfila_gra = format_time(calendar.get_sof_zman_tfila_gra(), "Tfila GRA", tz_offset);
+    let sof_zman_tfila_mga = format_time(calendar.get_sof_zman_tfila_mga(), "Tfila MGA", tz_offset);
+    let mincha_gedola = format_time(calendar.get_chatzos(), "Chatzos", tz_offset);
+    let mincha_gedola_default = format_time(
+        calendar.get_mincha_gedola_default(),
+        "Min Gedola ",
+        tz_offset,
     );
-    let sunset = format_time(calendar.get_astronomical_calendar().get_sunset(), "Sunset");
-    let tzais = format_time(calendar.get_tzais(), "Tzais");
-    let tzais72 = format_time(calendar.get_tzais72(), "Tzais72");
-    let style = MonoTextStyle::new(&PROFONT_10_POINT, TriColor::Black);
+    let mincha_ketana = format_time(
+        calendar.get_mincha_ketana_default(),
+        "Min Ketana",
+        tz_offset,
+    );
+    let plag_hamincha = format_time(calendar.get_plag_hamincha_default(), "Plag", tz_offset);
+    let sunset = format_time(
+        calendar.get_astronomical_calendar().get_sunset(),
+        "Sunset",
+        tz_offset,
+    );
+    let tzais = format_time(calendar.get_tzais(), "Tzais", tz_offset);
+    let tzais72 = format_time(calendar.get_tzais72(), "Tzais72", tz_offset);
+    println!(
+        "{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, ",
+        alos,
+        alos72,
+        sunrise,
+        sof_zman_shma_gra,
+        sof_zman_shma_mga,
+        sof_zman_tfila_gra,
+        sof_zman_tfila_mga,
+        mincha_gedola,
+        mincha_gedola_default,
+        mincha_ketana,
+        plag_hamincha,
+        sunset,
+        tzais,
+        tzais72
+    );
+    let style = MonoTextStyle::new(&PROFONT_9_POINT, TriColor::Black);
     display
         .draw_text(alos.as_str(), Point::new(0, 10), style)
         .await;
@@ -285,4 +324,5 @@ async fn draw_zmanim(display: &mut Display, timestamp: i64, latitude: f64, longi
     display
         .draw_text(tzais72.as_str(), Point::new(0, 140), style)
         .await;
+    display.go().await;
 }

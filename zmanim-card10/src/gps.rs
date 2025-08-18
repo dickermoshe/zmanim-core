@@ -28,7 +28,6 @@ const LINE_BUF_CAPACITY: usize = 128;
 pub type GpsDataChannelType = PubSubChannel<NoopRawMutex, GpsData, 64, 2, 64>;
 type RtcType = Mutex<CriticalSectionRawMutex, Option<Rtc<'static>>>;
 
-pub static RTC: RtcType = Mutex::new(None);
 pub enum GpsState {
     On,
     Off,
@@ -155,13 +154,6 @@ async fn gps_task(mut rx: UartRx<'static, Async>, gps_data_channel: &'static Gps
                                     _ => None,
                                 }
                             };
-                            if let Some(timestamp) = timestamp {
-                                {
-                                    let rtc_guard = RTC.lock().await;
-                                    let rtc = rtc_guard.as_ref().unwrap();
-                                    rtc.set_current_time_us((timestamp * 1000) as u64);
-                                }
-                            }
 
                             // Create the GPS data
                             let data = GpsData {
