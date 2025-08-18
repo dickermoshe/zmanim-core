@@ -1,5 +1,4 @@
 use chrono::Datelike;
-use defmt::info;
 use embassy_executor::Spawner;
 use embassy_sync::{
     blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex},

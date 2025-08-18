@@ -1,9 +1,8 @@
 use crate::gps_data::GpsData;
-use embedded_storage::nor_flash::{check_erase, NorFlash, ReadNorFlash};
+use embedded_storage::nor_flash::{NorFlash, ReadNorFlash};
 use esp_bootloader_esp_idf::partitions::{self, FlashRegion, PartitionEntry};
 use esp_println::println;
 use esp_storage::FlashStorage;
-use heapless::Vec;
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ZmanimConfig {
@@ -39,7 +38,7 @@ impl ConfigStorage {
         let mut flash = FlashStorage::new();
         let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
         let pt = partitions::read_partition_table(&mut flash, &mut pt_mem).unwrap();
-        let mut nvs = pt
+        let nvs = pt
             .find_partition(partitions::PartitionType::Data(
                 partitions::DataPartitionSubType::Nvs,
             ))

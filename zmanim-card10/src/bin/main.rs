@@ -53,9 +53,12 @@ use weact_studio_epd::{
     graphics::{Display290BlackWhite, Display290TriColor},
     Color, TriColor, WeActStudio290BlackWhiteDriver, WeActStudio290TriColorDriver,
 };
-use zmanim_card10::gps::{init_gps, GpsDataChannelType, GpsState, GPS_STATE, RTC};
 use zmanim_card10::gps_data::GpsData;
 use zmanim_card10::storage::{ConfigStorage, ZmanimConfig};
+use zmanim_card10::{
+    display::init_display,
+    gps::{init_gps, GpsDataChannelType, GpsState, GPS_STATE, RTC},
+};
 use zmanim_core::zmanim_calendar::{ZmanimCalendar, ZmanimCalendarTrait};
 use zmanim_core::{geolocation::GeoLocation, NOAACalculator};
 
@@ -151,6 +154,9 @@ async fn main(spawner: Spawner) {
     let _ = write!(line, "{:?}", datetime);
     println!("Line: {}", line);
 
+    let (mut driver, mut display) =
+        init_display(sda_mosi, scl_sck, cs, dc, busy, rst, peripherals.SPI2).await;
+
     let _ = Text::with_text_style(
         line.as_str(),
         Point::new(8, 68),
@@ -158,9 +164,6 @@ async fn main(spawner: Spawner) {
         TextStyle::default(),
     )
     .draw(&mut display);
-
-    let (driver, display) =
-        init_display(sda_mosi, scl_sck, cs, dc, busy, rst, peripherals.SPI2).await;
 
     driver.full_update(&display).await.unwrap();
 
