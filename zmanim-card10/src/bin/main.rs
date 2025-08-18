@@ -16,18 +16,23 @@ use embedded_graphics::{
     mono_font::MonoTextStyle,
     text::{Text, TextStyle},
 };
+use embedded_storage::nor_flash::{NorFlash, ReadNorFlash};
+use esp_storage::FlashStorage;
 use profont::{PROFONT_9_POINT, PROFONT_10_POINT, PROFONT_18_POINT};
+use serde::{Deserialize, Serialize};
 
 use esp_hal::Async;
 use esp_hal::analog::adc::{Adc, AdcConfig, AdcPin, Attenuation};
 use esp_hal::clock::CpuClock;
 use esp_hal::peripherals::{ADC1, GPIO1};
+use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::systimer::SystemTimer;
 use esp_println::println;
 use static_cell::StaticCell;
 use weact_studio_epd::TriColor;
-use zmanim_card10::storage::{ConfigStorage, ZmanimConfig};
+extern crate alloc;
+use zmanim_card10::storage::{Storage, ZmanimConfig};
 use zmanim_card10::{display::Display, gps_data::GpsData};
 use zmanim_card10::{
     display::init_display,
@@ -38,17 +43,24 @@ use zmanim_core::{
     astronomical_calendar::AstronomicalCalendarTrait,
     zmanim_calendar::{ZmanimCalendar, ZmanimCalendarTrait},
 };
-
 use {esp_backtrace as _, esp_println as _};
 // This creates a default app-descriptor required by the esp-idf bootloader.
 // For more information see: <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html#application-description>
 esp_bootloader_esp_idf::esp_app_desc!();
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Data {
+    pub user_id: u32,
+}
+
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
+    esp_alloc::heap_allocator!(size: 64 * 1024);
+
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
     let timer0 = SystemTimer::new(peripherals.SYSTIMER);
+    let mut rng = Rng::new(peripherals.RNG);
 
     esp_hal_embassy::init(timer0.alarm0);
     println!("Embassy initialized!");
@@ -74,33 +86,27 @@ async fn main(spawner: Spawner) {
     println!("Battery monitoring initialized!");
 
     // Read the config from storage
-    let config_storage = ConfigStorage::new();
-    let config_option = config_storage.read_config();
-    println!("Config read from storage: {:?}", config_option);
+    let mut config_storage = Storage::new();
+    let config = config_storage.read().unwrap_or(ZmanimConfig::new());
+    println!("Config read from storage: {:?}", config);
 
-    // let timestamp = 1755548752000;
-    // let latitude = 40.085521663953486;
-    // let longitude = -74.20940519301038;
+    // // let timestamp = 1755548752000;
+    // // let latitude = 40.085521663953486;
+    // // let longitude = -74.20940519301038;
     let latitude: f64;
     let longitude: f64;
-    let timestamp: i64;
 
-    if let Some(config) = config_option.as_ref()
-        && config.has_location()
-    {
-        timestamp = wait_for_gps(gps_data_channel, WaitFor::TimeFix)
-            .await
-            .timestamp
-            .unwrap();
+    // If we have a location, use it, otherwise wait for the GPS to get a fix
+    // and save the location to storage
+    if config.has_location() {
         latitude = config.latitude.unwrap();
         longitude = config.longitude.unwrap();
     } else {
-        let gps_data = wait_for_gps(gps_data_channel, WaitFor::LocationAndTimeFix).await;
-        timestamp = gps_data.timestamp.unwrap();
-        latitude = gps_data.latitude.unwrap();
-        longitude = gps_data.longitude.unwrap();
-        config_storage.write_config(&ZmanimConfig::new().with_location(latitude, longitude));
+        (latitude, longitude) = wait_for_gps(gps_data_channel).await;
+        config_storage.write(config.with_location(latitude, longitude));
     };
+
+    let timestamp = wait_for_time(gps_data_channel).await;
 
     // Disable the GPS once we have the user's location and time
     GPS_STATE.signal(GpsState::Off);
@@ -159,41 +165,40 @@ async fn battery_monitor(
     }
 }
 
-#[derive(Debug)]
-enum WaitFor {
-    TimeFix,
-    LocationAndTimeFix,
-}
-
-async fn wait_for_gps(gps_data_channel: &'static GpsDataChannelType, wait_for: WaitFor) -> GpsData {
+async fn wait_for_time(gps_data_channel: &'static GpsDataChannelType) -> i64 {
     let mut subscriber = gps_data_channel.subscriber().unwrap();
     loop {
         let data = subscriber.next_message().await;
         match data {
-            WaitResult::Message(data) => match wait_for {
-                WaitFor::TimeFix => {
-                    if data.timestamp.is_some() {
-                        return data;
-                    }
+            WaitResult::Message(data) => {
+                if data.timestamp.is_some() {
+                    return data.timestamp.unwrap();
                 }
-                WaitFor::LocationAndTimeFix => {
-                    if data.latitude.is_some()
-                        && data.longitude.is_some()
-                        && data.timestamp.is_some()
-                    {
-                        return data;
-                    }
-                }
-            },
+            }
             _ => {}
         }
     }
 }
 
-fn format_time(timestamp: Option<f64>, name: &str, tz_offset: f64) -> heapless::String<64> {
-    let mut line: heapless::String<64> = heapless::String::new();
-    line.push_str(name).unwrap();
-    line.push_str(": ").unwrap();
+async fn wait_for_gps(gps_data_channel: &'static GpsDataChannelType) -> (f64, f64) {
+    let mut subscriber = gps_data_channel.subscriber().unwrap();
+    loop {
+        let data = subscriber.next_message().await;
+        match data {
+            WaitResult::Message(data) => {
+                if data.latitude.is_some() && data.longitude.is_some() {
+                    return (data.latitude.unwrap(), data.longitude.unwrap());
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn format_time(timestamp: Option<f64>, name: &str, tz_offset: f64) -> alloc::string::String {
+    let mut line: alloc::string::String = alloc::string::String::new();
+    line.push_str(name);
+    line.push_str(": ");
 
     let datetime = timestamp
         .map(|timestamp| DateTime::from_timestamp_millis((timestamp + tz_offset) as i64))
@@ -210,7 +215,7 @@ fn format_time(timestamp: Option<f64>, name: &str, tz_offset: f64) -> heapless::
             if is_pm { "PM" } else { "AM" }
         );
     } else {
-        line.push_str("N/A").unwrap();
+        line.push_str("N/A");
     }
 
     line

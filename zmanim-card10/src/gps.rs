@@ -12,12 +12,12 @@ use esp_hal::{
 };
 
 use esp_hal::{
+    Async,
     gpio::interconnect::{PeripheralInput, PeripheralOutput},
     uart::{Config, Instance, RxConfig, Uart, UartRx},
-    Async,
 };
+extern crate alloc;
 use esp_println::println;
-use heapless::{String as HString, Vec as HVec};
 
 use nmea::Nmea;
 use static_cell::StaticCell;
@@ -98,7 +98,8 @@ async fn handle_gps_state(gps_enable_pin: &'static mut Output<'static>) {
 #[embassy_executor::task]
 async fn gps_task(mut rx: UartRx<'static, Async>, gps_data_channel: &'static GpsDataChannelType) {
     let publisher = gps_data_channel.publisher().unwrap();
-    let mut main_buffer: HVec<u8, LINE_BUF_CAPACITY> = HVec::new();
+    let mut main_buffer: alloc::vec::Vec<u8> = alloc::vec::Vec::new();
+
     let mut buf = [0u8; READ_BUF_SIZE];
 
     loop {
@@ -124,7 +125,7 @@ async fn gps_task(mut rx: UartRx<'static, Async>, gps_data_channel: &'static Gps
                             let parsed_str = parsed_str_result.unwrap();
 
                             // Parse the line as an NMEA sentence
-                            let mut line: HString<LINE_BUF_CAPACITY> = HString::new();
+                            let mut line: alloc::string::String = alloc::string::String::new();
                             let _ = line.push_str(parsed_str);
                             let mut nmea = Nmea::default();
                             let parse_result = nmea.parse(line.as_str());

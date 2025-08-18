@@ -1,26 +1,26 @@
 use core::fmt::Write;
 use display_interface_spi::SPIInterface;
+use embedded_graphics::Drawable;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::prelude::Point;
-use embedded_graphics::text::renderer::TextRenderer;
 use embedded_graphics::text::Text;
 use embedded_graphics::text::TextStyle;
-use embedded_graphics::Drawable;
+use embedded_graphics::text::renderer::TextRenderer;
 use embedded_hal_bus::spi::ExclusiveDevice;
+use esp_hal::Async;
 use esp_hal::gpio::Input;
 use esp_hal::gpio::Level;
 use esp_hal::gpio::{InputConfig, Pull};
 use esp_hal::gpio::{Output, OutputConfig};
 use esp_hal::peripherals::SPI2;
 use esp_hal::peripherals::*;
-use esp_hal::spi::master::{Config, Spi};
 use esp_hal::spi::Mode;
+use esp_hal::spi::master::{Config, Spi};
 use esp_hal::time::Rate;
-use esp_hal::Async;
 use esp_println::println;
 use profont::PROFONT_18_POINT;
 use weact_studio_epd::{
-    graphics::Display290TriColor, DisplayDriver, TriColor, WeActStudio290TriColorDriver,
+    DisplayDriver, TriColor, WeActStudio290TriColorDriver, graphics::Display290TriColor,
 };
 
 pub struct Display {

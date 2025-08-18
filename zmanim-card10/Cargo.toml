@@ -9,6 +9,8 @@ name = "zmanim-card10"
 path = "./src/bin/main.rs"
 
 [dependencies]
+esp-alloc = { version = "0.8.0", features = ["defmt"] }
+
 defmt = "1.0.1"
 esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32c6"] }
 esp-hal = { version = "=1.0.0-rc.0", features = [
@@ -32,7 +34,6 @@ esp-backtrace = { version = "0.17.0", features = [
 esp-hal-embassy = { version = "0.9.0", features = ["defmt", "esp32c6"] }
 esp-println = { version = "0.15.0", features = ["defmt-espflash", "esp32c6"] }
 static_cell = "2.1.1"
-heapless = { version = "0.7.17", features = ["defmt"] }
 embedded-io-async = { version = "0.6.1", features = ["defmt-03"] }
 
 chrono = { version = "0.4.41", default-features = false }
@@ -45,7 +46,7 @@ nmea = { version = "0.7.0", features = [
 embassy-sync = "0.7.1"
 esp-storage = { version = "0.7.0", features = ["esp32c6"] }
 embedded-storage = "0.3.1"
-postcard = "1.0.0"
+postcard = { version = "1.1.3", features = ["alloc"] }
 serde = { version = "1.0.219", default-features = false }
 weact-studio-epd = "0.1.2"
 embedded-hal-bus = { version = "0.3.0", features = ["defmt-03", "async"] }
