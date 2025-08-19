@@ -8,19 +8,26 @@
 use chrono::{DateTime, Timelike};
 use core::{fmt::Write, time};
 use embassy_executor::Spawner;
-use embassy_sync::pubsub::WaitResult;
-use embassy_time::{Duration, Timer};
+use embassy_sync::{
+    blocking_mutex::raw::CriticalSectionRawMutex, pubsub::WaitResult, signal::Signal,
+};
+use embassy_time::{Duration, Timer, WithTimeout};
 use embedded_graphics::{
     Drawable,
     geometry::Point,
     mono_font::MonoTextStyle,
-    text::{Text, TextStyle},
+    text::{Alignment, Text, TextStyle},
 };
 use embedded_storage::nor_flash::{NorFlash, ReadNorFlash};
 use esp_storage::FlashStorage;
-use profont::{PROFONT_9_POINT, PROFONT_10_POINT, PROFONT_18_POINT};
+use futures::{FutureExt, join};
+use futures_lite::future::race_with_seed;
+use profont::{
+    PROFONT_9_POINT, PROFONT_10_POINT, PROFONT_12_POINT, PROFONT_14_POINT, PROFONT_18_POINT,
+};
 use serde::{Deserialize, Serialize};
 
+use epd_waveshare::color::Color;
 use esp_hal::Async;
 use esp_hal::analog::adc::{Adc, AdcConfig, AdcPin, Attenuation};
 use esp_hal::clock::CpuClock;
@@ -30,7 +37,6 @@ use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::systimer::SystemTimer;
 use esp_println::println;
 use static_cell::StaticCell;
-use weact_studio_epd::TriColor;
 extern crate alloc;
 use zmanim_card10::storage::{Storage, ZmanimConfig};
 use zmanim_card10::{display::Display, gps_data::GpsData};
@@ -60,7 +66,6 @@ async fn main(spawner: Spawner) {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
     let timer0 = SystemTimer::new(peripherals.SYSTIMER);
-    let mut rng = Rng::new(peripherals.RNG);
 
     esp_hal_embassy::init(timer0.alarm0);
     println!("Embassy initialized!");
@@ -84,32 +89,7 @@ async fn main(spawner: Spawner) {
 
     spawner.spawn(battery_monitor(adc1, pin)).ok();
     println!("Battery monitoring initialized!");
-
-    // Read the config from storage
-    let mut config_storage = Storage::new();
-    let config = config_storage.read().unwrap_or(ZmanimConfig::new());
-    println!("Config read from storage: {:?}", config);
-
-    // // let timestamp = 1755548752000;
-    // // let latitude = 40.085521663953486;
-    // // let longitude = -74.20940519301038;
-    let latitude: f64;
-    let longitude: f64;
-
-    // If we have a location, use it, otherwise wait for the GPS to get a fix
-    // and save the location to storage
-    if config.has_location() {
-        latitude = config.latitude.unwrap();
-        longitude = config.longitude.unwrap();
-    } else {
-        (latitude, longitude) = wait_for_gps(gps_data_channel).await;
-        config_storage.write(config.with_location(latitude, longitude));
-    };
-
-    let timestamp = wait_for_time(gps_data_channel).await;
-
-    // Disable the GPS once we have the user's location and time
-    GPS_STATE.signal(GpsState::Off);
+    let style = MonoTextStyle::new(&PROFONT_9_POINT, Color::Black);
 
     let mut display = init_display(
         peripherals.GPIO18,
@@ -121,12 +101,88 @@ async fn main(spawner: Spawner) {
         peripherals.SPI2,
     )
     .await;
+    display
+        .draw_text(
+            "Waiting for GPS fix",
+            Point::new(128 / 2, 296 / 2 - 50),
+            style,
+            TextStyle::with_alignment(Alignment::Center),
+        )
+        .await;
+    display
+        .draw_text(
+            "Place me on a flat\nsurface with direct\nline of sight\nof the sky",
+            Point::new(128 / 2, 296 / 2 + 20),
+            style,
+            TextStyle::with_alignment(Alignment::Center),
+        )
+        .await;
+    display.go().await;
 
-    println!("Timestamp: {}", timestamp);
+    // Read the config from storage
+    let mut config_storage = Storage::new();
+    let config = config_storage.read().unwrap_or(ZmanimConfig::new());
+    println!("Config read from storage: {:?}", config);
+    static ZMANIM_ARGS_SIGNAL: Signal<CriticalSectionRawMutex, ZmanimArgs> = Signal::new();
 
+    spawner
+        .spawn(get_time_and_location(
+            &gps_data_channel,
+            &ZMANIM_ARGS_SIGNAL,
+            config.latitude,
+            config.longitude,
+        ))
+        .unwrap();
+    // Sometimes we have the data instantly, we will first wait for 5 seconds for the data to be available.
+    // After that we will show a message to the user to place the device on a flat surface and direct line of sight to the sky.
+    // We don't want to show that message if we have the data instantly.
+    let wait_for_args = ZMANIM_ARGS_SIGNAL.wait().map(|i| Some(i));
+    let wait_for_timeout = Timer::after(Duration::from_secs(5))
+        .into_future()
+        .map(|_| None);
+    let result = race_with_seed(wait_for_args, wait_for_timeout, 0).await;
+    let zmanim_args = if result.is_some() {
+        result.unwrap()
+    } else {
+        let style = MonoTextStyle::new(&PROFONT_9_POINT, Color::Black);
+        display
+            .draw_text(
+                "Waiting for GPS fix",
+                Point::new(128 / 2, 296 / 2 - 50),
+                style,
+                TextStyle::with_alignment(Alignment::Center),
+            )
+            .await;
+        display
+            .draw_text(
+                "Place me on a flat\nsurface with direct\nline of sight\nof the sky",
+                Point::new(128 / 2, 296 / 2 + 20),
+                style,
+                TextStyle::with_alignment(Alignment::Center),
+            )
+            .await;
+        let (_, zmanim_args) = join!(display.go(), ZMANIM_ARGS_SIGNAL.wait());
+        zmanim_args
+    };
+    println!("Zmanim args: {:?}", zmanim_args);
+
+    // Disable the GPS once we have the user's location and time
+    GPS_STATE.signal(GpsState::Off);
+
+    // Save the location to storage
+    config_storage.write(config.with_location(zmanim_args.latitude, zmanim_args.longitude));
+
+    // TODO: Get this from a dial/button/etc.
     let tz_offset = -4.0 * 60.0 * 60.0 * 1000.0;
     println!("Drawing zmanim");
-    draw_zmanim(&mut display, timestamp, latitude, longitude, tz_offset).await;
+    draw_zmanim(
+        &mut display,
+        zmanim_args.timestamp,
+        zmanim_args.latitude,
+        zmanim_args.longitude,
+        tz_offset,
+    )
+    .await;
 
     // // Configure GPIO2 as LED output for blinking
     // let mut led = Output::new(
@@ -148,6 +204,48 @@ async fn main(spawner: Spawner) {
     }
 }
 
+#[derive(Debug)]
+struct ZmanimArgs {
+    latitude: f64,
+    longitude: f64,
+    timestamp: i64,
+}
+
+#[embassy_executor::task]
+async fn get_time_and_location(
+    gps_channel: &'static GpsDataChannelType,
+    zmanim_args_signal: &'static Signal<CriticalSectionRawMutex, ZmanimArgs>,
+    current_latitude: Option<f64>,
+    current_longitude: Option<f64>,
+) {
+    let mut subscriber = gps_channel.subscriber().unwrap();
+    loop {
+        let data = subscriber.next_message().await;
+        match data {
+            WaitResult::Message(data) => {
+                if data.timestamp.is_some() {
+                    if current_latitude.is_some() && current_longitude.is_some() {
+                        zmanim_args_signal.signal(ZmanimArgs {
+                            latitude: current_latitude.unwrap(),
+                            longitude: current_longitude.unwrap(),
+                            timestamp: data.timestamp.unwrap(),
+                        });
+                        break;
+                    } else if data.latitude.is_some() && data.longitude.is_some() {
+                        zmanim_args_signal.signal(ZmanimArgs {
+                            latitude: data.latitude.unwrap(),
+                            longitude: data.longitude.unwrap(),
+                            timestamp: data.timestamp.unwrap(),
+                        });
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 #[embassy_executor::task]
 async fn battery_monitor(
     adc1: &'static mut Adc<'static, ADC1<'static>, Async>,
@@ -162,36 +260,6 @@ async fn battery_monitor(
 
         println!("Battery voltage: {}", (voltage as f64 * 2.0) / 1000.0);
         Timer::after(Duration::from_secs(1)).await;
-    }
-}
-
-async fn wait_for_time(gps_data_channel: &'static GpsDataChannelType) -> i64 {
-    let mut subscriber = gps_data_channel.subscriber().unwrap();
-    loop {
-        let data = subscriber.next_message().await;
-        match data {
-            WaitResult::Message(data) => {
-                if data.timestamp.is_some() {
-                    return data.timestamp.unwrap();
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-async fn wait_for_gps(gps_data_channel: &'static GpsDataChannelType) -> (f64, f64) {
-    let mut subscriber = gps_data_channel.subscriber().unwrap();
-    loop {
-        let data = subscriber.next_message().await;
-        match data {
-            WaitResult::Message(data) => {
-                if data.latitude.is_some() && data.longitude.is_some() {
-                    return (data.latitude.unwrap(), data.longitude.unwrap());
-                }
-            }
-            _ => {}
-        }
     }
 }
 
@@ -222,7 +290,7 @@ fn format_time(timestamp: Option<f64>, name: &str, tz_offset: f64) -> alloc::str
 }
 
 async fn draw_zmanim(
-    display: &mut Display,
+    display: &mut Display<'_>,
     timestamp: i64,
     latitude: f64,
     longitude: f64,
@@ -286,48 +354,119 @@ async fn draw_zmanim(
         tzais,
         tzais72
     );
-    let style = MonoTextStyle::new(&PROFONT_9_POINT, TriColor::Black);
+    let style = MonoTextStyle::new(&PROFONT_9_POINT, Color::Black);
+    display.clear().await;
     display
-        .draw_text(alos.as_str(), Point::new(0, 10), style)
+        .draw_text(
+            alos.as_str(),
+            Point::new(0, 10),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(alos72.as_str(), Point::new(0, 20), style)
+        .draw_text(
+            alos72.as_str(),
+            Point::new(0, 20),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(sunrise.as_str(), Point::new(0, 30), style)
+        .draw_text(
+            sunrise.as_str(),
+            Point::new(0, 30),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(sof_zman_shma_gra.as_str(), Point::new(0, 40), style)
+        .draw_text(
+            sof_zman_shma_gra.as_str(),
+            Point::new(0, 40),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(sof_zman_shma_mga.as_str(), Point::new(0, 50), style)
+        .draw_text(
+            sof_zman_shma_mga.as_str(),
+            Point::new(0, 50),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(sof_zman_tfila_gra.as_str(), Point::new(0, 60), style)
+        .draw_text(
+            sof_zman_tfila_gra.as_str(),
+            Point::new(0, 60),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(sof_zman_tfila_mga.as_str(), Point::new(0, 70), style)
+        .draw_text(
+            sof_zman_tfila_mga.as_str(),
+            Point::new(0, 70),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(mincha_gedola.as_str(), Point::new(0, 80), style)
+        .draw_text(
+            mincha_gedola.as_str(),
+            Point::new(0, 80),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(mincha_gedola_default.as_str(), Point::new(0, 90), style)
+        .draw_text(
+            mincha_gedola_default.as_str(),
+            Point::new(0, 90),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(mincha_ketana.as_str(), Point::new(0, 100), style)
+        .draw_text(
+            mincha_ketana.as_str(),
+            Point::new(0, 100),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(plag_hamincha.as_str(), Point::new(0, 110), style)
+        .draw_text(
+            plag_hamincha.as_str(),
+            Point::new(0, 110),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(sunset.as_str(), Point::new(0, 120), style)
+        .draw_text(
+            sunset.as_str(),
+            Point::new(0, 120),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(tzais.as_str(), Point::new(0, 130), style)
+        .draw_text(
+            tzais.as_str(),
+            Point::new(0, 130),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display
-        .draw_text(tzais72.as_str(), Point::new(0, 140), style)
+        .draw_text(
+            tzais72.as_str(),
+            Point::new(0, 140),
+            style,
+            TextStyle::default(),
+        )
         .await;
     display.go().await;
 }

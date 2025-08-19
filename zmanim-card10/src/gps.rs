@@ -170,6 +170,7 @@ async fn gps_task(mut rx: UartRx<'static, Async>, gps_data_channel: &'static Gps
                                 geoid_separation: nmea.geoid_separation,
                             };
                             println!("Publishing GPS data: {:?}", data);
+                            println!("Timestamp: {:?}", line);
 
                             // Publish the GPS data
                             publisher.publish_immediate(data);

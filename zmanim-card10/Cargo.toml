@@ -48,11 +48,19 @@ esp-storage = { version = "0.7.0", features = ["esp32c6"] }
 embedded-storage = "0.3.1"
 postcard = { version = "1.1.3", features = ["alloc"] }
 serde = { version = "1.0.219", default-features = false }
-weact-studio-epd = "0.1.2"
+
 embedded-hal-bus = { version = "0.3.0", features = ["defmt-03", "async"] }
 display-interface-spi = "0.5.0"
 embedded-graphics = "0.8.1"
 profont = "0.7.0"
+futures-lite = { version = "2.6.1", features = [
+  "race",
+], default-features = false }
+futures = { version = "0.3.31", default-features = false, features = [
+  "async-await",
+] }
+epd-waveshare = "0.6.0"
+embedded-hal = "1.0.0"
 
 
 [profile.dev]
