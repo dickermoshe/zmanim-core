@@ -21,6 +21,5 @@ version = "1.0"
 features = ["derive"]
 
 [workspace]
-members = ["zmanim-card10"]
-exclude = ["zmanim-card", "zmanim-card7", "zmanimcard-idf"]
+members = ["zmanim-card"]
 resolver = "3"

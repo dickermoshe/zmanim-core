@@ -27,7 +27,6 @@ use profont::{
 };
 use serde::{Deserialize, Serialize};
 
-use epd_waveshare::color::Color;
 use esp_hal::Async;
 use esp_hal::analog::adc::{Adc, AdcConfig, AdcPin, Attenuation};
 use esp_hal::clock::CpuClock;
@@ -37,10 +36,11 @@ use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::systimer::SystemTimer;
 use esp_println::println;
 use static_cell::StaticCell;
+use weact_studio_epd::TriColor;
 extern crate alloc;
-use zmanim_card10::storage::{Storage, ZmanimConfig};
-use zmanim_card10::{display::Display, gps_data::GpsData};
-use zmanim_card10::{
+use zmanim_card::storage::{Storage, ZmanimConfig};
+use zmanim_card::{display::Display, gps_data::GpsData};
+use zmanim_card::{
     display::init_display,
     gps::{GPS_STATE, GpsDataChannelType, GpsState, init_gps},
 };
@@ -89,7 +89,6 @@ async fn main(spawner: Spawner) {
 
     spawner.spawn(battery_monitor(adc1, pin)).ok();
     println!("Battery monitoring initialized!");
-    let style = MonoTextStyle::new(&PROFONT_9_POINT, Color::Black);
 
     let mut display = init_display(
         peripherals.GPIO18,
@@ -101,9 +100,10 @@ async fn main(spawner: Spawner) {
         peripherals.SPI2,
     )
     .await;
+    let style = MonoTextStyle::new(&PROFONT_9_POINT, TriColor::Black);
     display
         .draw_text(
-            "Waiting for GPS fix",
+            "Waiting fosdsdsdr GPS fix",
             Point::new(128 / 2, 296 / 2 - 50),
             style,
             TextStyle::with_alignment(Alignment::Center),
@@ -111,7 +111,7 @@ async fn main(spawner: Spawner) {
         .await;
     display
         .draw_text(
-            "Place me on a flat\nsurface with direct\nline of sight\nof the sky",
+            "Place me on a fsdsddddddddddddddlat\nsurface with direct\nline of sight\nof the sky",
             Point::new(128 / 2, 296 / 2 + 20),
             style,
             TextStyle::with_alignment(Alignment::Center),
@@ -144,7 +144,7 @@ async fn main(spawner: Spawner) {
     let zmanim_args = if result.is_some() {
         result.unwrap()
     } else {
-        let style = MonoTextStyle::new(&PROFONT_9_POINT, Color::Black);
+        let style = MonoTextStyle::new(&PROFONT_9_POINT, TriColor::Black);
         display
             .draw_text(
                 "Waiting for GPS fix",
@@ -290,7 +290,7 @@ fn format_time(timestamp: Option<f64>, name: &str, tz_offset: f64) -> alloc::str
 }
 
 async fn draw_zmanim(
-    display: &mut Display<'_>,
+    display: &mut Display,
     timestamp: i64,
     latitude: f64,
     longitude: f64,
@@ -354,7 +354,7 @@ async fn draw_zmanim(
         tzais,
         tzais72
     );
-    let style = MonoTextStyle::new(&PROFONT_9_POINT, Color::Black);
+    let style = MonoTextStyle::new(&PROFONT_9_POINT, TriColor::Black);
     display.clear().await;
     display
         .draw_text(
