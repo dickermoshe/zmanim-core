@@ -54,9 +54,7 @@ fn test_astronomical_calendar() {
         let rust_geolocation = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
             .expect("Failed to create Rust GeoLocation");
 
-        let noaa_calculator = NOAACalculator::new();
-        let rust_calendar =
-            RustAstronomicalCalendar::new(test_case.timestamp, &rust_geolocation, &noaa_calculator);
+        let rust_calendar = RustAstronomicalCalendar::new(test_case.timestamp, &rust_geolocation);
         let java_calendar =
             JavaAstronomicalCalendar::new(&jvm, test_case.timestamp, &rust_geolocation);
 

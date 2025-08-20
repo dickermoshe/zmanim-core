@@ -8,8 +8,8 @@ use crate::{
 const ZENITH_16_POINT_1: f64 = GEOMETRIC_ZENITH + 16.1;
 const ZENITH_8_POINT_5: f64 = GEOMETRIC_ZENITH + 8.5;
 
-pub struct ZmanimCalendar<'a, T: NOAACalculatorTrait> {
-    astronomical_calendar: AstronomicalCalendar<'a, T>,
+pub struct ZmanimCalendar<'a> {
+    astronomical_calendar: AstronomicalCalendar<'a>,
     use_astronomical_chatzos: bool,
     use_astronomical_chatzos_for_other_zmanim: bool,
     candle_lighting_offset: f64,
@@ -95,32 +95,28 @@ pub trait ZmanimCalendarTrait {
     fn get_shaah_zmanis_mga(&self) -> Option<i64>;
 }
 
-impl<'a, T: NOAACalculatorTrait> ZmanimCalendar<'a, T> {
+impl<'a> ZmanimCalendar<'a> {
     pub fn new(
         timestamp: i64,
         geo_location: &'a dyn GeoLocationTrait,
-        noaa_calculator: T,
+
         use_astronomical_chatzos: bool,
         use_astronomical_chatzos_for_other_zmanim: bool,
         candle_lighting_offset: f64,
     ) -> Self {
         Self {
-            astronomical_calendar: AstronomicalCalendar::new(
-                timestamp,
-                geo_location,
-                noaa_calculator,
-            ),
+            astronomical_calendar: AstronomicalCalendar::new(timestamp, geo_location),
             use_astronomical_chatzos,
             use_astronomical_chatzos_for_other_zmanim,
             candle_lighting_offset,
         }
     }
-    pub fn get_astronomical_calendar(&self) -> &AstronomicalCalendar<'a, T> {
+    pub fn get_astronomical_calendar(&self) -> &AstronomicalCalendar<'a> {
         &self.astronomical_calendar
     }
 }
 
-impl<'a, T: NOAACalculatorTrait> ZmanimCalendarTrait for ZmanimCalendar<'a, T> {
+impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
     fn get_tzais(&self) -> Option<f64> {
         self.astronomical_calendar
             .get_sunset_offset_by_degrees(ZENITH_8_POINT_5)

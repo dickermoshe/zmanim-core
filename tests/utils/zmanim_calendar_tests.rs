@@ -48,13 +48,11 @@ fn test_zmanim_calendar() {
     for _ in 0..10_000 {
         let test_case = TestCase::new();
 
-        let noaa_calculator = NOAACalculator::new();
         let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
             .expect("Failed to create Rust GeoLocation");
         let zmanim_calendar = ZmanimCalendar::new(
             test_case.timestamp,
             &geo_location,
-            &noaa_calculator,
             test_case.use_astronomical_chatzos,
             test_case.use_astronomical_chatzos_for_other_zmanim,
             test_case.candle_lighting_offset,

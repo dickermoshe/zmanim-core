@@ -5,5 +5,6 @@ pub mod solar_event;
 pub mod timezone;
 
 pub mod astronomical_calendar;
+pub mod complex_zmanim_calendar;
 pub mod date;
 pub mod zmanim_calendar;
