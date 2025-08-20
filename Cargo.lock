@@ -2200,6 +2200,7 @@ name = "zmanim-core"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "heapless 0.8.0",
  "j4rs",
  "libm",
  "rand",
