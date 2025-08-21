@@ -42,7 +42,6 @@ pub static GPS_STATE: Signal<CriticalSectionRawMutex, GpsState> = Signal::new();
 /// - write_gps_task: Writes lines to the UART from the outgoing_line_channel
 /// - gps_data_logger: Logs GPS data to the screen
 pub fn init_gps(
-    tx_pin: impl PeripheralOutput<'static>,
     rx_pin: impl PeripheralInput<'static>,
     uart: impl Instance + 'static,
     spawner: &Spawner,
@@ -53,7 +52,6 @@ pub fn init_gps(
         .with_baudrate(9600);
     let uart0 = Uart::new(uart, config)
         .unwrap()
-        .with_tx(tx_pin)
         .with_rx(rx_pin)
         .into_async();
     let (rx, _) = uart0.split();

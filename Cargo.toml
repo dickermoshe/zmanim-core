@@ -6,6 +6,7 @@ version = "0.1.0"
 [dependencies]
 libm = "0.2.15"
 heapless = "0.8.0"
+icu_calendar = { version = "2.0.3", default-features = false }
 
 [dependencies.chrono]
 version = "0.4.41"

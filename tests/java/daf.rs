@@ -6,6 +6,7 @@ pub struct JavaDaf<'a> {
 }
 
 impl<'a> JavaDaf<'a> {
+    /// Create a new Java Daf instance
     pub fn new(jvm: &'a Jvm, masechta_number: i32, daf: i32) -> Self {
         let instance = jvm
             .create_instance(
@@ -22,17 +23,20 @@ impl<'a> JavaDaf<'a> {
                 ],
             )
             .unwrap();
+
         Self { jvm, instance }
     }
 
+    /// Get the masechta number
     pub fn get_masechta_number(&self) -> i32 {
         let result = self
             .jvm
-            .invoke(&self.instance, "getMasechtaNumber", &[] as &[InvocationArg])
+            .invoke(&self.instance, "getMasechtaNumber", InvocationArg::empty())
             .unwrap();
-        self.jvm.to_rust::<i32>(result).unwrap()
+        self.jvm.to_rust(result).unwrap()
     }
 
+    /// Set the masechta number
     pub fn set_masechta_number(&self, masechta_number: i32) {
         self.jvm
             .invoke(
@@ -46,14 +50,16 @@ impl<'a> JavaDaf<'a> {
             .unwrap();
     }
 
+    /// Get the daf number
     pub fn get_daf(&self) -> i32 {
         let result = self
             .jvm
-            .invoke(&self.instance, "getDaf", &[] as &[InvocationArg])
+            .invoke(&self.instance, "getDaf", InvocationArg::empty())
             .unwrap();
-        self.jvm.to_rust::<i32>(result).unwrap()
+        self.jvm.to_rust(result).unwrap()
     }
 
+    /// Set the daf number
     pub fn set_daf(&self, daf: i32) {
         self.jvm
             .invoke(
@@ -67,49 +73,51 @@ impl<'a> JavaDaf<'a> {
             .unwrap();
     }
 
+    /// Get the masechta transliterated name
     pub fn get_masechta_transliterated(&self) -> String {
         let result = self
             .jvm
             .invoke(
                 &self.instance,
                 "getMasechtaTransliterated",
-                &[] as &[InvocationArg],
+                InvocationArg::empty(),
             )
             .unwrap();
-        self.jvm.to_rust::<String>(result).unwrap()
+        self.jvm.to_rust(result).unwrap()
     }
 
+    /// Get the masechta Hebrew name
     pub fn get_masechta(&self) -> String {
         let result = self
             .jvm
-            .invoke(&self.instance, "getMasechta", &[] as &[InvocationArg])
+            .invoke(&self.instance, "getMasechta", InvocationArg::empty())
             .unwrap();
-        self.jvm.to_rust::<String>(result).unwrap()
+        self.jvm.to_rust(result).unwrap()
     }
 
+    /// Get the Yerushalmi masechta transliterated name
     pub fn get_yerushalmi_masechta_transliterated(&self) -> String {
         let result = self
             .jvm
             .invoke(
                 &self.instance,
                 "getYerushalmiMasechtaTransliterated",
-                &[] as &[InvocationArg],
+                InvocationArg::empty(),
             )
             .unwrap();
-        self.jvm.to_rust::<String>(result).unwrap()
+        self.jvm.to_rust(result).unwrap()
     }
 
+    /// Get the Yerushalmi masechta Hebrew name
     pub fn get_yerushalmi_masechta(&self) -> String {
         let result = self
             .jvm
             .invoke(
                 &self.instance,
                 "getYerushalmiMasechta",
-                &[] as &[InvocationArg],
+                InvocationArg::empty(),
             )
             .unwrap();
-        self.jvm.to_rust::<String>(result).unwrap()
+        self.jvm.to_rust(result).unwrap()
     }
-
-    // Note: Static array access is complex in JNI, so we'll test individual masechtos instead
 }

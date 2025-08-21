@@ -5,8 +5,10 @@
     reason = "mem::forget is generally not safe to do with esp_hal types, especially those \
     holding buffers for the duration of a data transfer."
 )]
-use chrono::{DateTime, Timelike};
+use chrono::{DateTime, Datelike, NaiveDateTime, Timelike};
 use core::{fmt::Write, time};
+use ds323x::DateTimeAccess;
+use ds323x::{Ds323x, ic::DS3231};
 use embassy_executor::Spawner;
 use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex, pubsub::WaitResult, signal::Signal,
@@ -19,6 +21,7 @@ use embedded_graphics::{
     text::{Alignment, Text, TextStyle},
 };
 use embedded_storage::nor_flash::{NorFlash, ReadNorFlash};
+use esp_hal::gpio::{Level, Output, OutputConfig};
 use esp_storage::FlashStorage;
 use futures::{FutureExt, join};
 use futures_lite::future::race_with_seed;
@@ -27,13 +30,17 @@ use profont::{
 };
 use serde::{Deserialize, Serialize};
 
-use esp_hal::Async;
-use esp_hal::analog::adc::{Adc, AdcConfig, AdcPin, Attenuation};
 use esp_hal::clock::CpuClock;
+use esp_hal::i2c::lp_i2c::LpI2c;
 use esp_hal::peripherals::{ADC1, GPIO1};
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::systimer::SystemTimer;
+use esp_hal::{Async, i2c::master::I2c};
+use esp_hal::{
+    analog::adc::{Adc, AdcConfig, AdcPin, Attenuation},
+    i2c::master::Config,
+};
 use esp_println::println;
 use static_cell::StaticCell;
 use weact_studio_epd::TriColor;
@@ -71,7 +78,6 @@ async fn main(spawner: Spawner) {
     println!("Embassy initialized!");
 
     let gps_data_channel = init_gps(
-        peripherals.GPIO16,
         peripherals.GPIO17,
         peripherals.UART0,
         &spawner,
@@ -79,110 +85,173 @@ async fn main(spawner: Spawner) {
     );
     println!("GPS initialized!");
 
-    // Spawn battery monitoring task
-    let mut adc1_config = AdcConfig::<ADC1>::default();
+    // Initialize the DS3231 RTC
+    let clock_power = peripherals.GPIO21;
+    let mut clock_power = Output::new(clock_power, Level::High, OutputConfig::default());
+    let clock_sda = peripherals.GPIO1;
+    let clock_scl = peripherals.GPIO2;
+    let i2c = I2c::new(peripherals.I2C0, Config::default())
+        .unwrap()
+        .with_sda(clock_sda)
+        .with_scl(clock_scl);
+    let mut ds3231 = Ds323x::new_ds3231(i2c);
+    let datetime = ds3231.datetime();
+    if datetime.as_ref().is_err() {
+        println!("Error getting RTC datetime: {:?}", datetime.as_ref().err());
+    }
+    let datetime = datetime.unwrap();
 
-    let pin = adc1_config.enable_pin(peripherals.GPIO1, Attenuation::_11dB);
-
-    static ADC1_CELL: StaticCell<Adc<'static, ADC1, Async>> = StaticCell::new();
-    let adc1 = ADC1_CELL.init(Adc::new(peripherals.ADC1, adc1_config).into_async());
-
-    spawner.spawn(battery_monitor(adc1, pin)).ok();
-    println!("Battery monitoring initialized!");
-
-    let mut display = init_display(
-        peripherals.GPIO18,
-        peripherals.GPIO19,
-        peripherals.GPIO22,
-        peripherals.GPIO23,
-        peripherals.GPIO21,
-        peripherals.GPIO2,
-        peripherals.SPI2,
-    )
-    .await;
-    let style = MonoTextStyle::new(&PROFONT_9_POINT, TriColor::Black);
-    display
-        .draw_text(
-            "Waiting fosdsdsdr GPS fix",
-            Point::new(128 / 2, 296 / 2 - 50),
-            style,
-            TextStyle::with_alignment(Alignment::Center),
-        )
-        .await;
-    display
-        .draw_text(
-            "Place me on a fsdsddddddddddddddlat\nsurface with direct\nline of sight\nof the sky",
-            Point::new(128 / 2, 296 / 2 + 20),
-            style,
-            TextStyle::with_alignment(Alignment::Center),
-        )
-        .await;
-    display.go().await;
+    println!("RTC datetime: {:?}", datetime);
 
     // Read the config from storage
     let mut config_storage = Storage::new();
     let config = config_storage.read().unwrap_or(ZmanimConfig::new());
-    println!("Config read from storage: {:?}", config);
-    static ZMANIM_ARGS_SIGNAL: Signal<CriticalSectionRawMutex, ZmanimArgs> = Signal::new();
+    println!("Config: {:?}", config);
 
+    // Fetch the location from storage and the timestamp from the RTC
+    // If the RTC is not set, we will wait for the GPS to get the time
+    // If the Location is not set, we will wait for the GPS to get the location
+    let timestamp = {
+        if datetime.year() == 2000 {
+            None
+        } else {
+            Some(datetime.and_utc().timestamp_millis())
+        }
+    };
+    let is_first_time = timestamp.is_none();
+    let latitude = config.latitude;
+    let longitude = config.longitude;
+    static ZMANIM_ARGS_SIGNAL: Signal<CriticalSectionRawMutex, ZmanimArgs> = Signal::new();
     spawner
         .spawn(get_time_and_location(
             &gps_data_channel,
             &ZMANIM_ARGS_SIGNAL,
-            config.latitude,
-            config.longitude,
+            latitude,
+            longitude,
+            timestamp,
         ))
         .unwrap();
-    // Sometimes we have the data instantly, we will first wait for 5 seconds for the data to be available.
-    // After that we will show a message to the user to place the device on a flat surface and direct line of sight to the sky.
-    // We don't want to show that message if we have the data instantly.
-    let wait_for_args = ZMANIM_ARGS_SIGNAL.wait().map(|i| Some(i));
-    let wait_for_timeout = Timer::after(Duration::from_secs(5))
-        .into_future()
-        .map(|_| None);
-    let result = race_with_seed(wait_for_args, wait_for_timeout, 0).await;
-    let zmanim_args = if result.is_some() {
-        result.unwrap()
-    } else {
-        let style = MonoTextStyle::new(&PROFONT_9_POINT, TriColor::Black);
-        display
-            .draw_text(
-                "Waiting for GPS fix",
-                Point::new(128 / 2, 296 / 2 - 50),
-                style,
-                TextStyle::with_alignment(Alignment::Center),
-            )
-            .await;
-        display
-            .draw_text(
-                "Place me on a flat\nsurface with direct\nline of sight\nof the sky",
-                Point::new(128 / 2, 296 / 2 + 20),
-                style,
-                TextStyle::with_alignment(Alignment::Center),
-            )
-            .await;
-        let (_, zmanim_args) = join!(display.go(), ZMANIM_ARGS_SIGNAL.wait());
-        zmanim_args
-    };
+    let zmanim_args = ZMANIM_ARGS_SIGNAL.wait().await;
     println!("Zmanim args: {:?}", zmanim_args);
 
-    // Disable the GPS once we have the user's location and time
-    GPS_STATE.signal(GpsState::Off);
+    // We will only update the time if this is the first time we are setting the time
+    // for the 1st time.
+    if is_first_time {
+        ds3231
+            .set_datetime(
+                &DateTime::from_timestamp_millis(zmanim_args.timestamp)
+                    .unwrap()
+                    .naive_utc(),
+            )
+            .unwrap();
+    }
 
     // Save the location to storage
     config_storage.write(config.with_location(zmanim_args.latitude, zmanim_args.longitude));
 
-    // TODO: Get this from a dial/button/etc.
-    let tz_offset = -4.0 * 60.0 * 60.0 * 1000.0;
-    println!("Drawing zmanim");
-    draw_zmanim(
-        &mut display,
-        zmanim_args.timestamp,
-        zmanim_args.latitude,
-        zmanim_args.longitude,
-        tz_offset,
-    )
-    .await;
+    //Disable the GPS
+    GPS_STATE.signal(GpsState::Off);
+    // Disable the clock power
+    clock_power.set_low();
+
+    loop {
+        println!("Yay!");
+        Timer::after(Duration::from_secs(1)).await;
+    }
+
+    // let mut display = init_display(
+    //     peripherals.GPIO18,
+    //     peripherals.GPIO19,
+    //     peripherals.GPIO22,
+    //     peripherals.GPIO23,
+    //     peripherals.GPIO21,
+    //     peripherals.GPIO2,
+    //     peripherals.SPI2,
+    // )
+    // .await;
+    // let style = MonoTextStyle::new(&PROFONT_9_POINT, TriColor::Black);
+    // display
+    //     .draw_text(
+    //         "Waiting fosdsdsdr GPS fix",
+    //         Point::new(128 / 2, 296 / 2 - 50),
+    //         style,
+    //         TextStyle::with_alignment(Alignment::Center),
+    //     )
+    //     .await;
+    // display
+    //     .draw_text(
+    //         "Place me on a fsdsddddddddddddddlat\nsurface with direct\nline of sight\nof the sky",
+    //         Point::new(128 / 2, 296 / 2 + 20),
+    //         style,
+    //         TextStyle::with_alignment(Alignment::Center),
+    //     )
+    //     .await;
+    // display.go().await;
+
+    // // Read the config from storage
+    // let mut config_storage = Storage::new();
+    // let config = config_storage.read().unwrap_or(ZmanimConfig::new());
+    // println!("Config read from storage: {:?}", config);
+    // static ZMANIM_ARGS_SIGNAL: Signal<CriticalSectionRawMutex, ZmanimArgs> = Signal::new();
+
+    // spawner
+    //     .spawn(get_time_and_location(
+    //         &gps_data_channel,
+    //         &ZMANIM_ARGS_SIGNAL,
+    //         config.latitude,
+    //         config.longitude,
+    //     ))
+    //     .unwrap();
+    // // Sometimes we have the data instantly, we will first wait for 5 seconds for the data to be available.
+    // // After that we will show a message to the user to place the device on a flat surface and direct line of sight to the sky.
+    // // We don't want to show that message if we have the data instantly.
+    // let wait_for_args = ZMANIM_ARGS_SIGNAL.wait().map(|i| Some(i));
+    // let wait_for_timeout = Timer::after(Duration::from_secs(5))
+    //     .into_future()
+    //     .map(|_| None);
+    // let result = race_with_seed(wait_for_args, wait_for_timeout, 0).await;
+    // let zmanim_args = if result.is_some() {
+    //     result.unwrap()
+    // } else {
+    //     let style = MonoTextStyle::new(&PROFONT_9_POINT, TriColor::Black);
+    //     display
+    //         .draw_text(
+    //             "Waiting for GPS fix",
+    //             Point::new(128 / 2, 296 / 2 - 50),
+    //             style,
+    //             TextStyle::with_alignment(Alignment::Center),
+    //         )
+    //         .await;
+    //     display
+    //         .draw_text(
+    //             "Place me on a flat\nsurface with direct\nline of sight\nof the sky",
+    //             Point::new(128 / 2, 296 / 2 + 20),
+    //             style,
+    //             TextStyle::with_alignment(Alignment::Center),
+    //         )
+    //         .await;
+    //     let (_, zmanim_args) = join!(display.go(), ZMANIM_ARGS_SIGNAL.wait());
+    //     zmanim_args
+    // };
+    // println!("Zmanim args: {:?}", zmanim_args);
+
+    // // Disable the GPS once we have the user's location and time
+    // GPS_STATE.signal(GpsState::Off);
+
+    // // Save the location to storage
+    // config_storage.write(config.with_location(zmanim_args.latitude, zmanim_args.longitude));
+
+    // // TODO: Get this from a dial/button/etc.
+    // let tz_offset = -4.0 * 60.0 * 60.0 * 1000.0;
+    // println!("Drawing zmanim");
+    // draw_zmanim(
+    //     &mut display,
+    //     zmanim_args.timestamp,
+    //     zmanim_args.latitude,
+    //     zmanim_args.longitude,
+    //     tz_offset,
+    // )
+    // .await;
 
     // // Configure GPIO2 as LED output for blinking
     // let mut led = Output::new(
@@ -217,31 +286,30 @@ async fn get_time_and_location(
     zmanim_args_signal: &'static Signal<CriticalSectionRawMutex, ZmanimArgs>,
     current_latitude: Option<f64>,
     current_longitude: Option<f64>,
+    current_timestamp: Option<i64>,
 ) {
     let mut subscriber = gps_channel.subscriber().unwrap();
+    let mut current_timestamp = current_timestamp;
+    let mut current_latitude = current_latitude;
+    let mut current_longitude = current_longitude;
     loop {
+        if current_timestamp.is_some() && current_latitude.is_some() && current_longitude.is_some()
+        {
+            zmanim_args_signal.signal(ZmanimArgs {
+                latitude: current_latitude.unwrap(),
+                longitude: current_longitude.unwrap(),
+                timestamp: current_timestamp.unwrap(),
+            });
+            break;
+        }
         let data = subscriber.next_message().await;
         match data {
             WaitResult::Message(data) => {
-                if data.timestamp.is_some() {
-                    if current_latitude.is_some() && current_longitude.is_some() {
-                        zmanim_args_signal.signal(ZmanimArgs {
-                            latitude: current_latitude.unwrap(),
-                            longitude: current_longitude.unwrap(),
-                            timestamp: data.timestamp.unwrap(),
-                        });
-                        break;
-                    } else if data.latitude.is_some() && data.longitude.is_some() {
-                        zmanim_args_signal.signal(ZmanimArgs {
-                            latitude: data.latitude.unwrap(),
-                            longitude: data.longitude.unwrap(),
-                            timestamp: data.timestamp.unwrap(),
-                        });
-                        break;
-                    }
-                }
+                current_timestamp = data.timestamp;
+                current_latitude = data.latitude;
+                current_longitude = data.longitude;
             }
-            _ => {}
+            WaitResult::Lagged(_) => {}
         }
     }
 }
@@ -297,14 +365,7 @@ async fn draw_zmanim(
     tz_offset: f64,
 ) {
     let location = GeoLocation::new(latitude, longitude, 0.0).unwrap();
-    let calendar = ZmanimCalendar::new(
-        timestamp,
-        &location,
-        NOAACalculator::new(),
-        true,
-        true,
-        18.0,
-    );
+    let calendar = ZmanimCalendar::new(timestamp, &location, true, true, 18.0);
     let alos = format_time(calendar.get_alos_hashachar(), "Alos", tz_offset);
 
     let alos72 = format_time(calendar.get_alos72(), "Alos72", tz_offset);

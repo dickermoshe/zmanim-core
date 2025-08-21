@@ -1,119 +1,247 @@
-/// Represents a tractate in the Babylonian Talmud (Bavli) for Daf Yomi
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum BavliMasechta {
-    Berachos = 0,
-    Shabbos = 1,
-    Eruvin = 2,
-    Pesachim = 3,
-    Shekalim = 4,
-    Yoma = 5,
-    Sukkah = 6,
-    Beitzah = 7,
-    RoshHashana = 8,
-    Taanis = 9,
-    Megillah = 10,
-    MoedKatan = 11,
-    Chagigah = 12,
-    Yevamos = 13,
-    Kesubos = 14,
-    Nedarim = 15,
-    Nazir = 16,
-    Sotah = 17,
-    Gitin = 18,
-    Kiddushin = 19,
-    BavaKamma = 20,
-    BavaMetzia = 21,
-    BavaBasra = 22,
-    Sanhedrin = 23,
-    Makkos = 24,
-    Shevuos = 25,
-    AvodahZarah = 26,
-    Horiyos = 27,
-    Zevachim = 28,
-    Menachos = 29,
-    Chullin = 30,
-    Bechoros = 31,
-    Arachin = 32,
-    Temurah = 33,
-    Kerisos = 34,
-    Meilah = 35,
-    Kinnim = 36,
-    Tamid = 37,
-    Midos = 38,
-    Niddah = 39,
+/// Represents a Daf (page) in the Babylonian Talmud
+/// Each daf consists of a Masechta (tractate) and a page number
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Daf {
+    masechta_number: i32,
+    daf: i32,
 }
 
-/// Represents a tractate in the Jerusalem Talmud (Yerushalmi)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum YerushalmiMasechta {
-    Berachos = 0,
-    Peah = 1,
-    Demai = 2,
-    Kilayim = 3,
-    Sheviis = 4,
-    Terumos = 5,
-    Maasros = 6,
-    MaaserSheni = 7,
-    Chalah = 8,
-    Orlah = 9,
-    Bikurim = 10,
-    Shabbos = 11,
-    Eruvin = 12,
-    Pesachim = 13,
-    Beitzah = 14,
-    RoshHashanah = 15,
-    Yoma = 16,
-    Sukah = 17,
-    Taanis = 18,
-    Shekalim = 19,
-    Megilah = 20,
-    Chagigah = 21,
-    MoedKatan = 22,
-    Yevamos = 23,
-    Kesuvos = 24,
-    Sotah = 25,
-    Nedarim = 26,
-    Nazir = 27,
-    Gitin = 28,
-    Kidushin = 29,
-    BavaKama = 30,
-    BavaMetzia = 31,
-    BavaBasra = 32,
-    Shevuos = 33,
-    Makos = 34,
-    Sanhedrin = 35,
-    AvodahZarah = 36,
-    Horayos = 37,
-    Nidah = 38,
-    NoDafToday = 39,
-}
-
-/// Represents a daf (page) in the Daf Yomi cycle
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BavliDaf {
-    pub tractate: BavliMasechta,
-    pub page: u16,
-}
-
-/// Represents a daf (page) in the Yerushalmi Daf Yomi cycle
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct YerushalmiDaf {
-    pub tractate: YerushalmiMasechta,
-    pub page: u16,
-}
-
-impl BavliDaf {
-    /// Create a new Bavli Daf with the specified tractate and page number
-    pub const fn new(tractate: BavliMasechta, page: u16) -> Self {
-        Self { tractate, page }
+impl Daf {
+    /// Create a new Daf with the given masechta number and daf number
+    pub fn new(masechta_number: i32, daf: i32) -> Self {
+        Self {
+            masechta_number,
+            daf,
+        }
     }
-}
 
-impl YerushalmiDaf {
-    /// Create a new Yerushalmi Daf with the specified tractate and page number
-    pub const fn new(tractate: YerushalmiMasechta, page: u16) -> Self {
-        Self { tractate, page }
+    /// Get the masechta (tractate) number
+    pub fn get_masechta_number(&self) -> i32 {
+        self.masechta_number
+    }
+
+    /// Set the masechta (tractate) number
+    pub fn set_masechta_number(&mut self, masechta_number: i32) {
+        self.masechta_number = masechta_number;
+    }
+
+    /// Get the daf (page) number
+    pub fn get_daf(&self) -> i32 {
+        self.daf
+    }
+
+    /// Set the daf (page) number
+    pub fn set_daf(&mut self, daf: i32) {
+        self.daf = daf;
+    }
+
+    /// Get the transliterated masechta name
+    pub fn get_masechta_transliterated(&self) -> &'static str {
+        Self::get_bavli_masechtos_transliterated()
+            .get(self.masechta_number as usize)
+            .unwrap_or(&"Unknown")
+    }
+
+    /// Get the Hebrew masechta name
+    pub fn get_masechta(&self) -> &'static str {
+        Self::get_bavli_masechtos()
+            .get(self.masechta_number as usize)
+            .unwrap_or(&"Unknown")
+    }
+
+    /// Get the Yerushalmi (Jerusalem Talmud) masechta transliterated name
+    pub fn get_yerushalmi_masechta_transliterated(&self) -> &'static str {
+        Self::get_yerushalmi_masechtos_transliterated()
+            .get(self.masechta_number as usize)
+            .unwrap_or(&"Unknown")
+    }
+
+    /// Get the Yerushalmi (Jerusalem Talmud) masechta Hebrew name
+    pub fn get_yerushalmi_masechta(&self) -> &'static str {
+        Self::get_yerushalmi_masechtos()
+            .get(self.masechta_number as usize)
+            .unwrap_or(&"Unknown")
+    }
+
+    /// Get all Bavli (Babylonian Talmud) masechtos in transliterated form
+    pub fn get_bavli_masechtos_transliterated() -> &'static [&'static str] {
+        &[
+            "Berachos",
+            "Shabbos",
+            "Eruvin",
+            "Pesachim",
+            "Shekalim",
+            "Yoma",
+            "Sukkah",
+            "Beitzah",
+            "Rosh Hashana",
+            "Taanis",
+            "Megillah",
+            "Moed Katan",
+            "Chagigah",
+            "Yevamos",
+            "Kesubos",
+            "Nedarim",
+            "Nazir",
+            "Sotah",
+            "Gitin",
+            "Kiddushin",
+            "Bava Kamma",
+            "Bava Metzia",
+            "Bava Basra",
+            "Sanhedrin",
+            "Makkos",
+            "Shevuos",
+            "Avodah Zarah",
+            "Horiyos",
+            "Zevachim",
+            "Menachos",
+            "Chullin",
+            "Bechoros",
+            "Arachin",
+            "Temurah",
+            "Kerisos",
+            "Meilah",
+            "Kinnim",
+            "Tamid",
+            "Midos",
+            "Niddah",
+        ]
+    }
+
+    /// Get all Bavli (Babylonian Talmud) masechtos in Hebrew
+    pub fn get_bavli_masechtos() -> &'static [&'static str] {
+        &[
+            "ברכות",
+            "שבת",
+            "עירובין",
+            "פסחים",
+            "שקלים",
+            "יומא",
+            "סוכה",
+            "ביצה",
+            "ראש השנה",
+            "תענית",
+            "מגילה",
+            "מועד קטן",
+            "חגיגה",
+            "יבמות",
+            "כתובות",
+            "נדרים",
+            "נזיר",
+            "סוטה",
+            "גיטין",
+            "קידושין",
+            "בבא קמא",
+            "בבא מציעא",
+            "בבא בתרא",
+            "סנהדרין",
+            "מכות",
+            "שבועות",
+            "עבודה זרה",
+            "הוריות",
+            "זבחים",
+            "מנחות",
+            "חולין",
+            "בכורות",
+            "ערכין",
+            "תמורה",
+            "כריתות",
+            "מעילה",
+            "קינים",
+            "תמיד",
+            "מידות",
+            "נדה",
+        ]
+    }
+
+    /// Get all Yerushalmi (Jerusalem Talmud) masechtos in transliterated form
+    pub fn get_yerushalmi_masechtos_transliterated() -> &'static [&'static str] {
+        &[
+            "Berachos",
+            "Peah",
+            "Demai",
+            "Kilayim",
+            "Sheviis",
+            "Terumos",
+            "Maasros",
+            "Maaser Sheni",
+            "Challah",
+            "Orlah",
+            "Bikurim",
+            "Shabbos",
+            "Eruvin",
+            "Pesachim",
+            "Shekalim",
+            "Yoma",
+            "Sukkah",
+            "Beitzah",
+            "Rosh Hashana",
+            "Taanis",
+            "Megillah",
+            "Chagigah",
+            "Moed Katan",
+            "Yevamos",
+            "Kesubos",
+            "Nedarim",
+            "Nazir",
+            "Sotah",
+            "Gitin",
+            "Kiddushin",
+            "Bava Kamma",
+            "Bava Metzia",
+            "Bava Basra",
+            "Shevuos",
+            "Makkos",
+            "Sanhedrin",
+            "Avodah Zarah",
+            "Horiyos",
+            "Niddah",
+        ]
+    }
+
+    /// Get all Yerushalmi (Jerusalem Talmud) masechtos in Hebrew
+    pub fn get_yerushalmi_masechtos() -> &'static [&'static str] {
+        &[
+            "ברכות",
+            "פאה",
+            "דמאי",
+            "כלאים",
+            "שביעית",
+            "תרומות",
+            "מעשרות",
+            "מעשר שני",
+            "חלה",
+            "ערלה",
+            "ביכורים",
+            "שבת",
+            "עירובין",
+            "פסחים",
+            "שקלים",
+            "יומא",
+            "סוכה",
+            "ביצה",
+            "ראש השנה",
+            "תענית",
+            "מגילה",
+            "חגיגה",
+            "מועד קטן",
+            "יבמות",
+            "כתובות",
+            "נדרים",
+            "נזיר",
+            "סוטה",
+            "גיטין",
+            "קידושין",
+            "בבא קמא",
+            "בבא מציעא",
+            "בבא בתרא",
+            "שבועות",
+            "מכות",
+            "סנהדרין",
+            "עבודה זרה",
+            "הוריות",
+            "נדה",
+        ]
     }
 }
