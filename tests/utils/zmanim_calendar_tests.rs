@@ -1,6 +1,6 @@
 use rand::Rng;
 use zmanim_core::{
-    GeoLocation, NOAACalculator,
+    GeoLocation,
     zmanim_calendar::{ZmanimCalendar, ZmanimCalendarTrait},
 };
 

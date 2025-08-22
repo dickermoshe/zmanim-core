@@ -112,8 +112,8 @@ fn test_masechtos_lists() {
     // Test a few specific masechtos
     assert_eq!(yerushalmi_transliterated[0], "Berachos");
     assert_eq!(yerushalmi_hebrew[0], "ברכות");
-    assert_eq!(yerushalmi_transliterated[1], "Peah");
-    assert_eq!(yerushalmi_hebrew[1], "פאה");
+    assert_eq!(yerushalmi_transliterated[1], "Pe'ah");
+    assert_eq!(yerushalmi_hebrew[1], "פיאה");
 }
 
 #[test]

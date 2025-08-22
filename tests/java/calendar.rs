@@ -6,17 +6,6 @@ pub fn create_calendar(jvm: &Jvm, timestamp: i64) -> Instance {
         .invoke_static("java.util.Calendar", "getInstance", InvocationArg::empty())
         .unwrap();
 
-    // Set the time in milliseconds
-    jvm.invoke(
-        &calendar_instance,
-        "setTimeInMillis",
-        &[InvocationArg::try_from(timestamp)
-            .unwrap()
-            .into_primitive()
-            .unwrap()],
-    )
-    .unwrap();
-
     let timezone_instance = jvm
         .invoke_static(
             "java.util.TimeZone",
@@ -29,6 +18,17 @@ pub fn create_calendar(jvm: &Jvm, timestamp: i64) -> Instance {
         &calendar_instance,
         "setTimeZone",
         &[InvocationArg::try_from(timezone_instance).unwrap()],
+    )
+    .unwrap();
+
+    // Set the time in milliseconds
+    jvm.invoke(
+        &calendar_instance,
+        "setTimeInMillis",
+        &[InvocationArg::try_from(timestamp)
+            .unwrap()
+            .into_primitive()
+            .unwrap()],
     )
     .unwrap();
 

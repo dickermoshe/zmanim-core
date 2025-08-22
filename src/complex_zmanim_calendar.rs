@@ -19,9 +19,7 @@ const ZENITH_26_DEGREES: f64 = GEOMETRIC_ZENITH + 26.0;
 const ZENITH_4_POINT_37: f64 = GEOMETRIC_ZENITH + 4.37;
 const ZENITH_4_POINT_61: f64 = GEOMETRIC_ZENITH + 4.61;
 const ZENITH_4_POINT_8: f64 = GEOMETRIC_ZENITH + 4.8;
-#[deprecated]
 const ZENITH_3_POINT_65: f64 = GEOMETRIC_ZENITH + 3.65;
-#[deprecated]
 const ZENITH_3_POINT_676: f64 = GEOMETRIC_ZENITH + 3.676;
 const ZENITH_5_POINT_88: f64 = GEOMETRIC_ZENITH + 5.88;
 const ZENITH_1_POINT_583: f64 = GEOMETRIC_ZENITH + 1.583;
@@ -896,7 +894,6 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
 
     fn get_mincha_gedola_ahavat_shalom(&self) -> Option<f64> {
         let chatzos = self.get_zmanim_calendar().get_chatzos()?;
-        let mincha_gedola_30 = self.get_mincha_gedola_30_minutes()?;
         let shaah_zmanis = self.get_shaah_zmanis_alos_16_point_1_to_tzais_3_point_7()? as f64;
         let half_shaah = chatzos + (shaah_zmanis / 2.0);
 

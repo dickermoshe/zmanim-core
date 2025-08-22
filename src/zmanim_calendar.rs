@@ -1,5 +1,5 @@
 use crate::{
-    GeoLocationTrait, NOAACalculator, NOAACalculatorTrait,
+    GeoLocationTrait,
     astronomical_calendar::{
         AstronomicalCalendar, AstronomicalCalendarTrait, GEOMETRIC_ZENITH, MINUTE_MILLIS,
     },

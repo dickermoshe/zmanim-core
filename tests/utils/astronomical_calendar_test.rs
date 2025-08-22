@@ -1,6 +1,6 @@
 use rand::Rng;
 use zmanim_core::{
-    GeoLocation, NOAACalculator,
+    GeoLocation,
     astronomical_calendar::{
         AstronomicalCalendar as RustAstronomicalCalendar, AstronomicalCalendarTrait,
     },

@@ -39,28 +39,28 @@ impl Daf {
     pub fn get_masechta_transliterated(&self) -> &'static str {
         Self::get_bavli_masechtos_transliterated()
             .get(self.masechta_number as usize)
-            .unwrap_or(&"Unknown")
+            .unwrap_or(&&"No Daf Today")
     }
 
     /// Get the Hebrew masechta name
     pub fn get_masechta(&self) -> &'static str {
         Self::get_bavli_masechtos()
             .get(self.masechta_number as usize)
-            .unwrap_or(&"Unknown")
+            .unwrap_or(&"אין דף היום")
     }
 
     /// Get the Yerushalmi (Jerusalem Talmud) masechta transliterated name
     pub fn get_yerushalmi_masechta_transliterated(&self) -> &'static str {
         Self::get_yerushalmi_masechtos_transliterated()
             .get(self.masechta_number as usize)
-            .unwrap_or(&"Unknown")
+            .unwrap_or(&"No Daf Today")
     }
 
     /// Get the Yerushalmi (Jerusalem Talmud) masechta Hebrew name
     pub fn get_yerushalmi_masechta(&self) -> &'static str {
         Self::get_yerushalmi_masechtos()
             .get(self.masechta_number as usize)
-            .unwrap_or(&"Unknown")
+            .unwrap_or(&"אין דף היום")
     }
 
     /// Get all Bavli (Babylonian Talmud) masechtos in transliterated form
@@ -159,44 +159,44 @@ impl Daf {
     pub fn get_yerushalmi_masechtos_transliterated() -> &'static [&'static str] {
         &[
             "Berachos",
-            "Peah",
+            "Pe'ah",
             "Demai",
             "Kilayim",
-            "Sheviis",
+            "Shevi'is",
             "Terumos",
-            "Maasros",
-            "Maaser Sheni",
-            "Challah",
+            "Ma'asros",
+            "Ma'aser Sheni",
+            "Chalah",
             "Orlah",
             "Bikurim",
             "Shabbos",
             "Eruvin",
             "Pesachim",
-            "Shekalim",
-            "Yoma",
-            "Sukkah",
             "Beitzah",
-            "Rosh Hashana",
-            "Taanis",
-            "Megillah",
+            "Rosh Hashanah",
+            "Yoma",
+            "Sukah",
+            "Ta'anis",
+            "Shekalim",
+            "Megilah",
             "Chagigah",
             "Moed Katan",
             "Yevamos",
-            "Kesubos",
+            "Kesuvos",
+            "Sotah",
             "Nedarim",
             "Nazir",
-            "Sotah",
             "Gitin",
-            "Kiddushin",
-            "Bava Kamma",
+            "Kidushin",
+            "Bava Kama",
             "Bava Metzia",
             "Bava Basra",
             "Shevuos",
-            "Makkos",
+            "Makos",
             "Sanhedrin",
             "Avodah Zarah",
-            "Horiyos",
-            "Niddah",
+            "Horayos",
+            "Nidah",
         ]
     }
 
@@ -204,7 +204,7 @@ impl Daf {
     pub fn get_yerushalmi_masechtos() -> &'static [&'static str] {
         &[
             "ברכות",
-            "פאה",
+            "פיאה",
             "דמאי",
             "כלאים",
             "שביעית",
@@ -212,25 +212,25 @@ impl Daf {
             "מעשרות",
             "מעשר שני",
             "חלה",
-            "ערלה",
+            "עורלה",
             "ביכורים",
             "שבת",
             "עירובין",
             "פסחים",
-            "שקלים",
-            "יומא",
-            "סוכה",
             "ביצה",
             "ראש השנה",
+            "יומא",
+            "סוכה",
             "תענית",
+            "שקלים",
             "מגילה",
             "חגיגה",
             "מועד קטן",
             "יבמות",
             "כתובות",
+            "סוטה",
             "נדרים",
             "נזיר",
-            "סוטה",
             "גיטין",
             "קידושין",
             "בבא קמא",
@@ -241,7 +241,7 @@ impl Daf {
             "סנהדרין",
             "עבודה זרה",
             "הוריות",
-            "נדה",
+            "נידה",
         ]
     }
 }

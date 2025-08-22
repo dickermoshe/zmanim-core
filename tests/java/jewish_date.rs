@@ -5,6 +5,9 @@ pub struct JavaJewishDate<'a> {
 }
 
 use j4rs::{Instance, InvocationArg, Jvm};
+use zmanim_core::hebrew_calendar::MoladData;
+
+use crate::java::calendar::create_calendar;
 
 impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewishDate<'a> {
     fn get_jewish_year(&self) -> i32 {
@@ -64,24 +67,14 @@ impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewi
         self.jvm.to_rust(result).unwrap()
     }
 
-    fn get_day_of_week(&self) -> icu_calendar::types::Weekday {
+    fn get_day_of_week(&self) -> zmanim_core::hebrew_calendar::jewish_date::DayOfWeek {
         let result: Instance = self
             .jvm
             .invoke(&self.instance, "getDayOfWeek", InvocationArg::empty())
             .unwrap();
         let day_of_week: i32 = self.jvm.to_rust(result).unwrap();
 
-        // Convert Java day of week (1=Sunday) to ICU Weekday
-        match day_of_week {
-            1 => icu_calendar::types::Weekday::Sunday,
-            2 => icu_calendar::types::Weekday::Monday,
-            3 => icu_calendar::types::Weekday::Tuesday,
-            4 => icu_calendar::types::Weekday::Wednesday,
-            5 => icu_calendar::types::Weekday::Thursday,
-            6 => icu_calendar::types::Weekday::Friday,
-            7 => icu_calendar::types::Weekday::Saturday,
-            _ => icu_calendar::types::Weekday::Sunday, // Default
-        }
+        day_of_week.into()
     }
 
     fn is_jewish_leap_year(&self) -> bool {
@@ -171,94 +164,80 @@ impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewi
         self.jvm.to_rust(result).unwrap()
     }
 
-    fn is_jewish_leap_year_static(year: i32) -> bool {
-        // We can't call static methods from trait implementation without an instance
-        // For now, use the same logic as the Rust implementation
-        let year_in_cycle = ((year - 1) % 19) + 1;
-        matches!(year_in_cycle, 3 | 6 | 8 | 11 | 14 | 17 | 19)
+    fn get_abs_date(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getAbsDate", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
     }
 
-    fn get_last_month_of_jewish_year(_year: i32) -> i32 {
-        // This is a static method that needs to be called on the Java class
-        // For now, return a placeholder
-        12 // Adar
-    }
+    fn get_molad(
+        &self,
+    ) -> (
+        impl zmanim_core::hebrew_calendar::JewishDateTrait,
+        zmanim_core::hebrew_calendar::MoladData,
+    ) {
+        let molad_date = self
+            .jvm
+            .invoke(&self.instance, "getMolad", InvocationArg::empty())
+            .unwrap();
 
-    fn get_jewish_calendar_elapsed_days(_year: i32) -> i32 {
-        // This is a simplified implementation
-        // In a real implementation, this would call the Java static method
-        0 // Placeholder
-    }
-
-    fn get_days_in_jewish_year_static(_year: i32) -> i32 {
-        // Regular year has 354 days, leap year has 383 days
-        // In a real implementation, this would call the Java static method
-        354 // Placeholder
-    }
-
-    fn get_days_in_jewish_month_static(month: i32, year: i32) -> i32 {
-        match month {
-            1 | 2 | 4 | 5 | 7 | 9 | 10 | 11 => 30, // 30-day months
-            3 | 6 | 8 | 12 => 29,                  // 29-day months in non-leap years
-            13 => 29,                              // Adar II in leap years
-            _ => 29,                               // Default
-        }
+        let molad_date = JavaJewishDate {
+            jvm: self.jvm,
+            instance: molad_date,
+        };
+        let moladHoursResult = self
+            .jvm
+            .invoke(
+                &molad_date.instance,
+                "getMoladHours",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        let moladHours: i64 = self.jvm.to_rust(moladHoursResult).unwrap();
+        let moladMinutesResult = self
+            .jvm
+            .invoke(
+                &molad_date.instance,
+                "getMoladMinutes",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        let moladMinutes: i64 = self.jvm.to_rust(moladMinutesResult).unwrap();
+        let moladChalakimResult = self
+            .jvm
+            .invoke(
+                &molad_date.instance,
+                "getMoladChalakim",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        let moladChalakim: i64 = self.jvm.to_rust(moladChalakimResult).unwrap();
+        (
+            molad_date,
+            MoladData {
+                hours: moladHours,
+                minutes: moladMinutes,
+                chalakim: moladChalakim,
+            },
+        )
     }
 }
 
 impl<'a> JavaJewishDate<'a> {
     /// Create a JewishDate from Java Date
-    pub fn from_date(jvm: &'a Jvm, timestamp: i64) -> Self {
-        let date_instance = super::date::create_date(jvm, timestamp);
+    pub fn from_date(jvm: &'a Jvm, timestamp: i64, tz_offset: i64) -> Self {
+        let date_instance = create_calendar(jvm, timestamp + tz_offset);
+        // let r = jvm
+        //     .invoke(&date_instance, "toString", InvocationArg::empty())
+        //     .unwrap();
+        // let r_str: String = jvm.to_rust(r).unwrap();
+        // println!("r: {:?}", r_str);
         let instance = jvm
             .create_instance(
                 "com.kosherjava.zmanim.hebrewcalendar.JewishDate",
                 &[InvocationArg::from(date_instance)],
-            )
-            .unwrap();
-
-        Self { jvm, instance }
-    }
-    /// Create a JewishDate from Jewish date components with time
-    pub fn from_jewish_date(
-        jvm: &'a Jvm,
-        year: i32,
-        month: i32,
-        day: i32,
-        hours: i32,
-        minutes: i32,
-        chalakim: i32,
-    ) -> Self {
-        let instance = jvm
-            .invoke_static(
-                "com.kosherjava.zmanim.hebrewcalendar.JewishDate",
-                "new",
-                &[
-                    InvocationArg::try_from(year)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                    InvocationArg::try_from(month)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                    InvocationArg::try_from(day)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                    InvocationArg::try_from(hours)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                    InvocationArg::try_from(minutes)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                    InvocationArg::try_from(chalakim)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                ],
             )
             .unwrap();
 
@@ -439,65 +418,8 @@ impl<'a> JavaJewishDate<'a> {
             .unwrap();
         self.jvm.to_rust(result).unwrap()
     }
-    /// Check if a Jewish year is a leap year (static method)
-    pub fn is_jewish_leap_year_static(jvm: &'a Jvm, year: i32) -> bool {
-        let result = jvm
-            .invoke_static(
-                "com.kosherjava.zmanim.hebrewcalendar.JewishDate",
-                "isJewishLeapYear",
-                &[InvocationArg::try_from(year)
-                    .unwrap()
-                    .into_primitive()
-                    .unwrap()],
-            )
-            .unwrap();
-        jvm.to_rust(result).unwrap()
-    }
-
-    /// Get the last month of a Jewish year (static method)
-    pub fn get_last_month_of_jewish_year(jvm: &'a Jvm, year: i32) -> i32 {
-        let result = jvm
-            .invoke_static(
-                "com.kosherjava.zmanim.hebrewcalendar.JewishDate",
-                "getLastMonthOfJewishYear",
-                &[InvocationArg::try_from(year)
-                    .unwrap()
-                    .into_primitive()
-                    .unwrap()],
-            )
-            .unwrap();
-        jvm.to_rust(result).unwrap()
-    }
-
-    /// Get the Jewish calendar elapsed days (static method)
-    pub fn get_jewish_calendar_elapsed_days(jvm: &'a Jvm, year: i32) -> i32 {
-        let result = jvm
-            .invoke_static(
-                "com.kosherjava.zmanim.hebrewcalendar.JewishDate",
-                "getJewishCalendarElapsedDays",
-                &[InvocationArg::try_from(year)
-                    .unwrap()
-                    .into_primitive()
-                    .unwrap()],
-            )
-            .unwrap();
-        jvm.to_rust(result).unwrap()
-    }
-
-    /// Get the days in a Jewish year (static method)
-    pub fn get_days_in_jewish_year_static(jvm: &'a Jvm, year: i32) -> i32 {
-        let result = jvm
-            .invoke_static(
-                "com.kosherjava.zmanim.hebrewcalendar.JewishDate",
-                "getDaysInJewishYear",
-                &[InvocationArg::try_from(year)
-                    .unwrap()
-                    .into_primitive()
-                    .unwrap()],
-            )
-            .unwrap();
-        jvm.to_rust(result).unwrap()
-    }
+    // Note: Static methods isJewishLeapYear, getLastMonthOfJewishYear, etc. are private in Java
+    // so we cannot access them via JNI. We use instance methods as workarounds in tests.
 
     /// Get the days in a Jewish month (static method)
     pub fn get_days_in_jewish_month_static(jvm: &'a Jvm, month: i32, year: i32) -> i32 {
@@ -515,6 +437,66 @@ impl<'a> JavaJewishDate<'a> {
                         .into_primitive()
                         .unwrap(),
                 ],
+            )
+            .unwrap();
+        jvm.to_rust(result).unwrap()
+    }
+
+    /// Check if a Jewish year is a leap year (static method)
+    pub fn is_jewish_leap_year_static_java(jvm: &'a Jvm, year: i32) -> bool {
+        let result = jvm
+            .invoke_static(
+                "com.kosherjava.zmanim.hebrewcalendar.JewishDate",
+                "isJewishLeapYear",
+                &[InvocationArg::try_from(year)
+                    .unwrap()
+                    .into_primitive()
+                    .unwrap()],
+            )
+            .unwrap();
+        jvm.to_rust(result).unwrap()
+    }
+
+    /// Get the last month of a Jewish year (static method)
+    pub fn get_last_month_of_jewish_year_java(jvm: &'a Jvm, year: i32) -> i32 {
+        let result = jvm
+            .invoke_static(
+                "com.kosherjava.zmanim.hebrewcalendar.JewishDate",
+                "getLastMonthOfJewishYear",
+                &[InvocationArg::try_from(year)
+                    .unwrap()
+                    .into_primitive()
+                    .unwrap()],
+            )
+            .unwrap();
+        jvm.to_rust(result).unwrap()
+    }
+
+    /// Get the Jewish calendar elapsed days (static method)
+    pub fn get_jewish_calendar_elapsed_days_java(jvm: &'a Jvm, year: i32) -> i32 {
+        let result = jvm
+            .invoke_static(
+                "com.kosherjava.zmanim.hebrewcalendar.JewishDate",
+                "getJewishCalendarElapsedDays",
+                &[InvocationArg::try_from(year)
+                    .unwrap()
+                    .into_primitive()
+                    .unwrap()],
+            )
+            .unwrap();
+        jvm.to_rust(result).unwrap()
+    }
+
+    /// Get the days in a Jewish year (static method)
+    pub fn get_days_in_jewish_year_static_java(jvm: &'a Jvm, year: i32) -> i32 {
+        let result = jvm
+            .invoke_static(
+                "com.kosherjava.zmanim.hebrewcalendar.JewishDate",
+                "getDaysInJewishYear",
+                &[InvocationArg::try_from(year)
+                    .unwrap()
+                    .into_primitive()
+                    .unwrap()],
             )
             .unwrap();
         jvm.to_rust(result).unwrap()
