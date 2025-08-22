@@ -1,0 +1,827 @@
+/// Java JewishCalendar wrapper using JNI
+pub struct JavaJewishCalendar<'a> {
+    pub jvm: &'a Jvm,
+    pub instance: Instance,
+}
+
+use j4rs::{Instance, InvocationArg, Jvm};
+use zmanim_core::hebrew_calendar::parsha::Parsha;
+use zmanim_core::hebrew_calendar::{Daf, DayOfWeek, Holiday, JewishCalendarTrait, JewishMonth};
+
+use crate::java::calendar::create_calendar;
+
+use super::jewish_date::JavaJewishDate;
+
+impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
+    fn get_yom_tov_index(&self) -> Option<Holiday> {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getYomTovIndex", InvocationArg::empty())
+            .unwrap();
+        let index = self.jvm.to_rust::<i32>(result).unwrap();
+        if index == -1 {
+            None
+        } else {
+            Some(Holiday::from_index(index))
+        }
+    }
+
+    fn is_yom_tov(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isYomTov", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_yom_tov_assur_bemelacha(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(
+                &self.instance,
+                "isYomTovAssurBemelacha",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_assur_bemelacha(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isAssurBemelacha", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn has_candle_lighting(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "hasCandleLighting", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_tomorrow_shabbos_or_yom_tov(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(
+                &self.instance,
+                "isTomorrowShabbosOrYomTov",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_erev_yom_tov_sheni(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isErevYomTovSheni", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_aseres_yemei_teshuva(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(
+                &self.instance,
+                "isAseresYemeiTeshuva",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_pesach(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isPesach", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_chol_hamoed_pesach(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isCholHamoedPesach", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_shavuos(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isShavuos", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_rosh_hashana(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isRoshHashana", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_yom_kippur(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isYomKippur", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_succos(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isSuccos", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_hoshana_rabba(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isHoshanaRabba", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_shemini_atzeres(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isShminiAtzeres", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_simchas_torah(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isSimchasTorah", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_chol_hamoed_succos(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isCholHamoedSuccos", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_chol_hamoed(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isCholHamoed", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_erev_yom_tov(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isErevYomTov", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_rosh_chodesh(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isRoshChodesh", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_isru_chag(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isIsruChag", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_taanis(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isTaanis", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_taanis_bechoros(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isTaanisBechoros", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn get_day_of_chanukah(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getDayOfChanukah", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_chanukah(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isChanukah", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_purim(&self) -> bool {
+        // Java's isPurim() depends on Mukaf Choma; Rust's is_purim() is true for Purim OR Shushan Purim.
+        // Emulate Rust semantics by checking either condition on the Java side.
+        let purim_result = self
+            .jvm
+            .invoke(&self.instance, "isPurim", InvocationArg::empty())
+            .unwrap();
+        let is_purim: bool = self.jvm.to_rust(purim_result).unwrap();
+        if is_purim {
+            return true;
+        }
+
+        let yom_tov_idx = self
+            .jvm
+            .invoke(&self.instance, "getYomTovIndex", InvocationArg::empty())
+            .unwrap();
+        let idx: i32 = self.jvm.to_rust(yom_tov_idx).unwrap();
+        // 26 == SHUSHAN_PURIM per Java constants
+        idx == 26
+    }
+
+    fn get_day_of_omer(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getDayOfOmer", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_tisha_beav(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isTishaBav", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn get_daf_yomi_bavli(&self) -> Daf {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getDafYomiBavli", InvocationArg::empty())
+            .unwrap();
+
+        // Extract Daf information from the Java Daf object
+        let masechta_result = self
+            .jvm
+            .invoke(&result, "getMasechtaNumber", InvocationArg::empty())
+            .unwrap();
+        let masechta_number: i32 = self.jvm.to_rust(masechta_result).unwrap();
+
+        let daf_result = self
+            .jvm
+            .invoke(&result, "getDaf", InvocationArg::empty())
+            .unwrap();
+        let daf_number: i32 = self.jvm.to_rust(daf_result).unwrap();
+
+        Daf::new(masechta_number, daf_number)
+    }
+
+    fn get_parshah(&self) -> Parsha {
+        let result: Instance = self
+            .jvm
+            .invoke(&self.instance, "getParshah", InvocationArg::empty())
+            .unwrap();
+
+        let parsha_name: String = self.jvm.to_rust(result).unwrap();
+
+        // Convert Java Parsha enum to Rust Parsha enum
+        match parsha_name.as_str() {
+            "NONE" => Parsha::NONE,
+            "BERESHIS" => Parsha::BERESHIS,
+            "NOACH" => Parsha::NOACH,
+            "LECH_LECHA" => Parsha::LECH_LECHA,
+            "VAYERA" => Parsha::VAYERA,
+            "CHAYEI_SARA" => Parsha::CHAYEI_SARA,
+            "TOLDOS" => Parsha::TOLDOS,
+            "VAYETZEI" => Parsha::VAYETZEI,
+            "VAYISHLACH" => Parsha::VAYISHLACH,
+            "VAYESHEV" => Parsha::VAYESHEV,
+            "MIKETZ" => Parsha::MIKETZ,
+            "VAYIGASH" => Parsha::VAYIGASH,
+            "VAYECHI" => Parsha::VAYECHI,
+            "SHEMOS" => Parsha::SHEMOS,
+            "VAERA" => Parsha::VAERA,
+            "BO" => Parsha::BO,
+            "BESHALACH" => Parsha::BESHALACH,
+            "YISRO" => Parsha::YISRO,
+            "MISHPATIM" => Parsha::MISHPATIM,
+            "TERUMAH" => Parsha::TERUMAH,
+            "TETZAVEH" => Parsha::TETZAVEH,
+            "KI_SISA" => Parsha::KI_SISA,
+            "VAYAKHEL" => Parsha::VAYAKHEL,
+            "PEKUDEI" => Parsha::PEKUDEI,
+            "VAYIKRA" => Parsha::VAYIKRA,
+            "TZAV" => Parsha::TZAV,
+            "SHMINI" => Parsha::SHMINI,
+            "TAZRIA" => Parsha::TAZRIA,
+            "METZORA" => Parsha::METZORA,
+            "ACHREI_MOS" => Parsha::ACHREI_MOS,
+            "KEDOSHIM" => Parsha::KEDOSHIM,
+            "EMOR" => Parsha::EMOR,
+            "BEHAR" => Parsha::BEHAR,
+            "BECHUKOSAI" => Parsha::BECHUKOSAI,
+            "BAMIDBAR" => Parsha::BAMIDBAR,
+            "NASSO" => Parsha::NASSO,
+            "BEHAALOSCHA" => Parsha::BEHAALOSCHA,
+            "SHLACH" => Parsha::SHLACH,
+            "KORACH" => Parsha::KORACH,
+            "CHUKAS" => Parsha::CHUKAS,
+            "BALAK" => Parsha::BALAK,
+            "PINCHAS" => Parsha::PINCHAS,
+            "MATOS" => Parsha::MATOS,
+            "MASEI" => Parsha::MASEI,
+            "DEVARIM" => Parsha::DEVARIM,
+            "VAESCHANAN" => Parsha::VAESCHANAN,
+            "EIKEV" => Parsha::EIKEV,
+            "REEH" => Parsha::REEH,
+            "SHOFTIM" => Parsha::SHOFTIM,
+            "KI_SEITZEI" => Parsha::KI_SEITZEI,
+            "KI_SAVO" => Parsha::KI_SAVO,
+            "NITZAVIM" => Parsha::NITZAVIM,
+            "VAYEILECH" => Parsha::VAYEILECH,
+            "HAAZINU" => Parsha::HAAZINU,
+            "VZOS_HABERACHA" => Parsha::VZOS_HABERACHA,
+            "VAYAKHEL_PEKUDEI" => Parsha::VAYAKHEL_PEKUDEI,
+            "TAZRIA_METZORA" => Parsha::TAZRIA_METZORA,
+            "ACHREI_MOS_KEDOSHIM" => Parsha::ACHREI_MOS_KEDOSHIM,
+            "BEHAR_BECHUKOSAI" => Parsha::BEHAR_BECHUKOSAI,
+            "CHUKAS_BALAK" => Parsha::CHUKAS_BALAK,
+            "MATOS_MASEI" => Parsha::MATOS_MASEI,
+            "NITZAVIM_VAYEILECH" => Parsha::NITZAVIM_VAYEILECH,
+            "SHKALIM" => Parsha::SHKALIM,
+            "ZACHOR" => Parsha::ZACHOR,
+            "PARA" => Parsha::PARA,
+            "HACHODESH" => Parsha::HACHODESH,
+            "SHUVA" => Parsha::SHUVA,
+            "SHIRA" => Parsha::SHIRA,
+            "HAGADOL" => Parsha::HAGADOL,
+            "CHAZON" => Parsha::CHAZON,
+            "NACHAMU" => Parsha::NACHAMU,
+            _ => Parsha::NONE,
+        }
+    }
+}
+
+impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewishCalendar<'a> {
+    fn get_jewish_year(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getJewishYear", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn get_jewish_month(&self) -> JewishMonth {
+        let result: Instance = self
+            .jvm
+            .invoke(&self.instance, "getJewishMonth", InvocationArg::empty())
+            .unwrap();
+        let month: i32 = self.jvm.to_rust(result).unwrap();
+        month.into()
+    }
+
+    fn get_jewish_day_of_month(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(
+                &self.instance,
+                "getJewishDayOfMonth",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn get_gregorian_year(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getGregorianYear", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn get_gregorian_month(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getGregorianMonth", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn get_gregorian_day_of_month(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(
+                &self.instance,
+                "getGregorianDayOfMonth",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn get_day_of_week(&self) -> DayOfWeek {
+        let result: Instance = self
+            .jvm
+            .invoke(&self.instance, "getDayOfWeek", InvocationArg::empty())
+            .unwrap();
+        let day_of_week: i32 = self.jvm.to_rust(result).unwrap();
+        day_of_week.into()
+    }
+
+    fn is_jewish_leap_year(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isJewishLeapYear", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn get_days_in_jewish_year(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(
+                &self.instance,
+                "getDaysInJewishYear",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn get_days_in_jewish_month(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(
+                &self.instance,
+                "getDaysInJewishMonth",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_cheshvan_long(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isCheshvanLong", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn is_kislev_short(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "isKislevShort", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn get_cheshvan_kislev_kviah(
+        &self,
+    ) -> zmanim_core::hebrew_calendar::jewish_date::YearLengthType {
+        let result: Instance = self
+            .jvm
+            .invoke(
+                &self.instance,
+                "getCheshvanKislevKviah",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        let kviah: i32 = self.jvm.to_rust(result).unwrap();
+        kviah.into()
+    }
+
+    fn get_days_since_start_of_jewish_year(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(
+                &self.instance,
+                "getDaysSinceStartOfJewishYear",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn get_chalakim_since_molad_tohu(&self) -> i64 {
+        let result = self
+            .jvm
+            .invoke(
+                &self.instance,
+                "getChalakimSinceMoladTohu",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    fn get_molad(
+        &self,
+    ) -> (
+        impl zmanim_core::hebrew_calendar::JewishDateTrait,
+        zmanim_core::hebrew_calendar::MoladData,
+    ) {
+        let molad_date = self
+            .jvm
+            .invoke(&self.instance, "getMolad", InvocationArg::empty())
+            .unwrap();
+
+        let molad_date = JavaJewishDate {
+            jvm: self.jvm,
+            instance: molad_date,
+        };
+        let molad_hours_result = self
+            .jvm
+            .invoke(
+                &molad_date.instance,
+                "getMoladHours",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        let molad_hours: i64 = self.jvm.to_rust(molad_hours_result).unwrap();
+        let molad_minutes_result = self
+            .jvm
+            .invoke(
+                &molad_date.instance,
+                "getMoladMinutes",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        let molad_minutes: i64 = self.jvm.to_rust(molad_minutes_result).unwrap();
+        let molad_chalakim_result = self
+            .jvm
+            .invoke(
+                &molad_date.instance,
+                "getMoladChalakim",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        let molad_chalakim: i64 = self.jvm.to_rust(molad_chalakim_result).unwrap();
+        (
+            molad_date,
+            zmanim_core::hebrew_calendar::MoladData {
+                hours: molad_hours,
+                minutes: molad_minutes,
+                chalakim: molad_chalakim,
+            },
+        )
+    }
+}
+
+impl<'a> JavaJewishCalendar<'a> {
+    /// Create a JewishCalendar from Java Date
+    pub fn from_date(jvm: &'a Jvm, timestamp: i64, tz_offset: i64) -> Self {
+        let date_instance = create_calendar(jvm, timestamp + tz_offset);
+        let instance = jvm
+            .create_instance(
+                "com.kosherjava.zmanim.hebrewcalendar.JewishCalendar",
+                &[InvocationArg::from(date_instance)],
+            )
+            .unwrap();
+
+        Self { jvm, instance }
+    }
+
+    /// Create a JewishCalendar from Java Calendar
+    pub fn from_calendar(jvm: &'a Jvm, calendar_instance: Instance) -> Self {
+        let instance = jvm
+            .create_instance(
+                "com.kosherjava.zmanim.hebrewcalendar.JewishCalendar",
+                &[InvocationArg::from(calendar_instance)],
+            )
+            .unwrap();
+
+        Self { jvm, instance }
+    }
+
+    /// Create a JewishCalendar with default values (current date)
+    pub fn new(jvm: &'a Jvm) -> Self {
+        let instance = jvm
+            .create_instance(
+                "com.kosherjava.zmanim.hebrewcalendar.JewishCalendar",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+
+        Self { jvm, instance }
+    }
+
+    /// Create a JewishCalendar with specific Jewish date
+    pub fn from_jewish_date(
+        jvm: &'a Jvm,
+        jewish_year: i32,
+        jewish_month: i32,
+        jewish_day: i32,
+    ) -> Self {
+        let instance = jvm
+            .create_instance(
+                "com.kosherjava.zmanim.hebrewcalendar.JewishCalendar",
+                &[
+                    InvocationArg::try_from(jewish_year)
+                        .unwrap()
+                        .into_primitive()
+                        .unwrap(),
+                    InvocationArg::try_from(jewish_month)
+                        .unwrap()
+                        .into_primitive()
+                        .unwrap(),
+                    InvocationArg::try_from(jewish_day)
+                        .unwrap()
+                        .into_primitive()
+                        .unwrap(),
+                ],
+            )
+            .unwrap();
+
+        Self { jvm, instance }
+    }
+
+    /// Create a JewishCalendar with specific Jewish date and Israel setting
+    pub fn from_jewish_date_with_israel(
+        jvm: &'a Jvm,
+        jewish_year: i32,
+        jewish_month: i32,
+        jewish_day: i32,
+        in_israel: bool,
+    ) -> Self {
+        let instance = jvm
+            .create_instance(
+                "com.kosherjava.zmanim.hebrewcalendar.JewishCalendar",
+                &[
+                    InvocationArg::try_from(jewish_year)
+                        .unwrap()
+                        .into_primitive()
+                        .unwrap(),
+                    InvocationArg::try_from(jewish_month)
+                        .unwrap()
+                        .into_primitive()
+                        .unwrap(),
+                    InvocationArg::try_from(jewish_day)
+                        .unwrap()
+                        .into_primitive()
+                        .unwrap(),
+                    InvocationArg::try_from(in_israel)
+                        .unwrap()
+                        .into_primitive()
+                        .unwrap(),
+                ],
+            )
+            .unwrap();
+
+        Self { jvm, instance }
+    }
+
+    // Configuration methods
+    pub fn set_in_israel(&mut self, in_israel: bool) {
+        let _ = self.jvm.invoke(
+            &self.instance,
+            "setInIsrael",
+            &[InvocationArg::try_from(in_israel)
+                .unwrap()
+                .into_primitive()
+                .unwrap()],
+        );
+    }
+
+    pub fn get_in_israel(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getInIsrael", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    pub fn set_use_modern_holidays(&mut self, use_modern_holidays: bool) {
+        let _ = self.jvm.invoke(
+            &self.instance,
+            "setUseModernHolidays",
+            &[InvocationArg::try_from(use_modern_holidays)
+                .unwrap()
+                .into_primitive()
+                .unwrap()],
+        );
+    }
+
+    pub fn get_use_modern_holidays(&self) -> bool {
+        let result = self
+            .jvm
+            .invoke(
+                &self.instance,
+                "isUseModernHolidays",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    // Additional convenience methods
+    pub fn get_jewish_year(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getJewishYear", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    pub fn get_jewish_month_int(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getJewishMonth", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    pub fn get_jewish_day_of_month(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(
+                &self.instance,
+                "getJewishDayOfMonth",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    pub fn get_day_of_week_int(&self) -> i32 {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getDayOfWeek", InvocationArg::empty())
+            .unwrap();
+        self.jvm.to_rust(result).unwrap()
+    }
+
+    pub fn get_daf_yomi_bavli_java(&self) -> Instance {
+        self.jvm
+            .invoke(&self.instance, "getDafYomiBavli", InvocationArg::empty())
+            .unwrap()
+    }
+
+    pub fn get_molad_as_date(&self) -> Instance {
+        self.jvm
+            .invoke(&self.instance, "getMoladAsDate", InvocationArg::empty())
+            .unwrap()
+    }
+
+    pub fn get_tchilas_zman_kidush_levana_3_days(&self) -> Instance {
+        self.jvm
+            .invoke(
+                &self.instance,
+                "getTchilasZmanKidushLevana3Days",
+                InvocationArg::empty(),
+            )
+            .unwrap()
+    }
+
+    pub fn get_tchilas_zman_kidush_levana_7_days(&self) -> Instance {
+        self.jvm
+            .invoke(
+                &self.instance,
+                "getTchilasZmanKidushLevana7Days",
+                InvocationArg::empty(),
+            )
+            .unwrap()
+    }
+
+    pub fn get_so_fzman_kidush_levana_between_moldos(&self) -> Instance {
+        self.jvm
+            .invoke(
+                &self.instance,
+                "getSofZmanKidushLevanaBetweenMoldos",
+                InvocationArg::empty(),
+            )
+            .unwrap()
+    }
+
+    pub fn get_so_fzman_kidush_levana_15_days(&self) -> Instance {
+        self.jvm
+            .invoke(
+                &self.instance,
+                "getSofZmanKidushLevana15Days",
+                InvocationArg::empty(),
+            )
+            .unwrap()
+    }
+}

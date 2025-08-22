@@ -1,10 +1,11 @@
 use chrono::DateTime;
 use chrono::Datelike;
 use chrono::Duration as ChronoDuration;
-use icu_calendar::Gregorian;
 use icu_calendar::cal::Hebrew;
-use icu_calendar::{Date, DateDuration, types::Weekday};
+use icu_calendar::Gregorian;
+use icu_calendar::{types::Weekday, Date, DateDuration};
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum JewishMonth {
     NISSAN = 1,
     IYAR = 2,
@@ -160,6 +161,7 @@ pub trait JewishDateTrait {
     fn get_molad(&self) -> (impl JewishDateTrait, MoladData);
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JewishDate {
     pub hebrew_date: Date<Hebrew>,
     pub gregorian_date: Date<Gregorian>,
@@ -403,7 +405,7 @@ impl JewishDate {
             12 // Adar
         }
     }
-    fn get_jewish_calendar_elapsed_days(year: i32) -> i32 {
+    pub fn get_jewish_calendar_elapsed_days(year: i32) -> i32 {
         let chalakim_since = Self::get_chalakim_since_molad_tohu_static(year, constants::TISHREI);
         let molad_day = (chalakim_since / constants::CHALAKIM_PER_DAY as i64) as i32;
         let molad_parts =

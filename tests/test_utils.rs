@@ -5,7 +5,7 @@ use serde::Deserialize;
 use zmanim_core::GeoLocationError;
 
 // Test configuration constants
-pub const DEFAULT_TEST_ITERATIONS: usize = 100;
+pub const DEFAULT_TEST_ITERATIONS: usize = 10000;
 pub const DEFAULT_FLOAT_TOLERANCE: f64 = 0.00000001;
 pub const DEFAULT_INT_TOLERANCE: u64 = 0;
 pub const MAX_TIMESTAMP_YEAR_OFFSET: i64 = 50; // 50 years ago to 50 years from now

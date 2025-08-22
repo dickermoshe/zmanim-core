@@ -1,6 +1,6 @@
 /// Java JewishDate wrapper using JNI
 pub struct JavaJewishDate<'a> {
-    jvm: &'a Jvm,
+    pub jvm: &'a Jvm,
     pub instance: Instance,
 }
 

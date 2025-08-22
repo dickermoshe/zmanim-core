@@ -3,6 +3,7 @@ edition = "2021"
 name = "zmanim-core"
 version = "0.1.0"
 
+
 [dependencies]
 libm = "0.2.15"
 heapless = "0.8.0"
