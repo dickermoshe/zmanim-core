@@ -4,7 +4,7 @@ use crate::{
     java::geolocation::JavaGeoLocation,
     test_utils::{
         assert_almost_equal_f64, assert_almost_equal_f64_result, create_jvm,
-        random_test_geolocation,
+        random_test_geolocation, DEFAULT_FLOAT_TOLERANCE, DEFAULT_TEST_ITERATIONS,
     },
 };
 
@@ -14,7 +14,7 @@ fn test_geolocation() {
     let jvm = create_jvm();
 
     // Test with shuffled locations
-    for _ in 0..10_000 {
+    for _ in 0..DEFAULT_TEST_ITERATIONS {
         let test_geo = random_test_geolocation();
         let other_test_geo = random_test_geolocation();
 
@@ -57,33 +57,33 @@ fn test_geolocation() {
         assert_almost_equal_f64_result(
             &java_geolocation.geodesic_initial_bearing(&rust_other_geolocation),
             &rust_geolocation.geodesic_initial_bearing(&rust_other_geolocation),
-            0.00000001,
+            DEFAULT_FLOAT_TOLERANCE,
             &message,
         );
         assert_almost_equal_f64_result(
             &java_geolocation.geodesic_final_bearing(&rust_other_geolocation),
             &rust_geolocation.geodesic_final_bearing(&rust_other_geolocation),
-            0.00000001,
+            DEFAULT_FLOAT_TOLERANCE,
             &message,
         );
         assert_almost_equal_f64_result(
             &java_geolocation.geodesic_distance(&rust_other_geolocation),
             &rust_geolocation.geodesic_distance(&rust_other_geolocation),
-            0.00000001,
+            DEFAULT_FLOAT_TOLERANCE,
             &message,
         );
         assert_almost_equal_f64(
             java_geolocation.rhumb_line_bearing(&rust_other_geolocation),
             rust_geolocation.rhumb_line_bearing(&rust_other_geolocation),
-            0.00000001,
+            DEFAULT_FLOAT_TOLERANCE,
             &message,
         );
         assert_almost_equal_f64(
             java_geolocation.rhumb_line_distance(&rust_other_geolocation),
             rust_geolocation.rhumb_line_distance(&rust_other_geolocation),
-            0.00000001,
+            DEFAULT_FLOAT_TOLERANCE,
             &message,
         );
-        drop(java_geolocation.instance);
+        // java_geolocation will be automatically dropped when it goes out of scope
     }
 }

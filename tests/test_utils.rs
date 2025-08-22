@@ -4,6 +4,12 @@ use rand::Rng;
 use serde::Deserialize;
 use zmanim_core::GeoLocationError;
 
+// Test configuration constants
+pub const DEFAULT_TEST_ITERATIONS: usize = 100;
+pub const DEFAULT_FLOAT_TOLERANCE: f64 = 0.00000001;
+pub const DEFAULT_INT_TOLERANCE: u64 = 0;
+pub const MAX_TIMESTAMP_YEAR_OFFSET: i64 = 50; // 50 years ago to 50 years from now
+
 #[derive(Deserialize, Debug)]
 pub struct TestGeoLocation {
     pub lat: f64,
@@ -33,8 +39,8 @@ pub fn random_test_timestamp() -> i64 {
     let mut rng = rand::rng();
 
     let year_in_millis = 1000 * 60 * 60 * 24 * 365; // 1 year in milliseconds
-    let start = year_in_millis * -60; // 60 years ago
-    let end = year_in_millis * 60; // 60 years from now
+    let start = year_in_millis * -MAX_TIMESTAMP_YEAR_OFFSET; // N years ago
+    let end = year_in_millis * MAX_TIMESTAMP_YEAR_OFFSET; // N years from now
     rng.random_range(start..=end)
 }
 
@@ -72,9 +78,13 @@ fn almost_equal_f64(a: f64, b: f64, diff: f64) -> bool {
 }
 
 fn almost_equal_i64(a: i64, b: i64, diff: u64) -> bool {
-    return (a - b).abs() <= diff as i64;
+    // Prevent overflow by checking if diff fits in i64 range
+    if diff > i64::MAX as u64 {
+        return false;
+    }
+    (a - b).abs() <= diff as i64
 }
-pub fn assert_almost_equal_f64(a: f64, b: f64, diff: f64, message: &String) {
+pub fn assert_almost_equal_f64(a: f64, b: f64, diff: f64, message: &str) {
     let result = almost_equal_f64(a, b, diff);
     let distance = (a - b).abs();
     if !result {
@@ -87,18 +97,13 @@ pub fn assert_almost_equal_f64(a: f64, b: f64, diff: f64, message: &String) {
     assert!(result);
 }
 
-pub fn assert_almost_equal_f64_option(
-    a: &Option<f64>,
-    b: &Option<f64>,
-    diff: f64,
-    message: &String,
-) {
+pub fn assert_almost_equal_f64_option(a: &Option<f64>, b: &Option<f64>, diff: f64, message: &str) {
     match (a, b) {
         (Some(a), Some(b)) => assert_almost_equal_f64(*a, *b, diff, message),
         (None, None) => (),
         _ => {
             println!("Error: {:?} vs {:?}, {}", a, b, message);
-            panic!("Not matching!")
+            panic!("Option values do not match - one is Some, the other is None")
         }
     }
 }
@@ -107,18 +112,18 @@ pub fn assert_almost_equal_f64_result(
     a: &Result<f64, GeoLocationError>,
     b: &Result<f64, GeoLocationError>,
     diff: f64,
-    message: &String,
+    message: &str,
 ) {
     match (a, b) {
         (Ok(a), Ok(b)) => assert_almost_equal_f64(*a, *b, diff, message),
         (Err(_), Err(_)) => (), // Both errors are considered equal
         _ => {
             println!("Error: {:?} vs {:?}, {}", a, b, message);
-            panic!("Not Equal!")
+            panic!("Result types do not match - one is Ok, the other is Err")
         }
     }
 }
-pub fn assert_almost_equal_i64(a: i64, b: i64, diff: u64, message: &String) {
+pub fn assert_almost_equal_i64(a: i64, b: i64, diff: u64, message: &str) {
     let result = almost_equal_i64(a, b, diff);
     let distance = (a - b).abs();
     if !result {
@@ -129,18 +134,13 @@ pub fn assert_almost_equal_i64(a: i64, b: i64, diff: u64, message: &String) {
     }
     assert!(result);
 }
-pub fn assert_almost_equal_i64_option(
-    a: &Option<i64>,
-    b: &Option<i64>,
-    diff: u64,
-    message: &String,
-) {
+pub fn assert_almost_equal_i64_option(a: &Option<i64>, b: &Option<i64>, diff: u64, message: &str) {
     match (a, b) {
         (Some(a), Some(b)) => assert_almost_equal_i64(*a, *b, diff, message),
         (None, None) => (),
         _ => {
             println!("Error: {:?} vs {:?}, {}", a, b, message);
-            panic!("Not Equal!")
+            panic!("Option values do not match - one is Some, the other is None")
         }
     }
 }

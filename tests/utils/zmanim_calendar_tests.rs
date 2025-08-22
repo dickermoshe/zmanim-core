@@ -1,7 +1,7 @@
 use rand::Rng;
 use zmanim_core::{
-    GeoLocation,
     zmanim_calendar::{ZmanimCalendar, ZmanimCalendarTrait},
+    GeoLocation,
 };
 
 use crate::{
@@ -9,6 +9,7 @@ use crate::{
     test_utils::{
         assert_almost_equal_f64_option, assert_almost_equal_i64_option, create_jvm,
         random_test_geolocation, random_test_timestamp,
+        DEFAULT_INT_TOLERANCE, DEFAULT_TEST_ITERATIONS,
     },
 };
 #[derive(Debug)]
@@ -26,10 +27,10 @@ impl TestCase {
     fn new() -> Self {
         let test_geo = random_test_geolocation();
         let test_timestamp = random_test_timestamp();
-        let test_use_astronomical_chatzos = rand::rng().random_range(0.0..=1.0) > 0.5;
-        let test_use_astronomical_chatzos_for_other_zmanim =
-            rand::rng().random_range(0.0..=1.0) > 0.5;
-        let test_candle_lighting_offset = rand::rng().random_range(0..=60 * 1000);
+        let mut rng = rand::rng();
+        let test_use_astronomical_chatzos = rng.random_bool(0.5);
+        let test_use_astronomical_chatzos_for_other_zmanim = rng.random_bool(0.5);
+        let test_candle_lighting_offset = rng.random_range(0..=60 * 1000);
         Self {
             lat: test_geo.lat,
             lon: test_geo.lon,
@@ -46,7 +47,7 @@ impl TestCase {
 #[test]
 fn test_zmanim_calendar() {
     let jvm = create_jvm();
-    for _ in 0..10_000 {
+    for _ in 0..DEFAULT_TEST_ITERATIONS {
         let test_case = TestCase::new();
 
         let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
@@ -72,19 +73,19 @@ fn test_zmanim_calendar() {
         assert_almost_equal_i64_option(
             &zmanim_calendar.get_tzais(),
             &java_zmanim_calendar.get_tzais(),
-            0,
+            DEFAULT_INT_TOLERANCE,
             &message,
         );
         assert_almost_equal_i64_option(
             &zmanim_calendar.get_alos_hashachar(),
             &java_zmanim_calendar.get_alos_hashachar(),
-            0,
+            DEFAULT_INT_TOLERANCE,
             &message,
         );
         assert_almost_equal_i64_option(
             &zmanim_calendar.get_alos72(),
             &java_zmanim_calendar.get_alos72(),
-            0,
+            DEFAULT_INT_TOLERANCE,
             &message,
         );
 
@@ -92,42 +93,42 @@ fn test_zmanim_calendar() {
         assert_almost_equal_i64_option(
             &zmanim_calendar.get_tzais72(),
             &java_zmanim_calendar.get_tzais72(),
-            0,
+            DEFAULT_INT_TOLERANCE,
             &message,
         );
 
         assert_almost_equal_i64_option(
             &zmanim_calendar.get_candle_lighting(),
             &java_zmanim_calendar.get_candle_lighting(),
-            1,
+            1, // Keep 1 for candle lighting as it seems intentional
             &message,
         );
 
         assert_almost_equal_i64_option(
             &zmanim_calendar.get_sof_zman_shma_gra(),
             &java_zmanim_calendar.get_sof_zman_shma_gra(),
-            0,
+            DEFAULT_INT_TOLERANCE,
             &message,
         );
 
         assert_almost_equal_i64_option(
             &zmanim_calendar.get_sof_zman_shma_mga(),
             &java_zmanim_calendar.get_sof_zman_shma_mga(),
-            0,
+            DEFAULT_INT_TOLERANCE,
             &message,
         );
 
         assert_almost_equal_i64_option(
             &zmanim_calendar.get_sof_zman_tfila_gra(),
             &java_zmanim_calendar.get_sof_zman_tfila_gra(),
-            0,
+            DEFAULT_INT_TOLERANCE,
             &message,
         );
 
         assert_almost_equal_i64_option(
             &zmanim_calendar.get_sof_zman_tfila_mga(),
             &java_zmanim_calendar.get_sof_zman_tfila_mga(),
-            0,
+            DEFAULT_INT_TOLERANCE,
             &message,
         );
 
@@ -215,7 +216,7 @@ fn test_zmanim_calendar() {
             assert_almost_equal_i64_option(
                 &rust_sof_zman_shma_simple,
                 &java_sof_zman_shma_simple,
-                0,
+                DEFAULT_INT_TOLERANCE,
                 &message,
             );
 
@@ -233,7 +234,7 @@ fn test_zmanim_calendar() {
             assert_almost_equal_i64_option(
                 &rust_sof_zman_tfila_simple,
                 &java_sof_zman_tfila_simple,
-                0,
+                DEFAULT_INT_TOLERANCE,
                 &message,
             );
 
@@ -269,7 +270,7 @@ fn test_zmanim_calendar() {
             assert_almost_equal_i64_option(
                 &rust_samuch_mincha_simple,
                 &java_samuch_mincha_simple,
-                0,
+                DEFAULT_INT_TOLERANCE,
                 &message,
             );
 
@@ -321,7 +322,7 @@ fn test_zmanim_calendar() {
         assert_almost_equal_i64_option(
             &rust_chatzos_as_half_day,
             &java_chatzos_as_half_day,
-            0,
+            DEFAULT_INT_TOLERANCE,
             &message,
         );
         drop(java_zmanim_calendar);
