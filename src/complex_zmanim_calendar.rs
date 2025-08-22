@@ -122,20 +122,20 @@ pub trait ComplexZmanimCalendarTrait {
     fn get_shaah_zmanis_baal_hatanya(&self) -> Option<i64>;
 
     // Alos methods
-    fn get_alos_60(&self) -> Option<f64>;
-    fn get_alos_72_zmanis(&self) -> Option<f64>;
-    fn get_alos_96(&self) -> Option<f64>;
-    fn get_alos_90_zmanis(&self) -> Option<f64>;
-    fn get_alos_96_zmanis(&self) -> Option<f64>;
-    fn get_alos_90(&self) -> Option<f64>;
-    fn get_alos_120(&self) -> Option<f64>;
-    fn get_alos_120_zmanis(&self) -> Option<f64>;
-    fn get_alos_26_degrees(&self) -> Option<f64>;
-    fn get_alos_18_degrees(&self) -> Option<f64>;
-    fn get_alos_19_degrees(&self) -> Option<f64>;
-    fn get_alos_19_point_8_degrees(&self) -> Option<f64>;
-    fn get_alos_16_point_1_degrees(&self) -> Option<f64>;
-    fn get_alos_baal_hatanya(&self) -> Option<f64>;
+    fn get_alos_60(&self) -> Option<i64>;
+    fn get_alos_72_zmanis(&self) -> Option<i64>;
+    fn get_alos_96(&self) -> Option<i64>;
+    fn get_alos_90_zmanis(&self) -> Option<i64>;
+    fn get_alos_96_zmanis(&self) -> Option<i64>;
+    fn get_alos_90(&self) -> Option<i64>;
+    fn get_alos_120(&self) -> Option<i64>;
+    fn get_alos_120_zmanis(&self) -> Option<i64>;
+    fn get_alos_26_degrees(&self) -> Option<i64>;
+    fn get_alos_18_degrees(&self) -> Option<i64>;
+    fn get_alos_19_degrees(&self) -> Option<i64>;
+    fn get_alos_19_point_8_degrees(&self) -> Option<i64>;
+    fn get_alos_16_point_1_degrees(&self) -> Option<i64>;
+    fn get_alos_baal_hatanya(&self) -> Option<i64>;
 
     // Misheyakir methods
     fn get_misheyakir_11_point_5_degrees(&self) -> Option<f64>;

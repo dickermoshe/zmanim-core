@@ -1,7 +1,6 @@
 use zmanim_core::hebrew_calendar::jewish_date::{JewishDate, JewishDateTrait};
 #[cfg(test)]
 mod tests {
-    use chrono::DateTime;
 
     use super::*;
     use crate::java::jewish_date::JavaJewishDate;
@@ -23,7 +22,6 @@ mod tests {
                 Some(date) => date,
                 None => continue, // Skip invalid timestamps
             };
-            let chrono_date = DateTime::from_timestamp_millis(timestamp + tz_offset).unwrap();
 
             // Create Java implementation (note: Java version doesn't use timezone offset in constructor)
             let java_date = JavaJewishDate::from_date(&jvm, timestamp, tz_offset);

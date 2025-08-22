@@ -374,7 +374,7 @@ impl<'a> JavaJewishDate<'a> {
     }
 
     /// Get the molad date
-    pub fn get_molad(&self) -> JavaJewishDate {
+    pub fn get_molad(&self) -> JavaJewishDate<'_> {
         let result = self
             .jvm
             .invoke(&self.instance, "getMolad", InvocationArg::empty())
