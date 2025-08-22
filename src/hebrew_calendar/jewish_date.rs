@@ -292,9 +292,9 @@ impl JewishDateTrait for JewishDate {
         let chalakim_since_molad_tohu = self.get_chalakim_since_molad_tohu();
         let abs_date = Self::molad_to_abs_date(chalakim_since_molad_tohu);
         let gregorian_date = Self::abs_date_to_date(abs_date);
-        let conjunction_day = (chalakim_since_molad_tohu / constants::CHALAKIM_PER_DAY);
+        let conjunction_day = chalakim_since_molad_tohu / constants::CHALAKIM_PER_DAY;
         let conjunction_parts =
-            (chalakim_since_molad_tohu - conjunction_day * constants::CHALAKIM_PER_DAY);
+            chalakim_since_molad_tohu - conjunction_day * constants::CHALAKIM_PER_DAY;
         let hours = conjunction_parts / constants::CHALAKIM_PER_HOUR;
         let adjusted_conjunction_parts = conjunction_parts - (hours * constants::CHALAKIM_PER_HOUR);
         let minutes = adjusted_conjunction_parts / constants::CHALAKIM_PER_MINUTE;
@@ -472,16 +472,16 @@ impl JewishDate {
     }
     fn abs_date_to_date(abs_date: i64) -> Date<Gregorian> {
         let mut year: i64 = abs_date / 366; // Search forward year by year from approximate year
-        while (abs_date >= Self::gregorian_date_to_abs_date(year + 1, 1, 1)) {
+        while abs_date >= Self::gregorian_date_to_abs_date(year + 1, 1, 1) {
             year += 1;
         }
         let mut month: i64 = 1;
-        while (abs_date
+        while abs_date
             > Self::gregorian_date_to_abs_date(
                 year,
                 month,
                 Self::get_last_day_of_gregorian_month(month, year),
-            ))
+            )
         {
             month += 1;
         }

@@ -1,4 +1,3 @@
-use zmanim_core::hebrew_calendar::MoladData;
 use zmanim_core::hebrew_calendar::jewish_date::{JewishDate, JewishDateTrait};
 #[cfg(test)]
 mod tests {
