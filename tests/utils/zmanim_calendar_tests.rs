@@ -7,7 +7,8 @@ use zmanim_core::{
 use crate::{
     java::{noaa_calculator::JavaNOAACalculator, zmanim_calendar::JavaZmanimCalendar},
     test_utils::{
-        assert_almost_equal_f64_option, create_jvm, random_test_geolocation, random_test_timestamp,
+        assert_almost_equal_f64_option, assert_almost_equal_i64_option, create_jvm,
+        random_test_geolocation, random_test_timestamp,
     },
 };
 #[derive(Debug)]
@@ -18,7 +19,7 @@ struct TestCase {
     timestamp: i64,
     use_astronomical_chatzos: bool,
     use_astronomical_chatzos_for_other_zmanim: bool,
-    candle_lighting_offset: f64,
+    candle_lighting_offset: i64,
 }
 
 impl TestCase {
@@ -28,7 +29,7 @@ impl TestCase {
         let test_use_astronomical_chatzos = rand::rng().random_range(0.0..=1.0) > 0.5;
         let test_use_astronomical_chatzos_for_other_zmanim =
             rand::rng().random_range(0.0..=1.0) > 0.5;
-        let test_candle_lighting_offset = rand::rng().random_range(0.0..=60.0);
+        let test_candle_lighting_offset = rand::rng().random_range(0..=60 * 1000);
         Self {
             lat: test_geo.lat,
             lon: test_geo.lon,
@@ -68,86 +69,86 @@ fn test_zmanim_calendar() {
         );
 
         let message = format!("test_case: {:?}", test_case);
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &zmanim_calendar.get_tzais(),
             &java_zmanim_calendar.get_tzais(),
-            0.00000001,
+            0,
             &message,
         );
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &zmanim_calendar.get_alos_hashachar(),
             &java_zmanim_calendar.get_alos_hashachar(),
-            0.00000001,
+            0,
             &message,
         );
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &zmanim_calendar.get_alos72(),
             &java_zmanim_calendar.get_alos72(),
-            0.00000001,
+            0,
             &message,
         );
 
         // Test new methods
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &zmanim_calendar.get_tzais72(),
             &java_zmanim_calendar.get_tzais72(),
-            0.00000001,
+            0,
             &message,
         );
 
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &zmanim_calendar.get_candle_lighting(),
             &java_zmanim_calendar.get_candle_lighting(),
-            1.0,
+            1,
             &message,
         );
 
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &zmanim_calendar.get_sof_zman_shma_gra(),
             &java_zmanim_calendar.get_sof_zman_shma_gra(),
-            0.00000001,
+            0,
             &message,
         );
 
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &zmanim_calendar.get_sof_zman_shma_mga(),
             &java_zmanim_calendar.get_sof_zman_shma_mga(),
-            0.00000001,
+            0,
             &message,
         );
 
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &zmanim_calendar.get_sof_zman_tfila_gra(),
             &java_zmanim_calendar.get_sof_zman_tfila_gra(),
-            0.00000001,
+            0,
             &message,
         );
 
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &zmanim_calendar.get_sof_zman_tfila_mga(),
             &java_zmanim_calendar.get_sof_zman_tfila_mga(),
-            0.00000001,
+            0,
             &message,
         );
 
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &zmanim_calendar.get_mincha_gedola_default(),
             &java_zmanim_calendar.get_mincha_gedola_default(),
-            1.0,
+            1,
             &message,
         );
 
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &zmanim_calendar.get_mincha_ketana_default(),
             &java_zmanim_calendar.get_mincha_ketana_default(),
-            1.0,
+            1,
             &message,
         );
 
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &zmanim_calendar.get_plag_hamincha_default(),
             &java_zmanim_calendar.get_plag_hamincha_default(),
-            1.0,
+            1,
             &message,
         );
 
@@ -184,12 +185,7 @@ fn test_zmanim_calendar() {
             let rust_half_day_zman = zmanim_calendar.get_half_day_based_zman(sunrise, sunset, 3.0);
             let java_half_day_zman =
                 java_zmanim_calendar.get_half_day_based_zman(sunrise, sunset, 3.0);
-            assert_almost_equal_f64_option(
-                &rust_half_day_zman,
-                &java_half_day_zman,
-                0.00000001,
-                &message,
-            );
+            assert_almost_equal_i64_option(&rust_half_day_zman, &java_half_day_zman, 0, &message);
 
             // Test half day based shaah zmanis
             let rust_half_day_shaah =
@@ -203,33 +199,23 @@ fn test_zmanim_calendar() {
             let rust_shaah_zman = zmanim_calendar.get_shaah_zmanis_based_zman(sunrise, sunset, 4.0);
             let java_shaah_zman =
                 java_zmanim_calendar.get_shaah_zmanis_based_zman(sunrise, sunset, 4.0);
-            assert_almost_equal_f64_option(
-                &rust_shaah_zman,
-                &java_shaah_zman,
-                0.00000001,
-                &message,
-            );
+            assert_almost_equal_i64_option(&rust_shaah_zman, &java_shaah_zman, 0, &message);
 
             // Test sof zman shma variants
             let rust_sof_zman_shma =
                 zmanim_calendar._get_sof_zman_shma(sunrise, Some(sunset), true);
             let java_sof_zman_shma =
                 java_zmanim_calendar._get_sof_zman_shma(sunrise, Some(sunset), true);
-            assert_almost_equal_f64_option(
-                &rust_sof_zman_shma,
-                &java_sof_zman_shma,
-                0.00000001,
-                &message,
-            );
+            assert_almost_equal_i64_option(&rust_sof_zman_shma, &java_sof_zman_shma, 0, &message);
 
             let rust_sof_zman_shma_simple =
                 zmanim_calendar.get_sof_zman_shma_simple(sunrise, sunset);
             let java_sof_zman_shma_simple =
                 java_zmanim_calendar.get_sof_zman_shma_simple(sunrise, sunset);
-            assert_almost_equal_f64_option(
+            assert_almost_equal_i64_option(
                 &rust_sof_zman_shma_simple,
                 &java_sof_zman_shma_simple,
-                0.00000001,
+                0,
                 &message,
             );
 
@@ -238,21 +224,16 @@ fn test_zmanim_calendar() {
                 zmanim_calendar._get_sof_zman_tfila(sunrise, Some(sunset), true);
             let java_sof_zman_tfila =
                 java_zmanim_calendar._get_sof_zman_tfila(sunrise, Some(sunset), true);
-            assert_almost_equal_f64_option(
-                &rust_sof_zman_tfila,
-                &java_sof_zman_tfila,
-                0.00000001,
-                &message,
-            );
+            assert_almost_equal_i64_option(&rust_sof_zman_tfila, &java_sof_zman_tfila, 0, &message);
 
             let rust_sof_zman_tfila_simple =
                 zmanim_calendar.get_sof_zman_tfila_simple(sunrise, sunset);
             let java_sof_zman_tfila_simple =
                 java_zmanim_calendar.get_sof_zman_tfila_simple(sunrise, sunset);
-            assert_almost_equal_f64_option(
+            assert_almost_equal_i64_option(
                 &rust_sof_zman_tfila_simple,
                 &java_sof_zman_tfila_simple,
-                0.00000001,
+                0,
                 &message,
             );
 
@@ -261,16 +242,16 @@ fn test_zmanim_calendar() {
                 zmanim_calendar._get_mincha_gedola(Some(sunrise), sunset, true);
             let java_mincha_gedola =
                 java_zmanim_calendar._get_mincha_gedola(Some(sunrise), sunset, true);
-            assert_almost_equal_f64_option(&rust_mincha_gedola, &java_mincha_gedola, 1.0, &message);
+            assert_almost_equal_i64_option(&rust_mincha_gedola, &java_mincha_gedola, 1, &message);
 
             let rust_mincha_gedola_simple =
                 zmanim_calendar.get_mincha_gedola_simple(sunrise, sunset);
             let java_mincha_gedola_simple =
                 java_zmanim_calendar.get_mincha_gedola_simple(sunrise, sunset);
-            assert_almost_equal_f64_option(
+            assert_almost_equal_i64_option(
                 &rust_mincha_gedola_simple,
                 &java_mincha_gedola_simple,
-                1.0,
+                1,
                 &message,
             );
 
@@ -279,21 +260,16 @@ fn test_zmanim_calendar() {
                 zmanim_calendar._get_samuch_le_mincha_ketana(Some(sunrise), sunset, true);
             let java_samuch_mincha =
                 java_zmanim_calendar._get_samuch_le_mincha_ketana(Some(sunrise), sunset, true);
-            assert_almost_equal_f64_option(
-                &rust_samuch_mincha,
-                &java_samuch_mincha,
-                0.00000001,
-                &message,
-            );
+            assert_almost_equal_i64_option(&rust_samuch_mincha, &java_samuch_mincha, 0, &message);
 
             let rust_samuch_mincha_simple =
                 zmanim_calendar.get_samuch_le_mincha_ketana_simple(sunrise, sunset);
             let java_samuch_mincha_simple =
                 java_zmanim_calendar.get_samuch_le_mincha_ketana_simple(sunrise, sunset);
-            assert_almost_equal_f64_option(
+            assert_almost_equal_i64_option(
                 &rust_samuch_mincha_simple,
                 &java_samuch_mincha_simple,
-                0.00000001,
+                0,
                 &message,
             );
 
@@ -302,16 +278,16 @@ fn test_zmanim_calendar() {
                 zmanim_calendar._get_mincha_ketana(Some(sunrise), sunset, true);
             let java_mincha_ketana =
                 java_zmanim_calendar._get_mincha_ketana(Some(sunrise), sunset, true);
-            assert_almost_equal_f64_option(&rust_mincha_ketana, &java_mincha_ketana, 1.0, &message);
+            assert_almost_equal_i64_option(&rust_mincha_ketana, &java_mincha_ketana, 1, &message);
 
             let rust_mincha_ketana_simple =
                 zmanim_calendar.get_mincha_ketana_simple(sunrise, sunset);
             let java_mincha_ketana_simple =
                 java_zmanim_calendar.get_mincha_ketana_simple(sunrise, sunset);
-            assert_almost_equal_f64_option(
+            assert_almost_equal_i64_option(
                 &rust_mincha_ketana_simple,
                 &java_mincha_ketana_simple,
-                1.0,
+                1,
                 &message,
             );
 
@@ -320,16 +296,16 @@ fn test_zmanim_calendar() {
                 zmanim_calendar._get_plag_hamincha(Some(sunrise), sunset, true);
             let java_plag_hamincha =
                 java_zmanim_calendar._get_plag_hamincha(Some(sunrise), sunset, true);
-            assert_almost_equal_f64_option(&rust_plag_hamincha, &java_plag_hamincha, 1.0, &message);
+            assert_almost_equal_i64_option(&rust_plag_hamincha, &java_plag_hamincha, 1, &message);
 
             let rust_plag_hamincha_simple =
                 zmanim_calendar.get_plag_hamincha_simple(sunrise, sunset);
             let java_plag_hamincha_simple =
                 java_zmanim_calendar.get_plag_hamincha_simple(sunrise, sunset);
-            assert_almost_equal_f64_option(
+            assert_almost_equal_i64_option(
                 &rust_plag_hamincha_simple,
                 &java_plag_hamincha_simple,
-                1.0,
+                1,
                 &message,
             );
         }
@@ -337,15 +313,15 @@ fn test_zmanim_calendar() {
         let rust_chatzos = zmanim_calendar.get_chatzos();
         let java_chatzos = java_zmanim_calendar.get_chatzos();
 
-        assert_almost_equal_f64_option(&rust_chatzos, &java_chatzos, 0.00000001, &message);
+        assert_almost_equal_i64_option(&rust_chatzos, &java_chatzos, 0, &message);
 
         let rust_chatzos_as_half_day = zmanim_calendar.get_chatzos_as_half_day();
         let java_chatzos_as_half_day = java_zmanim_calendar.get_chatzos_as_half_day();
 
-        assert_almost_equal_f64_option(
+        assert_almost_equal_i64_option(
             &rust_chatzos_as_half_day,
             &java_chatzos_as_half_day,
-            0.00000001,
+            0,
             &message,
         );
         drop(java_zmanim_calendar);

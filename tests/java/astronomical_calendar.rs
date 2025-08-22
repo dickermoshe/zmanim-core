@@ -89,7 +89,7 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
         self.jvm.to_rust::<f64>(result).unwrap()
     }
 
-    fn get_sea_level_sunset(&self) -> Option<f64> {
+    fn get_sea_level_sunset(&self) -> Option<i64> {
         let date = self
             .jvm
             .invoke(&self.instance, "getSeaLevelSunset", InvocationArg::empty())
@@ -108,10 +108,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_sun_transit(&self) -> Option<f64> {
+    fn get_sun_transit(&self) -> Option<i64> {
         let date = self
             .jvm
             .invoke(&self.instance, "getSunTransit", InvocationArg::empty())
@@ -130,10 +130,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_solar_midnight(&self) -> Option<f64> {
+    fn get_solar_midnight(&self) -> Option<i64> {
         let date = self
             .jvm
             .invoke(&self.instance, "getSolarMidnight", InvocationArg::empty())
@@ -152,10 +152,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_sunset(&self) -> Option<f64> {
+    fn get_sunset(&self) -> Option<i64> {
         let date = self
             .jvm
             .invoke(&self.instance, "getSunset", InvocationArg::empty())
@@ -174,10 +174,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_sunrise(&self) -> Option<f64> {
+    fn get_sunrise(&self) -> Option<i64> {
         let date = self
             .jvm
             .invoke(&self.instance, "getSunrise", InvocationArg::empty())
@@ -196,10 +196,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_sea_level_sunrise(&self) -> Option<f64> {
+    fn get_sea_level_sunrise(&self) -> Option<i64> {
         let date = self
             .jvm
             .invoke(&self.instance, "getSeaLevelSunrise", InvocationArg::empty())
@@ -218,10 +218,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_sunrise_offset_by_degrees(&self, degrees: f64) -> Option<f64> {
+    fn get_sunrise_offset_by_degrees(&self, degrees: f64) -> Option<i64> {
         let date = self
             .jvm
             .invoke(
@@ -247,10 +247,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_sunset_offset_by_degrees(&self, degrees: f64) -> Option<f64> {
+    fn get_sunset_offset_by_degrees(&self, degrees: f64) -> Option<i64> {
         let date = self
             .jvm
             .invoke(
@@ -276,10 +276,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_begin_civil_twilight(&self) -> Option<f64> {
+    fn get_begin_civil_twilight(&self) -> Option<i64> {
         let date = self
             .jvm
             .invoke(
@@ -302,10 +302,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_begin_nautical_twilight(&self) -> Option<f64> {
+    fn get_begin_nautical_twilight(&self) -> Option<i64> {
         let date = self
             .jvm
             .invoke(
@@ -328,10 +328,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_begin_astronomical_twilight(&self) -> Option<f64> {
+    fn get_begin_astronomical_twilight(&self) -> Option<i64> {
         let date = self
             .jvm
             .invoke(
@@ -354,10 +354,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_end_civil_twilight(&self) -> Option<f64> {
+    fn get_end_civil_twilight(&self) -> Option<i64> {
         let date = self
             .jvm
             .invoke(
@@ -380,10 +380,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_end_nautical_twilight(&self) -> Option<f64> {
+    fn get_end_nautical_twilight(&self) -> Option<i64> {
         let date = self
             .jvm
             .invoke(
@@ -406,10 +406,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
-    fn get_end_astronomical_twilight(&self) -> Option<f64> {
+    fn get_end_astronomical_twilight(&self) -> Option<i64> {
         let date = self
             .jvm
             .invoke(
@@ -432,7 +432,7 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
             .jvm
             .invoke(&date, "getTime", InvocationArg::empty())
             .unwrap();
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 
     fn get_temporal_hour(&self) -> Option<i64> {
@@ -450,8 +450,8 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
 
     fn get_temporal_hour_with_start_and_end_times(
         &self,
-        start_time: f64,
-        end_time: f64,
+        start_time: i64,
+        end_time: i64,
     ) -> Option<i64> {
         let start_date = create_date(self.jvm, start_time as i64);
         let end_date = create_date(self.jvm, end_time as i64);
@@ -478,9 +478,9 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
 
     fn get_sun_transit_with_start_and_end_times(
         &self,
-        start_time: f64,
-        end_time: f64,
-    ) -> Option<f64> {
+        start_time: i64,
+        end_time: i64,
+    ) -> Option<i64> {
         let start_date = create_date(self.jvm, start_time as i64);
         let end_date = create_date(self.jvm, end_time as i64);
         let result = self
@@ -504,6 +504,6 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
         {
             return None;
         }
-        Some(self.jvm.to_rust::<f64>(result).unwrap())
+        Some(self.jvm.to_rust::<i64>(result).unwrap())
     }
 }

@@ -19,7 +19,7 @@ impl<'a> JavaZmanimCalendar<'a> {
         noaa_calculator: JavaNOAACalculator,
         use_astronomical_chatzos: bool,
         use_astronomical_chatzos_for_other_zmanim: bool,
-        candle_lighting_offset: f64,
+        candle_lighting_offset: i64,
     ) -> Self {
         let geolocation = JavaGeoLocation::new(jvm, geo_location);
         let calendar = create_calendar(jvm, timestamp);
@@ -64,10 +64,12 @@ impl<'a> JavaZmanimCalendar<'a> {
         jvm.invoke(
             &instance,
             "setCandleLightingOffset",
-            &[InvocationArg::try_from(candle_lighting_offset)
-                .unwrap()
-                .into_primitive()
-                .unwrap()],
+            &[
+                InvocationArg::try_from(candle_lighting_offset as f64 / 1000.0 / 60.0)
+                    .unwrap()
+                    .into_primitive()
+                    .unwrap(),
+            ],
         )
         .unwrap();
         // We always use elevation
@@ -86,8 +88,8 @@ impl<'a> JavaZmanimCalendar<'a> {
 }
 
 impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
-    fn get_tzais(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -96,8 +98,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_hashachar(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_hashachar(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -106,8 +108,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos72(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos72(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -116,8 +118,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_chatzos(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_chatzos(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -126,8 +128,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_chatzos_as_half_day(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_chatzos_as_half_day(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -165,17 +167,17 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
     fn get_half_day_based_zman(
         &self,
-        start_of_half_day: f64,
-        end_of_half_day: f64,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
         hours: f64,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         let start_date = create_date(&self.jvm, start_of_half_day as i64);
         let end_date = create_date(&self.jvm, end_of_half_day as i64);
 
         let start_arg = InvocationArg::try_from(start_date).unwrap();
         let end_arg = InvocationArg::try_from(end_date).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -197,8 +199,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
     fn get_half_day_based_shaah_zmanis(
         &self,
-        start_of_half_day: f64,
-        end_of_half_day: f64,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
     ) -> Option<i64> {
         let start_date = create_date(&self.jvm, start_of_half_day as i64);
         let end_date = create_date(&self.jvm, end_of_half_day as i64);
@@ -225,17 +227,17 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
     fn get_shaah_zmanis_based_zman(
         &self,
-        start_of_day: f64,
-        end_of_day: f64,
+        start_of_day: i64,
+        end_of_day: i64,
         hours: f64,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         let start_date = create_date(&self.jvm, start_of_day as i64);
         let end_date = create_date(&self.jvm, end_of_day as i64);
 
         let start_arg = InvocationArg::try_from(start_date).unwrap();
         let end_arg = InvocationArg::try_from(end_date).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -257,10 +259,10 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
     fn _get_sof_zman_shma(
         &self,
-        start_of_day: f64,
-        end_of_day: Option<f64>,
+        start_of_day: i64,
+        end_of_day: Option<i64>,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         let start_date = create_date(&self.jvm, start_of_day as i64);
         let end_arg = end_of_day
             .map(|day| InvocationArg::try_from(create_date(&self.jvm, day as i64)).unwrap())
@@ -268,7 +270,7 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
         let start_arg = InvocationArg::try_from(start_date).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -288,14 +290,14 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_sof_zman_shma_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         let start_date = create_date(&self.jvm, start_of_day as i64);
         let end_date = create_date(&self.jvm, end_of_day as i64);
 
         let start_arg = InvocationArg::try_from(start_date).unwrap();
         let end_arg = InvocationArg::try_from(end_date).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -304,8 +306,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_gra(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_gra(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -314,8 +316,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -324,8 +326,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais72(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais72(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -334,8 +336,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_candle_lighting(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_candle_lighting(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -346,10 +348,10 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
     fn _get_sof_zman_tfila(
         &self,
-        start_of_day: f64,
-        end_of_day: Option<f64>,
+        start_of_day: i64,
+        end_of_day: Option<i64>,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         let start_date = create_date(&self.jvm, start_of_day as i64);
         let end_arg = end_of_day
             .map(|day| InvocationArg::try_from(create_date(&self.jvm, day as i64)).unwrap())
@@ -357,7 +359,7 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
         let start_arg = InvocationArg::try_from(start_date).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -377,14 +379,14 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_sof_zman_tfila_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         let start_date = create_date(&self.jvm, start_of_day as i64);
         let end_date = create_date(&self.jvm, end_of_day as i64);
 
         let start_arg = InvocationArg::try_from(start_date).unwrap();
         let end_arg = InvocationArg::try_from(end_date).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -393,8 +395,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_gra(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_gra(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -403,8 +405,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_mga(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_mga(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -415,17 +417,17 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
     fn _get_mincha_gedola(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         let start_arg = start_of_day
             .map(|day| InvocationArg::try_from(create_date(&self.jvm, day as i64)).unwrap())
             .unwrap_or(InvocationArg::try_from(Null::Double).unwrap());
 
         let end_arg = InvocationArg::try_from(create_date(&self.jvm, end_of_day as i64)).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -445,7 +447,7 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_mincha_gedola_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_mincha_gedola_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         let start_date = create_date(&self.jvm, start_of_day as i64);
         let end_date = create_date(&self.jvm, end_of_day as i64);
 
@@ -453,7 +455,7 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
         let end_arg = InvocationArg::try_from(end_date).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -462,8 +464,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_mincha_gedola_default(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_gedola_default(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -474,17 +476,17 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
     fn _get_samuch_le_mincha_ketana(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         let start_arg = start_of_day
             .map(|day| InvocationArg::try_from(create_date(&self.jvm, day as i64)).unwrap())
             .unwrap_or(InvocationArg::try_from(Null::Double).unwrap());
 
         let end_arg = InvocationArg::try_from(create_date(&self.jvm, end_of_day as i64)).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -506,15 +508,15 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
     fn get_samuch_le_mincha_ketana_simple(
         &self,
-        start_of_day: f64,
-        end_of_day: f64,
-    ) -> Option<f64> {
+        start_of_day: i64,
+        end_of_day: i64,
+    ) -> Option<i64> {
         let start_arg =
             InvocationArg::try_from(create_date(&self.jvm, start_of_day as i64)).unwrap();
 
         let end_arg = InvocationArg::try_from(create_date(&self.jvm, end_of_day as i64)).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -529,17 +531,17 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
     fn _get_mincha_ketana(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         let start_arg = start_of_day
             .map(|day| InvocationArg::try_from(create_date(&self.jvm, day as i64)).unwrap())
             .unwrap_or(InvocationArg::try_from(Null::Double).unwrap());
 
         let end_arg = InvocationArg::try_from(create_date(&self.jvm, end_of_day as i64)).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -559,12 +561,12 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_mincha_ketana_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_mincha_ketana_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         let start_arg =
             InvocationArg::try_from(create_date(&self.jvm, start_of_day as i64)).unwrap();
         let end_arg = InvocationArg::try_from(create_date(&self.jvm, end_of_day as i64)).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -573,8 +575,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_mincha_ketana_default(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_ketana_default(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -585,17 +587,17 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
 
     fn _get_plag_hamincha(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         let start_arg = start_of_day
             .map(|day| InvocationArg::try_from(create_date(&self.jvm, day as i64)).unwrap())
             .unwrap_or(InvocationArg::try_from(Null::Double).unwrap());
 
         let end_arg = InvocationArg::try_from(create_date(&self.jvm, end_of_day as i64)).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -615,12 +617,12 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_plag_hamincha_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_plag_hamincha_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         let start_arg =
             InvocationArg::try_from(create_date(&self.jvm, start_of_day as i64)).unwrap();
         let end_arg = InvocationArg::try_from(create_date(&self.jvm, end_of_day as i64)).unwrap();
 
-        java_date_to_f64(
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -629,8 +631,8 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         )
     }
 
-    fn get_plag_hamincha_default(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_default(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -667,7 +669,7 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         }
     }
 }
-fn java_date_to_f64(jvm: &Jvm, value: &Instance) -> Option<f64> {
+fn java_date_to_i64(jvm: &Jvm, value: &Instance) -> Option<i64> {
     if jvm
         .check_equals(
             value,
@@ -681,5 +683,5 @@ fn java_date_to_f64(jvm: &Jvm, value: &Instance) -> Option<f64> {
     let result = jvm
         .invoke(&value, "getTime", InvocationArg::empty())
         .unwrap();
-    Some(jvm.to_rust::<f64>(result).unwrap())
+    Some(jvm.to_rust::<i64>(result).unwrap())
 }

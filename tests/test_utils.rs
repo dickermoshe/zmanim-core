@@ -98,6 +98,7 @@ pub fn assert_almost_equal_f64_option(
         (None, None) => (),
         _ => {
             println!("Error: {:?} vs {:?}, {}", a, b, message);
+            panic!("Not matching!")
         }
     }
 }
@@ -113,6 +114,7 @@ pub fn assert_almost_equal_f64_result(
         (Err(_), Err(_)) => (), // Both errors are considered equal
         _ => {
             println!("Error: {:?} vs {:?}, {}", a, b, message);
+            panic!("Not Equal!")
         }
     }
 }
@@ -138,6 +140,7 @@ pub fn assert_almost_equal_i64_option(
         (None, None) => (),
         _ => {
             println!("Error: {:?} vs {:?}, {}", a, b, message);
+            panic!("Not Equal!")
         }
     }
 }

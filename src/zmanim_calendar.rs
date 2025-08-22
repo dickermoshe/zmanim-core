@@ -12,85 +12,85 @@ pub struct ZmanimCalendar<'a> {
     astronomical_calendar: AstronomicalCalendar<'a>,
     use_astronomical_chatzos: bool,
     use_astronomical_chatzos_for_other_zmanim: bool,
-    candle_lighting_offset: f64,
+    candle_lighting_offset: i64,
 }
 
 pub trait ZmanimCalendarTrait {
-    fn get_tzais(&self) -> Option<f64>;
-    fn get_alos_hashachar(&self) -> Option<f64>;
-    fn get_alos72(&self) -> Option<f64>;
-    fn get_chatzos(&self) -> Option<f64>;
-    fn get_chatzos_as_half_day(&self) -> Option<f64>;
+    fn get_tzais(&self) -> Option<i64>;
+    fn get_alos_hashachar(&self) -> Option<i64>;
+    fn get_alos72(&self) -> Option<i64>;
+    fn get_chatzos(&self) -> Option<i64>;
+    fn get_chatzos_as_half_day(&self) -> Option<i64>;
     fn get_percent_of_shaah_zmanis_from_degrees(&self, degrees: f64, sunset: bool) -> Option<f64>;
     fn get_half_day_based_zman(
         &self,
-        start_of_half_day: f64,
-        end_of_half_day: f64,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
         hours: f64,
-    ) -> Option<f64>;
+    ) -> Option<i64>;
     fn get_half_day_based_shaah_zmanis(
         &self,
-        start_of_half_day: f64,
-        end_of_half_day: f64,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
     ) -> Option<i64>;
     fn get_shaah_zmanis_based_zman(
         &self,
-        start_of_day: f64,
-        end_of_day: f64,
+        start_of_day: i64,
+        end_of_day: i64,
         hours: f64,
-    ) -> Option<f64>;
+    ) -> Option<i64>;
     fn _get_sof_zman_shma(
         &self,
-        start_of_day: f64,
-        end_of_day: Option<f64>,
+        start_of_day: i64,
+        end_of_day: Option<i64>,
         synchronous: bool,
-    ) -> Option<f64>;
-    fn get_sof_zman_shma_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64>;
-    fn get_sof_zman_shma_gra(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga(&self) -> Option<f64>;
-    fn get_tzais72(&self) -> Option<f64>;
-    fn get_candle_lighting(&self) -> Option<f64>;
+    ) -> Option<i64>;
+    fn get_sof_zman_shma_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64>;
+    fn get_sof_zman_shma_gra(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga(&self) -> Option<i64>;
+    fn get_tzais72(&self) -> Option<i64>;
+    fn get_candle_lighting(&self) -> Option<i64>;
     fn _get_sof_zman_tfila(
         &self,
-        start_of_day: f64,
-        end_of_day: Option<f64>,
+        start_of_day: i64,
+        end_of_day: Option<i64>,
         synchronous: bool,
-    ) -> Option<f64>;
-    fn get_sof_zman_tfila_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64>;
-    fn get_sof_zman_tfila_gra(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_mga(&self) -> Option<f64>;
+    ) -> Option<i64>;
+    fn get_sof_zman_tfila_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64>;
+    fn get_sof_zman_tfila_gra(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_mga(&self) -> Option<i64>;
     fn _get_mincha_gedola(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64>;
-    fn get_mincha_gedola_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64>;
-    fn get_mincha_gedola_default(&self) -> Option<f64>;
+    ) -> Option<i64>;
+    fn get_mincha_gedola_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64>;
+    fn get_mincha_gedola_default(&self) -> Option<i64>;
     fn _get_samuch_le_mincha_ketana(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64>;
-    fn get_samuch_le_mincha_ketana_simple(&self, start_of_day: f64, end_of_day: f64)
-    -> Option<f64>;
+    ) -> Option<i64>;
+    fn get_samuch_le_mincha_ketana_simple(&self, start_of_day: i64, end_of_day: i64)
+    -> Option<i64>;
     fn _get_mincha_ketana(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64>;
-    fn get_mincha_ketana_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64>;
-    fn get_mincha_ketana_default(&self) -> Option<f64>;
+    ) -> Option<i64>;
+    fn get_mincha_ketana_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64>;
+    fn get_mincha_ketana_default(&self) -> Option<i64>;
     fn _get_plag_hamincha(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64>;
-    fn get_plag_hamincha_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64>;
-    fn get_plag_hamincha_default(&self) -> Option<f64>;
+    ) -> Option<i64>;
+    fn get_plag_hamincha_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64>;
+    fn get_plag_hamincha_default(&self) -> Option<i64>;
     fn get_shaah_zmanis_gra(&self) -> Option<i64>;
     fn get_shaah_zmanis_mga(&self) -> Option<i64>;
 }
@@ -102,7 +102,7 @@ impl<'a> ZmanimCalendar<'a> {
 
         use_astronomical_chatzos: bool,
         use_astronomical_chatzos_for_other_zmanim: bool,
-        candle_lighting_offset: f64,
+        candle_lighting_offset: i64,
     ) -> Self {
         Self {
             astronomical_calendar: AstronomicalCalendar::new(timestamp, geo_location),
@@ -117,21 +117,21 @@ impl<'a> ZmanimCalendar<'a> {
 }
 
 impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
-    fn get_tzais(&self) -> Option<f64> {
+    fn get_tzais(&self) -> Option<i64> {
         self.astronomical_calendar
             .get_sunset_offset_by_degrees(ZENITH_8_POINT_5)
     }
 
-    fn get_alos_hashachar(&self) -> Option<f64> {
+    fn get_alos_hashachar(&self) -> Option<i64> {
         self.astronomical_calendar
             .get_sunrise_offset_by_degrees(ZENITH_16_POINT_1)
     }
-    fn get_alos72(&self) -> Option<f64> {
+    fn get_alos72(&self) -> Option<i64> {
         self.astronomical_calendar
             .get_sunrise()
-            .map(|sunrise| sunrise + -72 as f64 * MINUTE_MILLIS as f64)
+            .map(|sunrise| sunrise + -72 * MINUTE_MILLIS)
     }
-    fn get_chatzos(&self) -> Option<f64> {
+    fn get_chatzos(&self) -> Option<i64> {
         if self.use_astronomical_chatzos {
             self.astronomical_calendar.get_sun_transit()
         } else {
@@ -139,7 +139,7 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
                 .or(self.astronomical_calendar.get_sun_transit())
         }
     }
-    fn get_chatzos_as_half_day(&self) -> Option<f64> {
+    fn get_chatzos_as_half_day(&self) -> Option<i64> {
         let sunrise = self.astronomical_calendar.get_sea_level_sunrise()?;
         let sunset = self.astronomical_calendar.get_sea_level_sunset()?;
         let chatzos = self
@@ -162,13 +162,13 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
 
         let result = match (sea_level_sunrise, sea_level_sunset, twilight) {
             (Some(sunrise), Some(sunset_time), Some(twilight_time)) => {
-                let shaah_zmanis = (sunset_time - sunrise) / 12.0;
+                let shaah_zmanis = (sunset_time - sunrise) as f64 / 12.0;
                 let rise_set_to_twilight = if sunset {
                     twilight_time - sunset_time
                 } else {
                     sunrise - twilight_time
                 };
-                Some(rise_set_to_twilight / shaah_zmanis)
+                Some(rise_set_to_twilight as f64 / shaah_zmanis)
             }
             _ => None,
         };
@@ -177,45 +177,45 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
 
     fn get_half_day_based_zman(
         &self,
-        start_of_half_day: f64,
-        end_of_half_day: f64,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
         hours: f64,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         let shaah_zmanis =
             self.get_half_day_based_shaah_zmanis(start_of_half_day, end_of_half_day)?;
         if hours >= 0.0 {
-            Some(start_of_half_day + (shaah_zmanis as f64 * hours))
+            Some(start_of_half_day + (shaah_zmanis as f64 * hours) as i64)
         } else {
-            Some(end_of_half_day + (shaah_zmanis as f64 * hours))
+            Some(end_of_half_day + (shaah_zmanis as f64 * hours) as i64)
         }
     }
 
     fn get_half_day_based_shaah_zmanis(
         &self,
-        start_of_half_day: f64,
-        end_of_half_day: f64,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
     ) -> Option<i64> {
-        Some(((end_of_half_day - start_of_half_day) / 6.0) as i64)
+        Some((end_of_half_day - start_of_half_day) / 6)
     }
 
     fn get_shaah_zmanis_based_zman(
         &self,
-        start_of_day: f64,
-        end_of_day: f64,
+        start_of_day: i64,
+        end_of_day: i64,
         hours: f64,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         let shaah_zmanis = self
             .astronomical_calendar
             .get_temporal_hour_with_start_and_end_times(start_of_day, end_of_day)?;
-        Some(start_of_day + (shaah_zmanis as f64 * hours))
+        Some(start_of_day + (shaah_zmanis as f64 * hours) as i64)
     }
 
     fn _get_sof_zman_shma(
         &self,
-        start_of_day: f64,
-        end_of_day: Option<f64>,
+        start_of_day: i64,
+        end_of_day: Option<i64>,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         if self.use_astronomical_chatzos_for_other_zmanim && synchronous {
             self.get_half_day_based_zman(start_of_day, self.get_chatzos()?, 3.0)
         } else {
@@ -223,11 +223,11 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
         }
     }
 
-    fn get_sof_zman_shma_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_sof_zman_shma_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         self._get_sof_zman_shma(start_of_day, Some(end_of_day), false)
     }
 
-    fn get_sof_zman_shma_gra(&self) -> Option<f64> {
+    fn get_sof_zman_shma_gra(&self) -> Option<i64> {
         self._get_sof_zman_shma(
             self.astronomical_calendar.get_sunrise()?,
             self.astronomical_calendar.get_sunset(),
@@ -235,28 +235,28 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga(&self) -> Option<i64> {
         self._get_sof_zman_shma(self.get_alos72()?, self.get_tzais72(), true)
     }
 
-    fn get_tzais72(&self) -> Option<f64> {
+    fn get_tzais72(&self) -> Option<i64> {
         self.astronomical_calendar
             .get_sunset()
-            .map(|sunset| sunset + 72.0 * MINUTE_MILLIS as f64)
+            .map(|sunset| sunset + 72 * MINUTE_MILLIS)
     }
 
-    fn get_candle_lighting(&self) -> Option<f64> {
+    fn get_candle_lighting(&self) -> Option<i64> {
         self.astronomical_calendar
             .get_sea_level_sunset()
-            .map(|sunset| sunset - self.candle_lighting_offset * MINUTE_MILLIS as f64)
+            .map(|sunset| sunset - self.candle_lighting_offset)
     }
 
     fn _get_sof_zman_tfila(
         &self,
-        start_of_day: f64,
-        end_of_day: Option<f64>,
+        start_of_day: i64,
+        end_of_day: Option<i64>,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         if self.use_astronomical_chatzos_for_other_zmanim && synchronous {
             self.get_half_day_based_zman(start_of_day, self.get_chatzos()?, 4.0)
         } else {
@@ -264,11 +264,11 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
         }
     }
 
-    fn get_sof_zman_tfila_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_sof_zman_tfila_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         self._get_sof_zman_tfila(start_of_day, Some(end_of_day), false)
     }
 
-    fn get_sof_zman_tfila_gra(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_gra(&self) -> Option<i64> {
         self._get_sof_zman_tfila(
             self.astronomical_calendar.get_sunrise()?,
             self.astronomical_calendar.get_sunset(),
@@ -276,16 +276,16 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_mga(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_mga(&self) -> Option<i64> {
         self._get_sof_zman_tfila(self.get_alos72()?, self.get_tzais72(), true)
     }
 
     fn _get_mincha_gedola(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         if self.use_astronomical_chatzos_for_other_zmanim && synchronous {
             self.get_half_day_based_zman(self.get_chatzos()?, end_of_day, 0.5)
         } else {
@@ -293,11 +293,11 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
         }
     }
 
-    fn get_mincha_gedola_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_mincha_gedola_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         self._get_mincha_gedola(Some(start_of_day), end_of_day, false)
     }
 
-    fn get_mincha_gedola_default(&self) -> Option<f64> {
+    fn get_mincha_gedola_default(&self) -> Option<i64> {
         self._get_mincha_gedola(
             self.astronomical_calendar.get_sunrise(),
             self.astronomical_calendar.get_sunset()?,
@@ -307,10 +307,10 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
 
     fn _get_samuch_le_mincha_ketana(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         if self.use_astronomical_chatzos_for_other_zmanim && synchronous {
             self.get_half_day_based_zman(self.get_chatzos()?, end_of_day, 3.0)
         } else {
@@ -320,18 +320,18 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
 
     fn get_samuch_le_mincha_ketana_simple(
         &self,
-        start_of_day: f64,
-        end_of_day: f64,
-    ) -> Option<f64> {
+        start_of_day: i64,
+        end_of_day: i64,
+    ) -> Option<i64> {
         self._get_samuch_le_mincha_ketana(Some(start_of_day), end_of_day, false)
     }
 
     fn _get_mincha_ketana(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         if self.use_astronomical_chatzos_for_other_zmanim && synchronous {
             self.get_half_day_based_zman(self.get_chatzos()?, end_of_day, 3.5)
         } else {
@@ -339,11 +339,11 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
         }
     }
 
-    fn get_mincha_ketana_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_mincha_ketana_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         self._get_mincha_ketana(Some(start_of_day), end_of_day, false)
     }
 
-    fn get_mincha_ketana_default(&self) -> Option<f64> {
+    fn get_mincha_ketana_default(&self) -> Option<i64> {
         self._get_mincha_ketana(
             self.astronomical_calendar.get_sunrise(),
             self.astronomical_calendar.get_sunset()?,
@@ -353,10 +353,10 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
 
     fn _get_plag_hamincha(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         if self.use_astronomical_chatzos_for_other_zmanim && synchronous {
             self.get_half_day_based_zman(self.get_chatzos()?, end_of_day, 4.75)
         } else {
@@ -364,11 +364,11 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
         }
     }
 
-    fn get_plag_hamincha_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_plag_hamincha_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         self._get_plag_hamincha(Some(start_of_day), end_of_day, false)
     }
 
-    fn get_plag_hamincha_default(&self) -> Option<f64> {
+    fn get_plag_hamincha_default(&self) -> Option<i64> {
         self._get_plag_hamincha(
             self.astronomical_calendar.get_sunrise(),
             self.astronomical_calendar.get_sunset()?,

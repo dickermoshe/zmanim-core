@@ -22,7 +22,8 @@ impl<'a> JavaComplexZmanimCalendar<'a> {
         noaa_calculator: JavaNOAACalculator,
         use_astronomical_chatzos: bool,
         use_astronomical_chatzos_for_other_zmanim: bool,
-        candle_lighting_offset: f64,
+        candle_lighting_offset: i64,
+        ateret_torah_sunset_offset: i64,
     ) -> Self {
         let geolocation = JavaGeoLocation::new(jvm, geo_location);
         let calendar = create_calendar(jvm, timestamp);
@@ -67,10 +68,24 @@ impl<'a> JavaComplexZmanimCalendar<'a> {
         jvm.invoke(
             &instance,
             "setCandleLightingOffset",
-            &[InvocationArg::try_from(candle_lighting_offset)
-                .unwrap()
-                .into_primitive()
-                .unwrap()],
+            &[
+                InvocationArg::try_from(candle_lighting_offset as f64 / 1000.0 / 60.0)
+                    .unwrap()
+                    .into_primitive()
+                    .unwrap(),
+            ],
+        )
+        .unwrap();
+
+        jvm.invoke(
+            &instance,
+            "setAteretTorahSunsetOffset",
+            &[
+                InvocationArg::try_from(ateret_torah_sunset_offset as f64 / 1000.0 / 60.0)
+                    .unwrap()
+                    .into_primitive()
+                    .unwrap(),
+            ],
         )
         .unwrap();
         // We always use elevation
@@ -312,8 +327,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
     }
 
     // Alos methods
-    fn get_alos_60(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_60(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -322,8 +337,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_72_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_72_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -332,8 +347,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_96(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_96(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -342,8 +357,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_90_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_90_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -352,8 +367,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_96_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_96_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -362,8 +377,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_90(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_90(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -372,8 +387,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_120(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_120(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -382,8 +397,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_120_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_120_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -392,8 +407,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_26_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_26_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -402,8 +417,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_18_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_18_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -412,8 +427,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_19_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_19_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -422,8 +437,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_19_point_8_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_19_point_8_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -436,8 +451,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_16_point_1_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_16_point_1_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -450,8 +465,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_baal_hatanya(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_baal_hatanya(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -461,8 +476,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
     }
 
     // Misheyakir methods
-    fn get_misheyakir_11_point_5_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_misheyakir_11_point_5_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -475,8 +490,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_misheyakir_11_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_misheyakir_11_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -489,8 +504,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_misheyakir_10_point_2_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_misheyakir_10_point_2_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -503,8 +518,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_misheyakir_7_point_65_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_misheyakir_7_point_65_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -517,8 +532,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_misheyakir_9_point_5_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_misheyakir_9_point_5_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -532,8 +547,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
     }
 
     // Sof Zman Shma methods
-    fn get_sof_zman_shma_mga_19_point_8_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_19_point_8_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -546,8 +561,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_16_point_1_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_16_point_1_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -560,8 +575,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_18_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_18_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -574,8 +589,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_72_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_72_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -588,8 +603,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_72_minutes_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_72_minutes_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -602,8 +617,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_90_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_90_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -616,8 +631,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_90_minutes_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_90_minutes_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -630,8 +645,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_96_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_96_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -644,8 +659,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_96_minutes_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_96_minutes_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -658,8 +673,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_3_hours_before_chatzos(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_3_hours_before_chatzos(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -672,8 +687,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_120_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_120_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -686,8 +701,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_alos_16_point_1_to_sunset(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_alos_16_point_1_to_sunset(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -700,8 +715,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -714,8 +729,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_kol_eliyahu(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_kol_eliyahu(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -728,8 +743,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_ateret_torah(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_ateret_torah(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -742,8 +757,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_baal_hatanya(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_baal_hatanya(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -756,8 +771,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_18_degrees_to_fixed_local_chatzos(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_18_degrees_to_fixed_local_chatzos(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -770,8 +785,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_16_point_1_degrees_to_fixed_local_chatzos(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_16_point_1_degrees_to_fixed_local_chatzos(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -784,8 +799,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_90_minutes_to_fixed_local_chatzos(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_90_minutes_to_fixed_local_chatzos(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -798,8 +813,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_72_minutes_to_fixed_local_chatzos(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga_72_minutes_to_fixed_local_chatzos(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -812,8 +827,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -827,8 +842,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
     }
 
     // Remaining methods - implementing key ones, others can be added as needed
-    fn get_sof_zman_tfila_mga_19_point_8_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_mga_19_point_8_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -841,8 +856,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_mga_16_point_1_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_mga_16_point_1_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -855,8 +870,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_mga_18_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_mga_18_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -869,8 +884,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_mga_72_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_mga_72_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -883,8 +898,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_mga_72_minutes_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_mga_72_minutes_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -897,8 +912,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_mga_90_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_mga_90_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -911,8 +926,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_mga_90_minutes_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_mga_90_minutes_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -925,8 +940,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_mga_96_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_mga_96_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -939,8 +954,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_mga_96_minutes_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_mga_96_minutes_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -953,8 +968,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_mga_120_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_mga_120_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -967,8 +982,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_2_hours_before_chatzos(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_2_hours_before_chatzos(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -981,8 +996,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_ateret_torah(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_ateret_torah(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -995,8 +1010,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_baal_hatanya(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_baal_hatanya(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1009,8 +1024,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1027,8 +1042,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
     // All other methods can be implemented following the same pattern
 
     // Mincha Gedola methods - implementing with proper JNI calls
-    fn get_mincha_gedola_30_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_gedola_30_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1040,8 +1055,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_gedola_72_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_gedola_72_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1053,8 +1068,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_gedola_16_point_1_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_gedola_16_point_1_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1066,8 +1081,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_gedola_ahavat_shalom(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_gedola_ahavat_shalom(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1079,8 +1094,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_gedola_greater_than_30(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_gedola_greater_than_30(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1092,8 +1107,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_gedola_ateret_torah(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_gedola_ateret_torah(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1105,8 +1120,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_gedola_baal_hatanya(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_gedola_baal_hatanya(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1118,8 +1133,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_gedola_baal_hatanya_greater_than_30(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_gedola_baal_hatanya_greater_than_30(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1131,8 +1146,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_gedola_gra_fixed_local_chatzos_30_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_gedola_gra_fixed_local_chatzos_30_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1145,8 +1160,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_mincha_ketana_16_point_1_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_ketana_16_point_1_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1158,8 +1173,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_ketana_ahavat_shalom(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_ketana_ahavat_shalom(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1171,8 +1186,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_ketana_72_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_ketana_72_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1184,8 +1199,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_ketana_ateret_torah(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_ketana_ateret_torah(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1197,8 +1212,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_ketana_baal_hatanya(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_ketana_baal_hatanya(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1210,8 +1225,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_mincha_ketana_gra_fixed_local_chatzos_to_sunset(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_ketana_gra_fixed_local_chatzos_to_sunset(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1224,8 +1239,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_plag_hamincha_60_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_60_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1237,8 +1252,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_72_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_72_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1250,8 +1265,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_90_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_90_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1263,8 +1278,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_96_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_96_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1276,8 +1291,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_96_minutes_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_96_minutes_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1289,8 +1304,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_90_minutes_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_90_minutes_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1302,8 +1317,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_72_minutes_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_72_minutes_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1315,8 +1330,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_16_point_1_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_16_point_1_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1328,8 +1343,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_19_point_8_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_19_point_8_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1341,8 +1356,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_26_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_26_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1354,8 +1369,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_18_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_18_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1367,8 +1382,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_alos_to_sunset(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_alos_to_sunset(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1380,8 +1395,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1393,8 +1408,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_ahavat_shalom(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_ahavat_shalom(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1406,8 +1421,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_ateret_torah(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_ateret_torah(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1419,8 +1434,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_baal_hatanya(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_baal_hatanya(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1432,8 +1447,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_120_minutes_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_120_minutes_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1445,8 +1460,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_120_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_120_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1458,8 +1473,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_plag_hamincha_gra_fixed_local_chatzos_to_sunset(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_gra_fixed_local_chatzos_to_sunset(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1472,8 +1487,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_bain_hashmashos_rt_13_point_24_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hashmashos_rt_13_point_24_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1485,8 +1500,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_bain_hashmashos_rt_58_point_5_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hashmashos_rt_58_point_5_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1498,8 +1513,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_bain_hashmashos_rt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hashmashos_rt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1511,8 +1526,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_bain_hashmashos_rt_2_stars(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hashmashos_rt_2_stars(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1524,8 +1539,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_bain_hashmashos_yereim_18_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hashmashos_yereim_18_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1537,8 +1552,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_bain_hashmashos_yereim_3_point_05_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hashmashos_yereim_3_point_05_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1550,8 +1565,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_bain_hashmashos_yereim_16_point_875_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hashmashos_yereim_16_point_875_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1563,8 +1578,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_bain_hashmashos_yereim_2_point_8_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hashmashos_yereim_2_point_8_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1576,8 +1591,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_bain_hashmashos_yereim_13_point_5_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hashmashos_yereim_13_point_5_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1589,8 +1604,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_bain_hashmashos_yereim_2_point_1_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hashmashos_yereim_2_point_1_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1604,8 +1619,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
     }
 
     // Key tzais methods
-    fn get_tzais_geonim_3_point_7_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_3_point_7_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1618,8 +1633,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_3_point_8_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_3_point_8_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1632,8 +1647,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_5_point_95_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_5_point_95_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1646,8 +1661,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_3_point_65_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_3_point_65_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1660,8 +1675,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_3_point_676_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_3_point_676_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1674,8 +1689,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_4_point_61_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_4_point_61_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1688,8 +1703,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_4_point_37_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_4_point_37_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1702,8 +1717,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_5_point_88_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_5_point_88_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1716,8 +1731,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_4_point_8_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_4_point_8_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1730,8 +1745,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_6_point_45_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_6_point_45_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1744,8 +1759,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_7_point_083_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_7_point_083_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1758,8 +1773,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_7_point_67_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_7_point_67_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1772,8 +1787,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_8_point_5_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_8_point_5_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1786,8 +1801,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_9_point_3_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_9_point_3_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1800,8 +1815,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_geonim_9_point_75_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_geonim_9_point_75_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1814,8 +1829,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_60(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_60(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1824,8 +1839,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_ateret_torah(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_ateret_torah(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1838,8 +1853,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_72_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_72_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1848,8 +1863,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_90_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_90_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1858,8 +1873,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_96_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_96_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1868,8 +1883,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_90(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_90(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1878,8 +1893,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_120(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_120(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1888,8 +1903,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_120_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_120_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1898,8 +1913,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_16_point_1_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_16_point_1_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1912,8 +1927,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_26_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_26_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1922,8 +1937,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_18_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_18_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1932,8 +1947,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_19_point_8_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_19_point_8_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1946,8 +1961,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_96(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_96(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1956,8 +1971,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_50(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_50(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1966,8 +1981,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais_baal_hatanya(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais_baal_hatanya(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1981,8 +1996,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
     }
 
     // Fixed Local Chatzos methods - implementing with proper JNI calls
-    fn get_fixed_local_chatzos(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_fixed_local_chatzos(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -1994,8 +2009,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_sof_zman_shma_fixed_local(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_fixed_local(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2007,8 +2022,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_sof_zman_tfila_fixed_local(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_fixed_local(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2023,50 +2038,50 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
 
     fn get_sof_zman_kidush_levana_between_moldos(
         &self,
-        _alos: Option<f64>,
-        _tzais: Option<f64>,
-    ) -> Option<f64> {
+        _alos: Option<i64>,
+        _tzais: Option<i64>,
+    ) -> Option<i64> {
         None
     }
-    fn get_sof_zman_kidush_levana_between_moldos_default(&self) -> Option<f64> {
+    fn get_sof_zman_kidush_levana_between_moldos_default(&self) -> Option<i64> {
         None
     }
     fn get_sof_zman_kidush_levana_15_days(
         &self,
-        _alos: Option<f64>,
-        _tzais: Option<f64>,
-    ) -> Option<f64> {
+        _alos: Option<i64>,
+        _tzais: Option<i64>,
+    ) -> Option<i64> {
         None
     }
-    fn get_sof_zman_kidush_levana_15_days_default(&self) -> Option<f64> {
+    fn get_sof_zman_kidush_levana_15_days_default(&self) -> Option<i64> {
         None
     }
-    fn get_tchilas_zman_kidush_levana_3_days(&self) -> Option<f64> {
+    fn get_tchilas_zman_kidush_levana_3_days(&self) -> Option<i64> {
         None
     }
     fn get_tchilas_zman_kidush_levana_3_days_with_times(
         &self,
-        _alos: Option<f64>,
-        _tzais: Option<f64>,
-    ) -> Option<f64> {
+        _alos: Option<i64>,
+        _tzais: Option<i64>,
+    ) -> Option<i64> {
         None
     }
-    fn get_zman_molad(&self) -> Option<f64> {
+    fn get_zman_molad(&self) -> Option<i64> {
         None
     }
     fn get_tchilas_zman_kidush_levana_7_days(
         &self,
-        _alos: Option<f64>,
-        _tzais: Option<f64>,
-    ) -> Option<f64> {
+        _alos: Option<i64>,
+        _tzais: Option<i64>,
+    ) -> Option<i64> {
         None
     }
-    fn get_tchilas_zman_kidush_levana_7_days_default(&self) -> Option<f64> {
+    fn get_tchilas_zman_kidush_levana_7_days_default(&self) -> Option<i64> {
         None
     }
 
-    fn get_sof_zman_achilas_chametz_gra(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_achilas_chametz_gra(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2078,8 +2093,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_sof_zman_achilas_chametz_mga_72_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_achilas_chametz_mga_72_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2091,8 +2106,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_sof_zman_achilas_chametz_mga_72_minutes_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_achilas_chametz_mga_72_minutes_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2104,8 +2119,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_sof_zman_achilas_chametz_mga_16_point_1_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_achilas_chametz_mga_16_point_1_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2117,8 +2132,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_sof_zman_biur_chametz_gra(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_biur_chametz_gra(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2130,8 +2145,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_sof_zman_biur_chametz_mga_72_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_biur_chametz_mga_72_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2143,8 +2158,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_sof_zman_biur_chametz_mga_72_minutes_zmanis(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_biur_chametz_mga_72_minutes_zmanis(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2156,8 +2171,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_sof_zman_biur_chametz_mga_16_point_1_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_biur_chametz_mga_16_point_1_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2169,8 +2184,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_sof_zman_achilas_chametz_baal_hatanya(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_achilas_chametz_baal_hatanya(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2182,8 +2197,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_sof_zman_biur_chametz_baal_hatanya(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_biur_chametz_baal_hatanya(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2196,8 +2211,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_samuch_le_mincha_ketana_gra(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_samuch_le_mincha_ketana_gra(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2209,8 +2224,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_samuch_le_mincha_ketana_16_point_1_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_samuch_le_mincha_ketana_16_point_1_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2222,8 +2237,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 .unwrap(),
         )
     }
-    fn get_samuch_le_mincha_ketana_72_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_samuch_le_mincha_ketana_72_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2236,7 +2251,7 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_ateret_torah_sunset_offset(&self) -> f64 {
+    fn get_ateret_torah_sunset_offset(&self) -> i64 {
         let result = self
             .jvm
             .invoke(
@@ -2245,25 +2260,12 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 InvocationArg::empty(),
             )
             .unwrap();
-        self.jvm.to_rust::<f64>(result).unwrap()
-    }
-
-    fn set_ateret_torah_sunset_offset(&mut self, offset: f64) {
-        self.jvm
-            .invoke(
-                &self.instance,
-                "setAteretTorahSunsetOffset",
-                &[InvocationArg::try_from(offset)
-                    .unwrap()
-                    .into_primitive()
-                    .unwrap()],
-            )
-            .unwrap();
+        (self.jvm.to_rust::<f64>(result).unwrap() * 1000.0 * 60.0) as i64
     }
 
     // Deprecated alias methods (for compatibility)
-    fn get_bain_hasmashosrt_13_point_24_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hasmashosrt_13_point_24_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2276,8 +2278,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_bain_hasmashosrt_58_point_5_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hasmashosrt_58_point_5_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2290,8 +2292,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_bain_hasmashosrt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hasmashosrt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2304,8 +2306,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_bain_hasmashosrt_2_stars(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hasmashosrt_2_stars(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2318,8 +2320,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_bain_hasmashosyereim_18_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hasmashosyereim_18_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2332,8 +2334,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_bain_hasmashosyereim_3_point_05_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hasmashosyereim_3_point_05_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2346,8 +2348,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_bain_hasmashosyereim_16_point_875_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hasmashosyereim_16_point_875_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2360,8 +2362,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_bain_hasmashosyereim_2_point_8_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hasmashosyereim_2_point_8_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2374,8 +2376,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_bain_hasmashosyereim_13_point_5_minutes(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hasmashosyereim_13_point_5_minutes(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2388,8 +2390,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_bain_hasmashosyereim_2_point_1_degrees(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_bain_hasmashosyereim_2_point_1_degrees(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2402,8 +2404,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfilah_ateret_torah(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfilah_ateret_torah(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2418,11 +2420,11 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
 
     fn get_fixed_local_chatzos_based_zmanim(
         &self,
-        start_of_half_day: f64,
-        end_of_half_day: f64,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
         hours: f64,
-    ) -> Option<f64> {
-        java_date_to_f64(
+    ) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2447,8 +2449,8 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
 
 // Implement the base traits that ComplexZmanimCalendarTrait extends
 impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
-    fn get_tzais(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2457,8 +2459,8 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos_hashachar(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos_hashachar(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2467,8 +2469,8 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_alos72(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_alos72(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2477,8 +2479,8 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_chatzos(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_chatzos(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2487,8 +2489,8 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_chatzos_as_half_day(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_chatzos_as_half_day(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2529,10 +2531,10 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
 
     fn get_half_day_based_zman(
         &self,
-        start_of_half_day: f64,
-        end_of_half_day: f64,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
         hours: f64,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         let result = self
             .jvm
             .invoke(
@@ -2550,13 +2552,13 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 ],
             )
             .unwrap();
-        java_date_to_f64(&self.jvm, &result)
+        java_date_to_i64(&self.jvm, &result)
     }
 
     fn get_half_day_based_shaah_zmanis(
         &self,
-        start_of_half_day: f64,
-        end_of_half_day: f64,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
     ) -> Option<i64> {
         let result = self
             .jvm
@@ -2576,10 +2578,10 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
 
     fn get_shaah_zmanis_based_zman(
         &self,
-        start_of_day: f64,
-        end_of_day: f64,
+        start_of_day: i64,
+        end_of_day: i64,
         hours: f64,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         let result = self
             .jvm
             .invoke(
@@ -2595,15 +2597,15 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 ],
             )
             .unwrap();
-        java_date_to_f64(&self.jvm, &result)
+        java_date_to_i64(&self.jvm, &result)
     }
 
     fn _get_sof_zman_shma(
         &self,
-        start_of_day: f64,
-        end_of_day: Option<f64>,
+        start_of_day: i64,
+        end_of_day: Option<i64>,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         // For now, use a simplified implementation that doesn't handle null end_of_day
         // This can be enhanced later if needed
         if let Some(end_day) = end_of_day {
@@ -2623,13 +2625,13 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                     ],
                 )
                 .unwrap();
-            java_date_to_f64(&self.jvm, &result)
+            java_date_to_i64(&self.jvm, &result)
         } else {
             None
         }
     }
 
-    fn get_sof_zman_shma_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_sof_zman_shma_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         let result = self
             .jvm
             .invoke(
@@ -2641,11 +2643,11 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 ],
             )
             .unwrap();
-        java_date_to_f64(&self.jvm, &result)
+        java_date_to_i64(&self.jvm, &result)
     }
 
-    fn get_sof_zman_shma_gra(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_gra(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2654,8 +2656,8 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_shma_mga(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2664,8 +2666,8 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_tzais72(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_tzais72(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2674,8 +2676,8 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_candle_lighting(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_candle_lighting(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2686,10 +2688,10 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
 
     fn _get_sof_zman_tfila(
         &self,
-        start_of_day: f64,
-        end_of_day: Option<f64>,
+        start_of_day: i64,
+        end_of_day: Option<i64>,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         if let Some(end_day) = end_of_day {
             let result = self
                 .jvm
@@ -2707,13 +2709,13 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                     ],
                 )
                 .unwrap();
-            java_date_to_f64(&self.jvm, &result)
+            java_date_to_i64(&self.jvm, &result)
         } else {
             None
         }
     }
 
-    fn get_sof_zman_tfila_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_sof_zman_tfila_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         let result = self
             .jvm
             .invoke(
@@ -2725,11 +2727,11 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 ],
             )
             .unwrap();
-        java_date_to_f64(&self.jvm, &result)
+        java_date_to_i64(&self.jvm, &result)
     }
 
-    fn get_sof_zman_tfila_gra(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_gra(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2738,8 +2740,8 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_tfila_mga(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sof_zman_tfila_mga(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2750,10 +2752,10 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
 
     fn _get_mincha_gedola(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         if let Some(start_day) = start_of_day {
             let result = self
                 .jvm
@@ -2770,13 +2772,13 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                     ],
                 )
                 .unwrap();
-            java_date_to_f64(&self.jvm, &result)
+            java_date_to_i64(&self.jvm, &result)
         } else {
             None
         }
     }
 
-    fn get_mincha_gedola_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_mincha_gedola_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         let result = self
             .jvm
             .invoke(
@@ -2788,11 +2790,11 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 ],
             )
             .unwrap();
-        java_date_to_f64(&self.jvm, &result)
+        java_date_to_i64(&self.jvm, &result)
     }
 
-    fn get_mincha_gedola_default(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_gedola_default(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2803,10 +2805,10 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
 
     fn _get_samuch_le_mincha_ketana(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         if let Some(start_day) = start_of_day {
             let result = self
                 .jvm
@@ -2823,7 +2825,7 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                     ],
                 )
                 .unwrap();
-            java_date_to_f64(&self.jvm, &result)
+            java_date_to_i64(&self.jvm, &result)
         } else {
             None
         }
@@ -2831,9 +2833,9 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
 
     fn get_samuch_le_mincha_ketana_simple(
         &self,
-        start_of_day: f64,
-        end_of_day: f64,
-    ) -> Option<f64> {
+        start_of_day: i64,
+        end_of_day: i64,
+    ) -> Option<i64> {
         let result = self
             .jvm
             .invoke(
@@ -2845,15 +2847,15 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 ],
             )
             .unwrap();
-        java_date_to_f64(&self.jvm, &result)
+        java_date_to_i64(&self.jvm, &result)
     }
 
     fn _get_mincha_ketana(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         if let Some(start_day) = start_of_day {
             let result = self
                 .jvm
@@ -2870,13 +2872,13 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                     ],
                 )
                 .unwrap();
-            java_date_to_f64(&self.jvm, &result)
+            java_date_to_i64(&self.jvm, &result)
         } else {
             None
         }
     }
 
-    fn get_mincha_ketana_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_mincha_ketana_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         let result = self
             .jvm
             .invoke(
@@ -2888,11 +2890,11 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 ],
             )
             .unwrap();
-        java_date_to_f64(&self.jvm, &result)
+        java_date_to_i64(&self.jvm, &result)
     }
 
-    fn get_mincha_ketana_default(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_mincha_ketana_default(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -2903,10 +2905,10 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
 
     fn _get_plag_hamincha(
         &self,
-        start_of_day: Option<f64>,
-        end_of_day: f64,
+        start_of_day: Option<i64>,
+        end_of_day: i64,
         synchronous: bool,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         if let Some(start_day) = start_of_day {
             let result = self
                 .jvm
@@ -2923,13 +2925,13 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                     ],
                 )
                 .unwrap();
-            java_date_to_f64(&self.jvm, &result)
+            java_date_to_i64(&self.jvm, &result)
         } else {
             None
         }
     }
 
-    fn get_plag_hamincha_simple(&self, start_of_day: f64, end_of_day: f64) -> Option<f64> {
+    fn get_plag_hamincha_simple(&self, start_of_day: i64, end_of_day: i64) -> Option<i64> {
         let result = self
             .jvm
             .invoke(
@@ -2941,11 +2943,11 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 ],
             )
             .unwrap();
-        java_date_to_f64(&self.jvm, &result)
+        java_date_to_i64(&self.jvm, &result)
     }
 
-    fn get_plag_hamincha_default(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_plag_hamincha_default(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3034,8 +3036,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         self.jvm.to_rust::<f64>(result).unwrap()
     }
 
-    fn get_sea_level_sunset(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sea_level_sunset(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3044,8 +3046,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sunset(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sunset(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3054,8 +3056,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sunrise(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sunrise(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3064,8 +3066,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sea_level_sunrise(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sea_level_sunrise(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3074,8 +3076,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sunrise_offset_by_degrees(&self, degrees: f64) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sunrise_offset_by_degrees(&self, degrees: f64) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3091,8 +3093,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sunset_offset_by_degrees(&self, degrees: f64) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sunset_offset_by_degrees(&self, degrees: f64) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3108,8 +3110,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_begin_civil_twilight(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_begin_civil_twilight(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3122,8 +3124,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_begin_nautical_twilight(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_begin_nautical_twilight(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3136,8 +3138,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_begin_astronomical_twilight(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_begin_astronomical_twilight(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3150,8 +3152,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_end_civil_twilight(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_end_civil_twilight(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3164,8 +3166,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_end_nautical_twilight(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_end_nautical_twilight(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3178,8 +3180,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_end_astronomical_twilight(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_end_astronomical_twilight(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3201,8 +3203,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sun_transit(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_sun_transit(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3211,8 +3213,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_solar_midnight(&self) -> Option<f64> {
-        java_date_to_f64(
+    fn get_solar_midnight(&self) -> Option<i64> {
+        java_date_to_i64(
             &self.jvm,
             &self
                 .jvm
@@ -3223,8 +3225,8 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
 
     fn get_temporal_hour_with_start_and_end_times(
         &self,
-        start_time: f64,
-        end_time: f64,
+        start_time: i64,
+        end_time: i64,
     ) -> Option<i64> {
         let result = self
             .jvm
@@ -3242,9 +3244,9 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
 
     fn get_sun_transit_with_start_and_end_times(
         &self,
-        start_time: f64,
-        end_time: f64,
-    ) -> Option<f64> {
+        start_time: i64,
+        end_time: i64,
+    ) -> Option<i64> {
         let result = self
             .jvm
             .invoke(
@@ -3256,12 +3258,12 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
                 ],
             )
             .unwrap();
-        java_date_to_f64(&self.jvm, &result)
+        java_date_to_i64(&self.jvm, &result)
     }
 }
 
 // Helper functions
-fn java_date_to_f64(jvm: &Jvm, value: &Instance) -> Option<f64> {
+fn java_date_to_i64(jvm: &Jvm, value: &Instance) -> Option<i64> {
     if jvm
         .check_equals(
             value,
@@ -3275,7 +3277,7 @@ fn java_date_to_f64(jvm: &Jvm, value: &Instance) -> Option<f64> {
     let result = jvm
         .invoke(&value, "getTime", InvocationArg::empty())
         .unwrap();
-    Some(jvm.to_rust::<f64>(result).unwrap())
+    Some(jvm.to_rust::<i64>(result).unwrap())
 }
 
 fn java_long_to_i64(jvm: &Jvm, value: Instance) -> Option<i64> {

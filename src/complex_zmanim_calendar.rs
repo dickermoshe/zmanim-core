@@ -42,7 +42,7 @@ const ASTRONOMICAL_ZENITH: f64 = 108.0;
 
 pub struct ComplexZmanimCalendar<'a> {
     pub zmanim_calendar: ZmanimCalendar<'a>,
-    ateret_torah_sunset_offset: f64,
+    ateret_torah_sunset_offset: i64,
 }
 impl<'a> ComplexZmanimCalendar<'a> {
     pub fn new(
@@ -50,7 +50,8 @@ impl<'a> ComplexZmanimCalendar<'a> {
         geo_location: &'a dyn GeoLocationTrait,
         use_astronomical_chatzos: bool,
         use_astronomical_chatzos_for_other_zmanim: bool,
-        candle_lighting_offset: f64,
+        candle_lighting_offset: i64,
+        ateret_torah_sunset_offset: i64,
     ) -> Self {
         Self {
             zmanim_calendar: ZmanimCalendar::new(
@@ -60,7 +61,7 @@ impl<'a> ComplexZmanimCalendar<'a> {
                 use_astronomical_chatzos_for_other_zmanim,
                 candle_lighting_offset,
             ),
-            ateret_torah_sunset_offset: 40.0,
+            ateret_torah_sunset_offset,
         }
     }
     pub fn get_zmanim_calendar(&self) -> &ZmanimCalendar<'a> {
@@ -68,7 +69,7 @@ impl<'a> ComplexZmanimCalendar<'a> {
     }
 
     // Helper methods
-    fn get_zmanis_based_offset(&self, hours: f64) -> Option<f64> {
+    fn get_zmanis_based_offset(&self, hours: f64) -> Option<i64> {
         let shaah_zmanis = self.get_zmanim_calendar().get_shaah_zmanis_gra()? as f64;
         if hours == 0.0 {
             return None;
@@ -79,23 +80,23 @@ impl<'a> ComplexZmanimCalendar<'a> {
                 .get_zmanim_calendar()
                 .get_astronomical_calendar()
                 .get_sunset()?;
-            Some(sunset + (shaah_zmanis * hours))
+            Some(sunset + (shaah_zmanis * hours) as i64)
         } else {
             let sunrise = self
                 .get_zmanim_calendar()
                 .get_astronomical_calendar()
                 .get_sunrise()?;
-            Some(sunrise + (shaah_zmanis * hours))
+            Some(sunrise + (shaah_zmanis * hours) as i64)
         }
     }
 
-    fn get_sunrise_baal_hatanya(&self) -> Option<f64> {
+    fn get_sunrise_baal_hatanya(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ZENITH_1_POINT_583)
     }
 
-    fn get_sunset_baal_hatanya(&self) -> Option<f64> {
+    fn get_sunset_baal_hatanya(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_1_POINT_583)
@@ -138,206 +139,205 @@ pub trait ComplexZmanimCalendarTrait {
     fn get_alos_baal_hatanya(&self) -> Option<i64>;
 
     // Misheyakir methods
-    fn get_misheyakir_11_point_5_degrees(&self) -> Option<f64>;
-    fn get_misheyakir_11_degrees(&self) -> Option<f64>;
-    fn get_misheyakir_10_point_2_degrees(&self) -> Option<f64>;
-    fn get_misheyakir_7_point_65_degrees(&self) -> Option<f64>;
-    fn get_misheyakir_9_point_5_degrees(&self) -> Option<f64>;
+    fn get_misheyakir_11_point_5_degrees(&self) -> Option<i64>;
+    fn get_misheyakir_11_degrees(&self) -> Option<i64>;
+    fn get_misheyakir_10_point_2_degrees(&self) -> Option<i64>;
+    fn get_misheyakir_7_point_65_degrees(&self) -> Option<i64>;
+    fn get_misheyakir_9_point_5_degrees(&self) -> Option<i64>;
 
     // Sof Zman Shma methods
-    fn get_sof_zman_shma_mga_19_point_8_degrees(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_16_point_1_degrees(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_18_degrees(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_72_minutes(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_72_minutes_zmanis(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_90_minutes(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_90_minutes_zmanis(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_96_minutes(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_96_minutes_zmanis(&self) -> Option<f64>;
-    fn get_sof_zman_shma_3_hours_before_chatzos(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_120_minutes(&self) -> Option<f64>;
-    fn get_sof_zman_shma_alos_16_point_1_to_sunset(&self) -> Option<f64>;
-    fn get_sof_zman_shma_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(&self) -> Option<f64>;
-    fn get_sof_zman_shma_kol_eliyahu(&self) -> Option<f64>;
-    fn get_sof_zman_shma_ateret_torah(&self) -> Option<f64>;
-    fn get_sof_zman_shma_baal_hatanya(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_18_degrees_to_fixed_local_chatzos(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_16_point_1_degrees_to_fixed_local_chatzos(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_90_minutes_to_fixed_local_chatzos(&self) -> Option<f64>;
-    fn get_sof_zman_shma_mga_72_minutes_to_fixed_local_chatzos(&self) -> Option<f64>;
-    fn get_sof_zman_shma_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<f64>;
+    fn get_sof_zman_shma_mga_19_point_8_degrees(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_16_point_1_degrees(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_18_degrees(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_72_minutes(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_72_minutes_zmanis(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_90_minutes(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_90_minutes_zmanis(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_96_minutes(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_96_minutes_zmanis(&self) -> Option<i64>;
+    fn get_sof_zman_shma_3_hours_before_chatzos(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_120_minutes(&self) -> Option<i64>;
+    fn get_sof_zman_shma_alos_16_point_1_to_sunset(&self) -> Option<i64>;
+    fn get_sof_zman_shma_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(&self) -> Option<i64>;
+    fn get_sof_zman_shma_kol_eliyahu(&self) -> Option<i64>;
+    fn get_sof_zman_shma_ateret_torah(&self) -> Option<i64>;
+    fn get_sof_zman_shma_baal_hatanya(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_18_degrees_to_fixed_local_chatzos(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_16_point_1_degrees_to_fixed_local_chatzos(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_90_minutes_to_fixed_local_chatzos(&self) -> Option<i64>;
+    fn get_sof_zman_shma_mga_72_minutes_to_fixed_local_chatzos(&self) -> Option<i64>;
+    fn get_sof_zman_shma_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<i64>;
 
     // Sof Zman Tfila methods
-    fn get_sof_zman_tfila_mga_19_point_8_degrees(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_mga_16_point_1_degrees(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_mga_18_degrees(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_mga_72_minutes(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_mga_72_minutes_zmanis(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_mga_90_minutes(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_mga_90_minutes_zmanis(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_mga_96_minutes(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_mga_96_minutes_zmanis(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_mga_120_minutes(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_2_hours_before_chatzos(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_ateret_torah(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_baal_hatanya(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<f64>;
+    fn get_sof_zman_tfila_mga_19_point_8_degrees(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_mga_16_point_1_degrees(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_mga_18_degrees(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_mga_72_minutes(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_mga_72_minutes_zmanis(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_mga_90_minutes(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_mga_90_minutes_zmanis(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_mga_96_minutes(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_mga_96_minutes_zmanis(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_mga_120_minutes(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_2_hours_before_chatzos(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_ateret_torah(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_baal_hatanya(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<i64>;
 
     // Mincha Gedola methods
-    fn get_mincha_gedola_30_minutes(&self) -> Option<f64>;
-    fn get_mincha_gedola_72_minutes(&self) -> Option<f64>;
-    fn get_mincha_gedola_16_point_1_degrees(&self) -> Option<f64>;
-    fn get_mincha_gedola_ahavat_shalom(&self) -> Option<f64>;
-    fn get_mincha_gedola_greater_than_30(&self) -> Option<f64>;
-    fn get_mincha_gedola_ateret_torah(&self) -> Option<f64>;
-    fn get_mincha_gedola_baal_hatanya(&self) -> Option<f64>;
-    fn get_mincha_gedola_baal_hatanya_greater_than_30(&self) -> Option<f64>;
-    fn get_mincha_gedola_gra_fixed_local_chatzos_30_minutes(&self) -> Option<f64>;
+    fn get_mincha_gedola_30_minutes(&self) -> Option<i64>;
+    fn get_mincha_gedola_72_minutes(&self) -> Option<i64>;
+    fn get_mincha_gedola_16_point_1_degrees(&self) -> Option<i64>;
+    fn get_mincha_gedola_ahavat_shalom(&self) -> Option<i64>;
+    fn get_mincha_gedola_greater_than_30(&self) -> Option<i64>;
+    fn get_mincha_gedola_ateret_torah(&self) -> Option<i64>;
+    fn get_mincha_gedola_baal_hatanya(&self) -> Option<i64>;
+    fn get_mincha_gedola_baal_hatanya_greater_than_30(&self) -> Option<i64>;
+    fn get_mincha_gedola_gra_fixed_local_chatzos_30_minutes(&self) -> Option<i64>;
 
     // Mincha Ketana methods
-    fn get_mincha_ketana_16_point_1_degrees(&self) -> Option<f64>;
-    fn get_mincha_ketana_ahavat_shalom(&self) -> Option<f64>;
-    fn get_mincha_ketana_72_minutes(&self) -> Option<f64>;
-    fn get_mincha_ketana_ateret_torah(&self) -> Option<f64>;
-    fn get_mincha_ketana_baal_hatanya(&self) -> Option<f64>;
-    fn get_mincha_ketana_gra_fixed_local_chatzos_to_sunset(&self) -> Option<f64>;
+    fn get_mincha_ketana_16_point_1_degrees(&self) -> Option<i64>;
+    fn get_mincha_ketana_ahavat_shalom(&self) -> Option<i64>;
+    fn get_mincha_ketana_72_minutes(&self) -> Option<i64>;
+    fn get_mincha_ketana_ateret_torah(&self) -> Option<i64>;
+    fn get_mincha_ketana_baal_hatanya(&self) -> Option<i64>;
+    fn get_mincha_ketana_gra_fixed_local_chatzos_to_sunset(&self) -> Option<i64>;
 
     // Plag Hamincha methods
-    fn get_plag_hamincha_60_minutes(&self) -> Option<f64>;
-    fn get_plag_hamincha_72_minutes(&self) -> Option<f64>;
-    fn get_plag_hamincha_90_minutes(&self) -> Option<f64>;
-    fn get_plag_hamincha_96_minutes(&self) -> Option<f64>;
-    fn get_plag_hamincha_96_minutes_zmanis(&self) -> Option<f64>;
-    fn get_plag_hamincha_90_minutes_zmanis(&self) -> Option<f64>;
-    fn get_plag_hamincha_72_minutes_zmanis(&self) -> Option<f64>;
-    fn get_plag_hamincha_16_point_1_degrees(&self) -> Option<f64>;
-    fn get_plag_hamincha_19_point_8_degrees(&self) -> Option<f64>;
-    fn get_plag_hamincha_26_degrees(&self) -> Option<f64>;
-    fn get_plag_hamincha_18_degrees(&self) -> Option<f64>;
-    fn get_plag_alos_to_sunset(&self) -> Option<f64>;
-    fn get_plag_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(&self) -> Option<f64>;
-    fn get_plag_ahavat_shalom(&self) -> Option<f64>;
-    fn get_plag_hamincha_ateret_torah(&self) -> Option<f64>;
-    fn get_plag_hamincha_baal_hatanya(&self) -> Option<f64>;
-    fn get_plag_hamincha_120_minutes_zmanis(&self) -> Option<f64>;
-    fn get_plag_hamincha_120_minutes(&self) -> Option<f64>;
-    fn get_plag_hamincha_gra_fixed_local_chatzos_to_sunset(&self) -> Option<f64>;
+    fn get_plag_hamincha_60_minutes(&self) -> Option<i64>;
+    fn get_plag_hamincha_72_minutes(&self) -> Option<i64>;
+    fn get_plag_hamincha_90_minutes(&self) -> Option<i64>;
+    fn get_plag_hamincha_96_minutes(&self) -> Option<i64>;
+    fn get_plag_hamincha_96_minutes_zmanis(&self) -> Option<i64>;
+    fn get_plag_hamincha_90_minutes_zmanis(&self) -> Option<i64>;
+    fn get_plag_hamincha_72_minutes_zmanis(&self) -> Option<i64>;
+    fn get_plag_hamincha_16_point_1_degrees(&self) -> Option<i64>;
+    fn get_plag_hamincha_19_point_8_degrees(&self) -> Option<i64>;
+    fn get_plag_hamincha_26_degrees(&self) -> Option<i64>;
+    fn get_plag_hamincha_18_degrees(&self) -> Option<i64>;
+    fn get_plag_alos_to_sunset(&self) -> Option<i64>;
+    fn get_plag_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(&self) -> Option<i64>;
+    fn get_plag_ahavat_shalom(&self) -> Option<i64>;
+    fn get_plag_hamincha_ateret_torah(&self) -> Option<i64>;
+    fn get_plag_hamincha_baal_hatanya(&self) -> Option<i64>;
+    fn get_plag_hamincha_120_minutes_zmanis(&self) -> Option<i64>;
+    fn get_plag_hamincha_120_minutes(&self) -> Option<i64>;
+    fn get_plag_hamincha_gra_fixed_local_chatzos_to_sunset(&self) -> Option<i64>;
 
     // Bain Hashmashos methods
-    fn get_bain_hashmashos_rt_13_point_24_degrees(&self) -> Option<f64>;
-    fn get_bain_hashmashos_rt_58_point_5_minutes(&self) -> Option<f64>;
-    fn get_bain_hashmashos_rt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<f64>;
-    fn get_bain_hashmashos_rt_2_stars(&self) -> Option<f64>;
-    fn get_bain_hashmashos_yereim_18_minutes(&self) -> Option<f64>;
-    fn get_bain_hashmashos_yereim_3_point_05_degrees(&self) -> Option<f64>;
-    fn get_bain_hashmashos_yereim_16_point_875_minutes(&self) -> Option<f64>;
-    fn get_bain_hashmashos_yereim_2_point_8_degrees(&self) -> Option<f64>;
-    fn get_bain_hashmashos_yereim_13_point_5_minutes(&self) -> Option<f64>;
-    fn get_bain_hashmashos_yereim_2_point_1_degrees(&self) -> Option<f64>;
+    fn get_bain_hashmashos_rt_13_point_24_degrees(&self) -> Option<i64>;
+    fn get_bain_hashmashos_rt_58_point_5_minutes(&self) -> Option<i64>;
+    fn get_bain_hashmashos_rt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<i64>;
+    fn get_bain_hashmashos_rt_2_stars(&self) -> Option<i64>;
+    fn get_bain_hashmashos_yereim_18_minutes(&self) -> Option<i64>;
+    fn get_bain_hashmashos_yereim_3_point_05_degrees(&self) -> Option<i64>;
+    fn get_bain_hashmashos_yereim_16_point_875_minutes(&self) -> Option<i64>;
+    fn get_bain_hashmashos_yereim_2_point_8_degrees(&self) -> Option<i64>;
+    fn get_bain_hashmashos_yereim_13_point_5_minutes(&self) -> Option<i64>;
+    fn get_bain_hashmashos_yereim_2_point_1_degrees(&self) -> Option<i64>;
 
     // Tzais methods
-    fn get_tzais_geonim_3_point_7_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_3_point_8_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_5_point_95_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_3_point_65_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_3_point_676_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_4_point_61_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_4_point_37_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_5_point_88_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_4_point_8_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_6_point_45_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_7_point_083_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_7_point_67_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_8_point_5_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_9_point_3_degrees(&self) -> Option<f64>;
-    fn get_tzais_geonim_9_point_75_degrees(&self) -> Option<f64>;
-    fn get_tzais_60(&self) -> Option<f64>;
-    fn get_tzais_ateret_torah(&self) -> Option<f64>;
-    fn get_tzais_72_zmanis(&self) -> Option<f64>;
-    fn get_tzais_90_zmanis(&self) -> Option<f64>;
-    fn get_tzais_96_zmanis(&self) -> Option<f64>;
-    fn get_tzais_90(&self) -> Option<f64>;
-    fn get_tzais_120(&self) -> Option<f64>;
-    fn get_tzais_120_zmanis(&self) -> Option<f64>;
-    fn get_tzais_16_point_1_degrees(&self) -> Option<f64>;
-    fn get_tzais_26_degrees(&self) -> Option<f64>;
-    fn get_tzais_18_degrees(&self) -> Option<f64>;
-    fn get_tzais_19_point_8_degrees(&self) -> Option<f64>;
-    fn get_tzais_96(&self) -> Option<f64>;
-    fn get_tzais_50(&self) -> Option<f64>;
-    fn get_tzais_baal_hatanya(&self) -> Option<f64>;
+    fn get_tzais_geonim_3_point_7_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_3_point_8_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_5_point_95_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_3_point_65_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_3_point_676_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_4_point_61_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_4_point_37_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_5_point_88_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_4_point_8_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_6_point_45_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_7_point_083_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_7_point_67_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_8_point_5_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_9_point_3_degrees(&self) -> Option<i64>;
+    fn get_tzais_geonim_9_point_75_degrees(&self) -> Option<i64>;
+    fn get_tzais_60(&self) -> Option<i64>;
+    fn get_tzais_ateret_torah(&self) -> Option<i64>;
+    fn get_tzais_72_zmanis(&self) -> Option<i64>;
+    fn get_tzais_90_zmanis(&self) -> Option<i64>;
+    fn get_tzais_96_zmanis(&self) -> Option<i64>;
+    fn get_tzais_90(&self) -> Option<i64>;
+    fn get_tzais_120(&self) -> Option<i64>;
+    fn get_tzais_120_zmanis(&self) -> Option<i64>;
+    fn get_tzais_16_point_1_degrees(&self) -> Option<i64>;
+    fn get_tzais_26_degrees(&self) -> Option<i64>;
+    fn get_tzais_18_degrees(&self) -> Option<i64>;
+    fn get_tzais_19_point_8_degrees(&self) -> Option<i64>;
+    fn get_tzais_96(&self) -> Option<i64>;
+    fn get_tzais_50(&self) -> Option<i64>;
+    fn get_tzais_baal_hatanya(&self) -> Option<i64>;
 
     // Fixed Local Chatzos methods
-    fn get_fixed_local_chatzos(&self) -> Option<f64>;
-    fn get_sof_zman_shma_fixed_local(&self) -> Option<f64>;
-    fn get_sof_zman_tfila_fixed_local(&self) -> Option<f64>;
+    fn get_fixed_local_chatzos(&self) -> Option<i64>;
+    fn get_sof_zman_shma_fixed_local(&self) -> Option<i64>;
+    fn get_sof_zman_tfila_fixed_local(&self) -> Option<i64>;
 
     // Kidush Levana methods
     fn get_sof_zman_kidush_levana_between_moldos(
         &self,
-        alos: Option<f64>,
-        tzais: Option<f64>,
-    ) -> Option<f64>;
-    fn get_sof_zman_kidush_levana_between_moldos_default(&self) -> Option<f64>;
+        alos: Option<i64>,
+        tzais: Option<i64>,
+    ) -> Option<i64>;
+    fn get_sof_zman_kidush_levana_between_moldos_default(&self) -> Option<i64>;
     fn get_sof_zman_kidush_levana_15_days(
         &self,
-        alos: Option<f64>,
-        tzais: Option<f64>,
-    ) -> Option<f64>;
-    fn get_sof_zman_kidush_levana_15_days_default(&self) -> Option<f64>;
-    fn get_tchilas_zman_kidush_levana_3_days(&self) -> Option<f64>;
+        alos: Option<i64>,
+        tzais: Option<i64>,
+    ) -> Option<i64>;
+    fn get_sof_zman_kidush_levana_15_days_default(&self) -> Option<i64>;
+    fn get_tchilas_zman_kidush_levana_3_days(&self) -> Option<i64>;
     fn get_tchilas_zman_kidush_levana_3_days_with_times(
         &self,
-        alos: Option<f64>,
-        tzais: Option<f64>,
-    ) -> Option<f64>;
-    fn get_zman_molad(&self) -> Option<f64>;
+        alos: Option<i64>,
+        tzais: Option<i64>,
+    ) -> Option<i64>;
+    fn get_zman_molad(&self) -> Option<i64>;
     fn get_tchilas_zman_kidush_levana_7_days(
         &self,
-        alos: Option<f64>,
-        tzais: Option<f64>,
-    ) -> Option<f64>;
-    fn get_tchilas_zman_kidush_levana_7_days_default(&self) -> Option<f64>;
+        alos: Option<i64>,
+        tzais: Option<i64>,
+    ) -> Option<i64>;
+    fn get_tchilas_zman_kidush_levana_7_days_default(&self) -> Option<i64>;
 
     // Chametz methods
-    fn get_sof_zman_achilas_chametz_gra(&self) -> Option<f64>;
-    fn get_sof_zman_achilas_chametz_mga_72_minutes(&self) -> Option<f64>;
-    fn get_sof_zman_achilas_chametz_mga_72_minutes_zmanis(&self) -> Option<f64>;
-    fn get_sof_zman_achilas_chametz_mga_16_point_1_degrees(&self) -> Option<f64>;
-    fn get_sof_zman_biur_chametz_gra(&self) -> Option<f64>;
-    fn get_sof_zman_biur_chametz_mga_72_minutes(&self) -> Option<f64>;
-    fn get_sof_zman_biur_chametz_mga_72_minutes_zmanis(&self) -> Option<f64>;
-    fn get_sof_zman_biur_chametz_mga_16_point_1_degrees(&self) -> Option<f64>;
-    fn get_sof_zman_achilas_chametz_baal_hatanya(&self) -> Option<f64>;
-    fn get_sof_zman_biur_chametz_baal_hatanya(&self) -> Option<f64>;
+    fn get_sof_zman_achilas_chametz_gra(&self) -> Option<i64>;
+    fn get_sof_zman_achilas_chametz_mga_72_minutes(&self) -> Option<i64>;
+    fn get_sof_zman_achilas_chametz_mga_72_minutes_zmanis(&self) -> Option<i64>;
+    fn get_sof_zman_achilas_chametz_mga_16_point_1_degrees(&self) -> Option<i64>;
+    fn get_sof_zman_biur_chametz_gra(&self) -> Option<i64>;
+    fn get_sof_zman_biur_chametz_mga_72_minutes(&self) -> Option<i64>;
+    fn get_sof_zman_biur_chametz_mga_72_minutes_zmanis(&self) -> Option<i64>;
+    fn get_sof_zman_biur_chametz_mga_16_point_1_degrees(&self) -> Option<i64>;
+    fn get_sof_zman_achilas_chametz_baal_hatanya(&self) -> Option<i64>;
+    fn get_sof_zman_biur_chametz_baal_hatanya(&self) -> Option<i64>;
 
     // Samuch Le Mincha Ketana methods
-    fn get_samuch_le_mincha_ketana_gra(&self) -> Option<f64>;
-    fn get_samuch_le_mincha_ketana_16_point_1_degrees(&self) -> Option<f64>;
-    fn get_samuch_le_mincha_ketana_72_minutes(&self) -> Option<f64>;
+    fn get_samuch_le_mincha_ketana_gra(&self) -> Option<i64>;
+    fn get_samuch_le_mincha_ketana_16_point_1_degrees(&self) -> Option<i64>;
+    fn get_samuch_le_mincha_ketana_72_minutes(&self) -> Option<i64>;
 
     // Ateret Torah sunset offset getter/setter
-    fn get_ateret_torah_sunset_offset(&self) -> f64;
-    fn set_ateret_torah_sunset_offset(&mut self, offset: f64);
+    fn get_ateret_torah_sunset_offset(&self) -> i64;
 
     // Deprecated alias methods (for compatibility)
-    fn get_bain_hasmashosrt_13_point_24_degrees(&self) -> Option<f64>;
-    fn get_bain_hasmashosrt_58_point_5_minutes(&self) -> Option<f64>;
-    fn get_bain_hasmashosrt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<f64>;
-    fn get_bain_hasmashosrt_2_stars(&self) -> Option<f64>;
-    fn get_bain_hasmashosyereim_18_minutes(&self) -> Option<f64>;
-    fn get_bain_hasmashosyereim_3_point_05_degrees(&self) -> Option<f64>;
-    fn get_bain_hasmashosyereim_16_point_875_minutes(&self) -> Option<f64>;
-    fn get_bain_hasmashosyereim_2_point_8_degrees(&self) -> Option<f64>;
-    fn get_bain_hasmashosyereim_13_point_5_minutes(&self) -> Option<f64>;
-    fn get_bain_hasmashosyereim_2_point_1_degrees(&self) -> Option<f64>;
-    fn get_sof_zman_tfilah_ateret_torah(&self) -> Option<f64>;
+    fn get_bain_hasmashosrt_13_point_24_degrees(&self) -> Option<i64>;
+    fn get_bain_hasmashosrt_58_point_5_minutes(&self) -> Option<i64>;
+    fn get_bain_hasmashosrt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<i64>;
+    fn get_bain_hasmashosrt_2_stars(&self) -> Option<i64>;
+    fn get_bain_hasmashosyereim_18_minutes(&self) -> Option<i64>;
+    fn get_bain_hasmashosyereim_3_point_05_degrees(&self) -> Option<i64>;
+    fn get_bain_hasmashosyereim_16_point_875_minutes(&self) -> Option<i64>;
+    fn get_bain_hasmashosyereim_2_point_8_degrees(&self) -> Option<i64>;
+    fn get_bain_hasmashosyereim_13_point_5_minutes(&self) -> Option<i64>;
+    fn get_bain_hasmashosyereim_2_point_1_degrees(&self) -> Option<i64>;
+    fn get_sof_zman_tfilah_ateret_torah(&self) -> Option<i64>;
     fn get_fixed_local_chatzos_based_zmanim(
         &self,
-        start_of_half_day: f64,
-        end_of_half_day: f64,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
         hours: f64,
-    ) -> Option<f64>;
+    ) -> Option<i64>;
 }
 
 impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
@@ -479,204 +479,204 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
     }
 
     // Alos methods
-    fn get_alos_60(&self) -> Option<f64> {
+    fn get_alos_60(&self) -> Option<i64> {
         let sunrise = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise()?;
-        Some(sunrise - 60.0 * MINUTE_MILLIS as f64)
+        Some(sunrise - 60 * MINUTE_MILLIS)
     }
 
-    fn get_alos_72_zmanis(&self) -> Option<f64> {
+    fn get_alos_72_zmanis(&self) -> Option<i64> {
         self.get_zmanis_based_offset(-1.2)
     }
 
-    fn get_alos_96(&self) -> Option<f64> {
+    fn get_alos_96(&self) -> Option<i64> {
         let sunrise = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise()?;
-        Some(sunrise - 96.0 * MINUTE_MILLIS as f64)
+        Some(sunrise - 96 * MINUTE_MILLIS)
     }
 
-    fn get_alos_90_zmanis(&self) -> Option<f64> {
+    fn get_alos_90_zmanis(&self) -> Option<i64> {
         self.get_zmanis_based_offset(-1.5)
     }
 
-    fn get_alos_96_zmanis(&self) -> Option<f64> {
+    fn get_alos_96_zmanis(&self) -> Option<i64> {
         self.get_zmanis_based_offset(-1.6)
     }
 
-    fn get_alos_90(&self) -> Option<f64> {
+    fn get_alos_90(&self) -> Option<i64> {
         let sunrise = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise()?;
-        Some(sunrise - 90.0 * MINUTE_MILLIS as f64)
+        Some(sunrise - 90 * MINUTE_MILLIS)
     }
 
-    fn get_alos_120(&self) -> Option<f64> {
+    fn get_alos_120(&self) -> Option<i64> {
         let sunrise = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise()?;
-        Some(sunrise - 120.0 * MINUTE_MILLIS as f64)
+        Some(sunrise - 120 * MINUTE_MILLIS)
     }
 
-    fn get_alos_120_zmanis(&self) -> Option<f64> {
+    fn get_alos_120_zmanis(&self) -> Option<i64> {
         self.get_zmanis_based_offset(-2.0)
     }
 
-    fn get_alos_26_degrees(&self) -> Option<f64> {
+    fn get_alos_26_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ZENITH_26_DEGREES)
     }
 
-    fn get_alos_18_degrees(&self) -> Option<f64> {
+    fn get_alos_18_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ASTRONOMICAL_ZENITH)
     }
 
-    fn get_alos_19_degrees(&self) -> Option<f64> {
+    fn get_alos_19_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ZENITH_19_DEGREES)
     }
 
-    fn get_alos_19_point_8_degrees(&self) -> Option<f64> {
+    fn get_alos_19_point_8_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ZENITH_19_POINT_8)
     }
 
-    fn get_alos_16_point_1_degrees(&self) -> Option<f64> {
+    fn get_alos_16_point_1_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ZENITH_16_POINT_1)
     }
 
-    fn get_alos_baal_hatanya(&self) -> Option<f64> {
+    fn get_alos_baal_hatanya(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ZENITH_16_POINT_9)
     }
 
     // Misheyakir methods
-    fn get_misheyakir_11_point_5_degrees(&self) -> Option<f64> {
+    fn get_misheyakir_11_point_5_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ZENITH_11_POINT_5)
     }
 
-    fn get_misheyakir_11_degrees(&self) -> Option<f64> {
+    fn get_misheyakir_11_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ZENITH_11_DEGREES)
     }
 
-    fn get_misheyakir_10_point_2_degrees(&self) -> Option<f64> {
+    fn get_misheyakir_10_point_2_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ZENITH_10_POINT_2)
     }
 
-    fn get_misheyakir_7_point_65_degrees(&self) -> Option<f64> {
+    fn get_misheyakir_7_point_65_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ZENITH_7_POINT_65)
     }
 
-    fn get_misheyakir_9_point_5_degrees(&self) -> Option<f64> {
+    fn get_misheyakir_9_point_5_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ZENITH_9_POINT_5)
     }
 
     // Sof Zman Shma methods
-    fn get_sof_zman_shma_mga_19_point_8_degrees(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_19_point_8_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_19_point_8_degrees()?,
-            Some(self.get_tzais_19_point_8_degrees()?),
+            self.get_tzais_19_point_8_degrees(),
             true,
         )
     }
 
-    fn get_sof_zman_shma_mga_16_point_1_degrees(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_16_point_1_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_16_point_1_degrees()?,
-            Some(self.get_tzais_16_point_1_degrees()?),
+            self.get_tzais_16_point_1_degrees(),
             true,
         )
     }
 
-    fn get_sof_zman_shma_mga_18_degrees(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_18_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_18_degrees()?,
-            Some(self.get_tzais_18_degrees()?),
+            self.get_tzais_18_degrees(),
             true,
         )
     }
 
-    fn get_sof_zman_shma_mga_72_minutes(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_72_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar().get_sof_zman_shma_mga()
     }
 
-    fn get_sof_zman_shma_mga_72_minutes_zmanis(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_72_minutes_zmanis(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_72_zmanis()?,
-            Some(self.get_tzais_72_zmanis()?),
+            self.get_tzais_72_zmanis(),
             true,
         )
     }
 
-    fn get_sof_zman_shma_mga_90_minutes(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_90_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_90()?,
-            Some(self.get_tzais_90()?),
+            self.get_tzais_90(),
             true,
         )
     }
 
-    fn get_sof_zman_shma_mga_90_minutes_zmanis(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_90_minutes_zmanis(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_90_zmanis()?,
-            Some(self.get_tzais_90_zmanis()?),
+            self.get_tzais_90_zmanis(),
             true,
         )
     }
 
-    fn get_sof_zman_shma_mga_96_minutes(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_96_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_96()?,
-            Some(self.get_tzais_96()?),
+            self.get_tzais_96(),
             true,
         )
     }
 
-    fn get_sof_zman_shma_mga_96_minutes_zmanis(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_96_minutes_zmanis(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_96_zmanis()?,
-            Some(self.get_tzais_96_zmanis()?),
+            self.get_tzais_96_zmanis(),
             true,
         )
     }
 
-    fn get_sof_zman_shma_3_hours_before_chatzos(&self) -> Option<f64> {
+    fn get_sof_zman_shma_3_hours_before_chatzos(&self) -> Option<i64> {
         let chatzos = self.get_zmanim_calendar().get_chatzos()?;
-        Some(chatzos - 180.0 * MINUTE_MILLIS as f64)
+        Some(chatzos - 180 * MINUTE_MILLIS)
     }
 
-    fn get_sof_zman_shma_mga_120_minutes(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_120_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_120()?,
-            Some(self.get_tzais_120()?),
+            self.get_tzais_120(),
             true,
         )
     }
 
-    fn get_sof_zman_shma_alos_16_point_1_to_sunset(&self) -> Option<f64> {
+    fn get_sof_zman_shma_alos_16_point_1_to_sunset(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_16_point_1_degrees()?,
             self.get_zmanim_calendar()
@@ -686,41 +686,41 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(&self) -> Option<f64> {
+    fn get_sof_zman_shma_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_16_point_1_degrees()?,
-            Some(self.get_tzais_geonim_7_point_083_degrees()?),
+            self.get_tzais_geonim_7_point_083_degrees(),
             false,
         )
     }
 
-    fn get_sof_zman_shma_kol_eliyahu(&self) -> Option<f64> {
+    fn get_sof_zman_shma_kol_eliyahu(&self) -> Option<i64> {
         let chatzos = self.get_zmanim_calendar().get_chatzos()?;
         let sunrise = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise()?;
-        let diff = (chatzos - sunrise) / 2.0;
+        let diff = (chatzos - sunrise) / 2;
         Some(chatzos - diff)
     }
 
-    fn get_sof_zman_shma_ateret_torah(&self) -> Option<f64> {
+    fn get_sof_zman_shma_ateret_torah(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_72_zmanis()?,
-            Some(self.get_tzais_ateret_torah()?),
+            self.get_tzais_ateret_torah(),
             false,
         )
     }
 
-    fn get_sof_zman_shma_baal_hatanya(&self) -> Option<f64> {
+    fn get_sof_zman_shma_baal_hatanya(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_sunrise_baal_hatanya()?,
-            Some(self.get_sunset_baal_hatanya()?),
+            self.get_sunset_baal_hatanya(),
             true,
         )
     }
 
-    fn get_sof_zman_shma_mga_18_degrees_to_fixed_local_chatzos(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_18_degrees_to_fixed_local_chatzos(&self) -> Option<i64> {
         self.get_zmanim_calendar().get_half_day_based_zman(
             self.get_alos_18_degrees()?,
             self.get_zmanim_calendar().get_chatzos()?,
@@ -728,7 +728,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_16_point_1_degrees_to_fixed_local_chatzos(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_16_point_1_degrees_to_fixed_local_chatzos(&self) -> Option<i64> {
         self.get_zmanim_calendar().get_half_day_based_zman(
             self.get_alos_16_point_1_degrees()?,
             self.get_zmanim_calendar().get_chatzos()?,
@@ -736,7 +736,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_90_minutes_to_fixed_local_chatzos(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_90_minutes_to_fixed_local_chatzos(&self) -> Option<i64> {
         self.get_zmanim_calendar().get_half_day_based_zman(
             self.get_alos_90()?,
             self.get_zmanim_calendar().get_chatzos()?,
@@ -744,7 +744,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_mga_72_minutes_to_fixed_local_chatzos(&self) -> Option<f64> {
+    fn get_sof_zman_shma_mga_72_minutes_to_fixed_local_chatzos(&self) -> Option<i64> {
         self.get_zmanim_calendar().get_half_day_based_zman(
             self.get_zmanim_calendar().get_alos72()?,
             self.get_zmanim_calendar().get_chatzos()?,
@@ -752,7 +752,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_sof_zman_shma_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<f64> {
+    fn get_sof_zman_shma_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<i64> {
         self.get_zmanim_calendar().get_half_day_based_zman(
             self.get_zmanim_calendar()
                 .get_astronomical_calendar()
@@ -763,104 +763,104 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
     }
 
     // Sof Zman Tfila methods
-    fn get_sof_zman_tfila_mga_19_point_8_degrees(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_mga_19_point_8_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_tfila(
             self.get_alos_19_point_8_degrees()?,
-            Some(self.get_tzais_19_point_8_degrees()?),
+            self.get_tzais_19_point_8_degrees(),
             true,
         )
     }
 
-    fn get_sof_zman_tfila_mga_16_point_1_degrees(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_mga_16_point_1_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_tfila(
             self.get_alos_16_point_1_degrees()?,
-            Some(self.get_tzais_16_point_1_degrees()?),
+            self.get_tzais_16_point_1_degrees(),
             true,
         )
     }
 
-    fn get_sof_zman_tfila_mga_18_degrees(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_mga_18_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_tfila(
             self.get_alos_18_degrees()?,
-            Some(self.get_tzais_18_degrees()?),
+            self.get_tzais_18_degrees(),
             true,
         )
     }
 
-    fn get_sof_zman_tfila_mga_72_minutes(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_mga_72_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar().get_sof_zman_tfila_mga()
     }
 
-    fn get_sof_zman_tfila_mga_72_minutes_zmanis(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_mga_72_minutes_zmanis(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_tfila(
             self.get_alos_72_zmanis()?,
-            Some(self.get_tzais_72_zmanis()?),
+            self.get_tzais_72_zmanis(),
             true,
         )
     }
 
-    fn get_sof_zman_tfila_mga_90_minutes(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_mga_90_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_tfila(
             self.get_alos_90()?,
-            Some(self.get_tzais_90()?),
+            self.get_tzais_90(),
             true,
         )
     }
 
-    fn get_sof_zman_tfila_mga_90_minutes_zmanis(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_mga_90_minutes_zmanis(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_tfila(
             self.get_alos_90_zmanis()?,
-            Some(self.get_tzais_90_zmanis()?),
+            self.get_tzais_90_zmanis(),
             true,
         )
     }
 
-    fn get_sof_zman_tfila_mga_96_minutes(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_mga_96_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_tfila(
             self.get_alos_96()?,
-            Some(self.get_tzais_96()?),
+            self.get_tzais_96(),
             true,
         )
     }
 
-    fn get_sof_zman_tfila_mga_96_minutes_zmanis(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_mga_96_minutes_zmanis(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_tfila(
             self.get_alos_96_zmanis()?,
-            Some(self.get_tzais_96_zmanis()?),
+            self.get_tzais_96_zmanis(),
             true,
         )
     }
 
-    fn get_sof_zman_tfila_mga_120_minutes(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_mga_120_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_tfila(
             self.get_alos_120()?,
-            Some(self.get_tzais_120()?),
+            self.get_tzais_120(),
             true,
         )
     }
 
-    fn get_sof_zman_tfila_2_hours_before_chatzos(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_2_hours_before_chatzos(&self) -> Option<i64> {
         let chatzos = self.get_zmanim_calendar().get_chatzos()?;
-        Some(chatzos - 120.0 * MINUTE_MILLIS as f64)
+        Some(chatzos - 120 * MINUTE_MILLIS)
     }
 
-    fn get_sof_zman_tfila_ateret_torah(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_ateret_torah(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_tfila(
             self.get_alos_72_zmanis()?,
-            Some(self.get_tzais_ateret_torah()?),
+            self.get_tzais_ateret_torah(),
             false,
         )
     }
 
-    fn get_sof_zman_tfila_baal_hatanya(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_baal_hatanya(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_tfila(
             self.get_sunrise_baal_hatanya()?,
-            Some(self.get_sunset_baal_hatanya()?),
+            self.get_sunset_baal_hatanya(),
             true,
         )
     }
 
-    fn get_sof_zman_tfila_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<i64> {
         self.get_zmanim_calendar().get_half_day_based_zman(
             self.get_zmanim_calendar()
                 .get_astronomical_calendar()
@@ -871,40 +871,40 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
     }
 
     // Mincha Gedola methods
-    fn get_mincha_gedola_30_minutes(&self) -> Option<f64> {
+    fn get_mincha_gedola_30_minutes(&self) -> Option<i64> {
         let chatzos = self.get_zmanim_calendar().get_chatzos()?;
-        Some(chatzos + 30.0 * MINUTE_MILLIS as f64)
+        Some(chatzos + 30 * MINUTE_MILLIS)
     }
 
-    fn get_mincha_gedola_72_minutes(&self) -> Option<f64> {
+    fn get_mincha_gedola_72_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_mincha_gedola(
-            Some(self.get_zmanim_calendar().get_alos72()?),
+            self.get_zmanim_calendar().get_alos72(),
             self.get_zmanim_calendar().get_tzais72()?,
             true,
         )
     }
 
-    fn get_mincha_gedola_16_point_1_degrees(&self) -> Option<f64> {
+    fn get_mincha_gedola_16_point_1_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_mincha_gedola(
-            Some(self.get_alos_16_point_1_degrees()?),
+            self.get_alos_16_point_1_degrees(),
             self.get_tzais_16_point_1_degrees()?,
             true,
         )
     }
 
-    fn get_mincha_gedola_ahavat_shalom(&self) -> Option<f64> {
+    fn get_mincha_gedola_ahavat_shalom(&self) -> Option<i64> {
         let chatzos = self.get_zmanim_calendar().get_chatzos()?;
         let shaah_zmanis = self.get_shaah_zmanis_alos_16_point_1_to_tzais_3_point_7()? as f64;
-        let half_shaah = chatzos + (shaah_zmanis / 2.0);
+        let half_shaah = chatzos + (shaah_zmanis / 2.0) as i64;
 
         if self.get_mincha_gedola_30_minutes()? > half_shaah {
-            Some(self.get_mincha_gedola_30_minutes()?)
+            self.get_mincha_gedola_30_minutes()
         } else {
             Some(half_shaah)
         }
     }
 
-    fn get_mincha_gedola_greater_than_30(&self) -> Option<f64> {
+    fn get_mincha_gedola_greater_than_30(&self) -> Option<i64> {
         let mincha_gedola_30 = self.get_mincha_gedola_30_minutes()?;
         let mincha_gedola = self.get_zmanim_calendar().get_mincha_gedola_default()?;
 
@@ -915,23 +915,23 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         }
     }
 
-    fn get_mincha_gedola_ateret_torah(&self) -> Option<f64> {
+    fn get_mincha_gedola_ateret_torah(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_mincha_gedola(
-            Some(self.get_alos_72_zmanis()?),
+            self.get_alos_72_zmanis(),
             self.get_tzais_ateret_torah()?,
             false,
         )
     }
 
-    fn get_mincha_gedola_baal_hatanya(&self) -> Option<f64> {
+    fn get_mincha_gedola_baal_hatanya(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_mincha_gedola(
-            Some(self.get_sunrise_baal_hatanya()?),
+            self.get_sunrise_baal_hatanya(),
             self.get_sunset_baal_hatanya()?,
             true,
         )
     }
 
-    fn get_mincha_gedola_baal_hatanya_greater_than_30(&self) -> Option<f64> {
+    fn get_mincha_gedola_baal_hatanya_greater_than_30(&self) -> Option<i64> {
         let mincha_gedola_30 = self.get_mincha_gedola_30_minutes()?;
         let mincha_gedola_baal_hatanya = self.get_mincha_gedola_baal_hatanya()?;
 
@@ -942,51 +942,51 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         }
     }
 
-    fn get_mincha_gedola_gra_fixed_local_chatzos_30_minutes(&self) -> Option<f64> {
+    fn get_mincha_gedola_gra_fixed_local_chatzos_30_minutes(&self) -> Option<i64> {
         let fixed_local_chatzos = self.get_fixed_local_chatzos()?;
-        Some(fixed_local_chatzos + 30.0 * MINUTE_MILLIS as f64)
+        Some(fixed_local_chatzos + 30 * MINUTE_MILLIS)
     }
 
     // Mincha Ketana methods
-    fn get_mincha_ketana_16_point_1_degrees(&self) -> Option<f64> {
+    fn get_mincha_ketana_16_point_1_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_mincha_ketana(
-            Some(self.get_alos_16_point_1_degrees()?),
+            self.get_alos_16_point_1_degrees(),
             self.get_tzais_16_point_1_degrees()?,
             true,
         )
     }
 
-    fn get_mincha_ketana_ahavat_shalom(&self) -> Option<f64> {
+    fn get_mincha_ketana_ahavat_shalom(&self) -> Option<i64> {
         let tzais = self.get_tzais_geonim_3_point_8_degrees()?;
         let shaah_zmanis = self.get_shaah_zmanis_alos_16_point_1_to_tzais_3_point_8()? as f64;
-        Some(tzais - (shaah_zmanis * 2.5))
+        Some(tzais - (shaah_zmanis * 2.5) as i64)
     }
 
-    fn get_mincha_ketana_72_minutes(&self) -> Option<f64> {
+    fn get_mincha_ketana_72_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_mincha_ketana(
-            Some(self.get_zmanim_calendar().get_alos72()?),
+            self.get_zmanim_calendar().get_alos72(),
             self.get_zmanim_calendar().get_tzais72()?,
             true,
         )
     }
 
-    fn get_mincha_ketana_ateret_torah(&self) -> Option<f64> {
+    fn get_mincha_ketana_ateret_torah(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_mincha_ketana(
-            Some(self.get_alos_72_zmanis()?),
+            self.get_alos_72_zmanis(),
             self.get_tzais_ateret_torah()?,
             false,
         )
     }
 
-    fn get_mincha_ketana_baal_hatanya(&self) -> Option<f64> {
+    fn get_mincha_ketana_baal_hatanya(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_mincha_ketana(
-            Some(self.get_sunrise_baal_hatanya()?),
+            self.get_sunrise_baal_hatanya(),
             self.get_sunset_baal_hatanya()?,
             true,
         )
     }
 
-    fn get_mincha_ketana_gra_fixed_local_chatzos_to_sunset(&self) -> Option<f64> {
+    fn get_mincha_ketana_gra_fixed_local_chatzos_to_sunset(&self) -> Option<i64> {
         self.get_zmanim_calendar().get_half_day_based_zman(
             self.get_zmanim_calendar().get_chatzos()?,
             self.get_zmanim_calendar()
@@ -997,97 +997,97 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
     }
 
     // Plag Hamincha methods
-    fn get_plag_hamincha_60_minutes(&self) -> Option<f64> {
+    fn get_plag_hamincha_60_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_60()?),
+            self.get_alos_60(),
             self.get_tzais_60()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_72_minutes(&self) -> Option<f64> {
+    fn get_plag_hamincha_72_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_zmanim_calendar().get_alos72()?),
+            self.get_zmanim_calendar().get_alos72(),
             self.get_zmanim_calendar().get_tzais72()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_90_minutes(&self) -> Option<f64> {
+    fn get_plag_hamincha_90_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_90()?),
+            self.get_alos_90(),
             self.get_tzais_90()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_96_minutes(&self) -> Option<f64> {
+    fn get_plag_hamincha_96_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_96()?),
+            self.get_alos_96(),
             self.get_tzais_96()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_96_minutes_zmanis(&self) -> Option<f64> {
+    fn get_plag_hamincha_96_minutes_zmanis(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_96_zmanis()?),
+            self.get_alos_96_zmanis(),
             self.get_tzais_96_zmanis()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_90_minutes_zmanis(&self) -> Option<f64> {
+    fn get_plag_hamincha_90_minutes_zmanis(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_90_zmanis()?),
+            self.get_alos_90_zmanis(),
             self.get_tzais_90_zmanis()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_72_minutes_zmanis(&self) -> Option<f64> {
+    fn get_plag_hamincha_72_minutes_zmanis(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_72_zmanis()?),
+            self.get_alos_72_zmanis(),
             self.get_tzais_72_zmanis()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_16_point_1_degrees(&self) -> Option<f64> {
+    fn get_plag_hamincha_16_point_1_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_16_point_1_degrees()?),
+            self.get_alos_16_point_1_degrees(),
             self.get_tzais_16_point_1_degrees()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_19_point_8_degrees(&self) -> Option<f64> {
+    fn get_plag_hamincha_19_point_8_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_19_point_8_degrees()?),
+            self.get_alos_19_point_8_degrees(),
             self.get_tzais_19_point_8_degrees()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_26_degrees(&self) -> Option<f64> {
+    fn get_plag_hamincha_26_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_26_degrees()?),
+            self.get_alos_26_degrees(),
             self.get_tzais_26_degrees()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_18_degrees(&self) -> Option<f64> {
+    fn get_plag_hamincha_18_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_18_degrees()?),
+            self.get_alos_18_degrees(),
             self.get_tzais_18_degrees()?,
             true,
         )
     }
 
-    fn get_plag_alos_to_sunset(&self) -> Option<f64> {
+    fn get_plag_alos_to_sunset(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_16_point_1_degrees()?),
+            self.get_alos_16_point_1_degrees(),
             self.get_zmanim_calendar()
                 .get_astronomical_calendar()
                 .get_sunset()?,
@@ -1095,53 +1095,53 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_plag_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(&self) -> Option<f64> {
+    fn get_plag_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_16_point_1_degrees()?),
+            self.get_alos_16_point_1_degrees(),
             self.get_tzais_geonim_7_point_083_degrees()?,
             false,
         )
     }
 
-    fn get_plag_ahavat_shalom(&self) -> Option<f64> {
+    fn get_plag_ahavat_shalom(&self) -> Option<i64> {
         let tzais = self.get_tzais_geonim_3_point_8_degrees()?;
         let shaah_zmanis = self.get_shaah_zmanis_alos_16_point_1_to_tzais_3_point_8()? as f64;
-        Some(tzais - (shaah_zmanis * 1.25))
+        Some(tzais - (shaah_zmanis * 1.25) as i64)
     }
 
-    fn get_plag_hamincha_ateret_torah(&self) -> Option<f64> {
+    fn get_plag_hamincha_ateret_torah(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_72_zmanis()?),
+            self.get_alos_72_zmanis(),
             self.get_tzais_ateret_torah()?,
             false,
         )
     }
 
-    fn get_plag_hamincha_baal_hatanya(&self) -> Option<f64> {
+    fn get_plag_hamincha_baal_hatanya(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_sunrise_baal_hatanya()?),
+            self.get_sunrise_baal_hatanya(),
             self.get_sunset_baal_hatanya()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_120_minutes_zmanis(&self) -> Option<f64> {
+    fn get_plag_hamincha_120_minutes_zmanis(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_120_zmanis()?),
+            self.get_alos_120_zmanis(),
             self.get_tzais_120_zmanis()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_120_minutes(&self) -> Option<f64> {
+    fn get_plag_hamincha_120_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
-            Some(self.get_alos_120()?),
+            self.get_alos_120(),
             self.get_tzais_120()?,
             true,
         )
     }
 
-    fn get_plag_hamincha_gra_fixed_local_chatzos_to_sunset(&self) -> Option<f64> {
+    fn get_plag_hamincha_gra_fixed_local_chatzos_to_sunset(&self) -> Option<i64> {
         self.get_zmanim_calendar().get_half_day_based_zman(
             self.get_zmanim_calendar().get_chatzos()?,
             self.get_zmanim_calendar()
@@ -1152,29 +1152,29 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
     }
 
     // Bain Hashmashos methods
-    fn get_bain_hashmashos_rt_13_point_24_degrees(&self) -> Option<f64> {
+    fn get_bain_hashmashos_rt_13_point_24_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_13_POINT_24)
     }
 
-    fn get_bain_hashmashos_rt_58_point_5_minutes(&self) -> Option<f64> {
+    fn get_bain_hashmashos_rt_58_point_5_minutes(&self) -> Option<i64> {
         let sunset = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset()?;
-        Some(sunset + 58.5 * MINUTE_MILLIS as f64)
+        Some(sunset + (58.5 * MINUTE_MILLIS as f64) as i64)
     }
 
-    fn get_bain_hashmashos_rt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<f64> {
+    fn get_bain_hashmashos_rt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<i64> {
         let sunset_offset = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_7_POINT_083)?;
-        Some(sunset_offset - 13.5 * MINUTE_MILLIS as f64)
+        Some(sunset_offset - (13.5 * MINUTE_MILLIS as f64) as i64)
     }
 
-    fn get_bain_hashmashos_rt_2_stars(&self) -> Option<f64> {
+    fn get_bain_hashmashos_rt_2_stars(&self) -> Option<i64> {
         let alos_19_8 = self.get_alos_19_point_8_degrees()?;
         let sunrise = self
             .get_zmanim_calendar()
@@ -1184,371 +1184,371 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset()?;
-        Some(sunset + ((sunrise - alos_19_8) * (5.0 / 18.0)))
+        Some(sunset + ((sunrise - alos_19_8) as f64 * (5.0 / 18.0)) as i64)
     }
 
-    fn get_bain_hashmashos_yereim_18_minutes(&self) -> Option<f64> {
+    fn get_bain_hashmashos_yereim_18_minutes(&self) -> Option<i64> {
         let sunset = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset()?;
-        Some(sunset - 18.0 * MINUTE_MILLIS as f64)
+        Some(sunset - 18 * MINUTE_MILLIS)
     }
 
-    fn get_bain_hashmashos_yereim_3_point_05_degrees(&self) -> Option<f64> {
+    fn get_bain_hashmashos_yereim_3_point_05_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_MINUS_3_POINT_05)
     }
 
-    fn get_bain_hashmashos_yereim_16_point_875_minutes(&self) -> Option<f64> {
+    fn get_bain_hashmashos_yereim_16_point_875_minutes(&self) -> Option<i64> {
         let sunset = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset()?;
-        Some(sunset - 16.875 * MINUTE_MILLIS as f64)
+        Some(sunset - (16.875 * MINUTE_MILLIS as f64) as i64)
     }
 
-    fn get_bain_hashmashos_yereim_2_point_8_degrees(&self) -> Option<f64> {
+    fn get_bain_hashmashos_yereim_2_point_8_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_MINUS_2_POINT_8)
     }
 
-    fn get_bain_hashmashos_yereim_13_point_5_minutes(&self) -> Option<f64> {
+    fn get_bain_hashmashos_yereim_13_point_5_minutes(&self) -> Option<i64> {
         let sunset = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset()?;
-        Some(sunset - 13.5 * MINUTE_MILLIS as f64)
+        Some(sunset - (13.5 * MINUTE_MILLIS as f64) as i64)
     }
 
-    fn get_bain_hashmashos_yereim_2_point_1_degrees(&self) -> Option<f64> {
+    fn get_bain_hashmashos_yereim_2_point_1_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_MINUS_2_POINT_1)
     }
 
     // Tzais methods
-    fn get_tzais_geonim_3_point_7_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_3_point_7_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_3_POINT_7)
     }
 
-    fn get_tzais_geonim_3_point_8_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_3_point_8_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_3_POINT_8)
     }
 
-    fn get_tzais_geonim_5_point_95_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_5_point_95_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_5_POINT_95)
     }
 
-    fn get_tzais_geonim_3_point_65_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_3_point_65_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_3_POINT_65)
     }
 
-    fn get_tzais_geonim_3_point_676_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_3_point_676_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_3_POINT_676)
     }
 
-    fn get_tzais_geonim_4_point_61_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_4_point_61_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_4_POINT_61)
     }
 
-    fn get_tzais_geonim_4_point_37_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_4_point_37_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_4_POINT_37)
     }
 
-    fn get_tzais_geonim_5_point_88_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_5_point_88_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_5_POINT_88)
     }
 
-    fn get_tzais_geonim_4_point_8_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_4_point_8_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_4_POINT_8)
     }
 
-    fn get_tzais_geonim_6_point_45_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_6_point_45_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_6_POINT_45)
     }
 
-    fn get_tzais_geonim_7_point_083_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_7_point_083_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_7_POINT_083)
     }
 
-    fn get_tzais_geonim_7_point_67_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_7_point_67_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_7_POINT_67)
     }
 
-    fn get_tzais_geonim_8_point_5_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_8_point_5_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_8_POINT_5)
     }
 
-    fn get_tzais_geonim_9_point_3_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_9_point_3_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_9_POINT_3)
     }
 
-    fn get_tzais_geonim_9_point_75_degrees(&self) -> Option<f64> {
+    fn get_tzais_geonim_9_point_75_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_9_POINT_75)
     }
 
-    fn get_tzais_60(&self) -> Option<f64> {
+    fn get_tzais_60(&self) -> Option<i64> {
         let sunset = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset()?;
-        Some(sunset + 60.0 * MINUTE_MILLIS as f64)
+        Some(sunset + 60 * MINUTE_MILLIS)
     }
 
-    fn get_tzais_ateret_torah(&self) -> Option<f64> {
+    fn get_tzais_ateret_torah(&self) -> Option<i64> {
         let sunset = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset()?;
-        Some(sunset + self.ateret_torah_sunset_offset * MINUTE_MILLIS as f64)
+        Some(sunset + self.ateret_torah_sunset_offset)
     }
 
-    fn get_tzais_72_zmanis(&self) -> Option<f64> {
+    fn get_tzais_72_zmanis(&self) -> Option<i64> {
         self.get_zmanis_based_offset(1.2)
     }
 
-    fn get_tzais_90_zmanis(&self) -> Option<f64> {
+    fn get_tzais_90_zmanis(&self) -> Option<i64> {
         self.get_zmanis_based_offset(1.5)
     }
 
-    fn get_tzais_96_zmanis(&self) -> Option<f64> {
+    fn get_tzais_96_zmanis(&self) -> Option<i64> {
         self.get_zmanis_based_offset(1.6)
     }
 
-    fn get_tzais_90(&self) -> Option<f64> {
+    fn get_tzais_90(&self) -> Option<i64> {
         let sunset = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset()?;
-        Some(sunset + 90.0 * MINUTE_MILLIS as f64)
+        Some(sunset + 90 * MINUTE_MILLIS)
     }
 
-    fn get_tzais_120(&self) -> Option<f64> {
+    fn get_tzais_120(&self) -> Option<i64> {
         let sunset = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset()?;
-        Some(sunset + 120.0 * MINUTE_MILLIS as f64)
+        Some(sunset + 120 * MINUTE_MILLIS)
     }
 
-    fn get_tzais_120_zmanis(&self) -> Option<f64> {
+    fn get_tzais_120_zmanis(&self) -> Option<i64> {
         self.get_zmanis_based_offset(2.0)
     }
 
-    fn get_tzais_16_point_1_degrees(&self) -> Option<f64> {
+    fn get_tzais_16_point_1_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_16_POINT_1)
     }
 
-    fn get_tzais_26_degrees(&self) -> Option<f64> {
+    fn get_tzais_26_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_26_DEGREES)
     }
 
-    fn get_tzais_18_degrees(&self) -> Option<f64> {
+    fn get_tzais_18_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ASTRONOMICAL_ZENITH)
     }
 
-    fn get_tzais_19_point_8_degrees(&self) -> Option<f64> {
+    fn get_tzais_19_point_8_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_19_POINT_8)
     }
 
-    fn get_tzais_96(&self) -> Option<f64> {
+    fn get_tzais_96(&self) -> Option<i64> {
         let sunset = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset()?;
-        Some(sunset + 96.0 * MINUTE_MILLIS as f64)
+        Some(sunset + 96 * MINUTE_MILLIS)
     }
 
-    fn get_tzais_50(&self) -> Option<f64> {
+    fn get_tzais_50(&self) -> Option<i64> {
         let sunset = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset()?;
-        Some(sunset + 50.0 * MINUTE_MILLIS as f64)
+        Some(sunset + 50 * MINUTE_MILLIS)
     }
 
-    fn get_tzais_baal_hatanya(&self) -> Option<f64> {
+    fn get_tzais_baal_hatanya(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunset_offset_by_degrees(ZENITH_6_DEGREES)
     }
 
     // Fixed Local Chatzos methods
-    fn get_fixed_local_chatzos(&self) -> Option<f64> {
+    fn get_fixed_local_chatzos(&self) -> Option<i64> {
         // This would require implementing get_local_mean_time which is complex
         // For now, return None as a placeholder
         None
     }
 
-    fn get_sof_zman_shma_fixed_local(&self) -> Option<f64> {
+    fn get_sof_zman_shma_fixed_local(&self) -> Option<i64> {
         let chatzos = self.get_zmanim_calendar().get_chatzos()?;
-        Some(chatzos - 180.0 * MINUTE_MILLIS as f64)
+        Some(chatzos - 180 * MINUTE_MILLIS)
     }
 
-    fn get_sof_zman_tfila_fixed_local(&self) -> Option<f64> {
+    fn get_sof_zman_tfila_fixed_local(&self) -> Option<i64> {
         let chatzos = self.get_zmanim_calendar().get_chatzos()?;
-        Some(chatzos - 120.0 * MINUTE_MILLIS as f64)
+        Some(chatzos - 120 * MINUTE_MILLIS)
     }
 
     // Kidush Levana methods (simplified implementations - would need JewishCalendar)
     fn get_sof_zman_kidush_levana_between_moldos(
         &self,
-        _alos: Option<f64>,
-        _tzais: Option<f64>,
-    ) -> Option<f64> {
+        _alos: Option<i64>,
+        _tzais: Option<i64>,
+    ) -> Option<i64> {
         // Would require JewishCalendar implementation
         None
     }
 
-    fn get_sof_zman_kidush_levana_between_moldos_default(&self) -> Option<f64> {
+    fn get_sof_zman_kidush_levana_between_moldos_default(&self) -> Option<i64> {
         self.get_sof_zman_kidush_levana_between_moldos(None, None)
     }
 
     fn get_sof_zman_kidush_levana_15_days(
         &self,
-        _alos: Option<f64>,
-        _tzais: Option<f64>,
-    ) -> Option<f64> {
+        _alos: Option<i64>,
+        _tzais: Option<i64>,
+    ) -> Option<i64> {
         // Would require JewishCalendar implementation
         None
     }
 
-    fn get_sof_zman_kidush_levana_15_days_default(&self) -> Option<f64> {
+    fn get_sof_zman_kidush_levana_15_days_default(&self) -> Option<i64> {
         self.get_sof_zman_kidush_levana_15_days(None, None)
     }
 
-    fn get_tchilas_zman_kidush_levana_3_days(&self) -> Option<f64> {
+    fn get_tchilas_zman_kidush_levana_3_days(&self) -> Option<i64> {
         self.get_tchilas_zman_kidush_levana_3_days_with_times(None, None)
     }
 
     fn get_tchilas_zman_kidush_levana_3_days_with_times(
         &self,
-        _alos: Option<f64>,
-        _tzais: Option<f64>,
-    ) -> Option<f64> {
+        _alos: Option<i64>,
+        _tzais: Option<i64>,
+    ) -> Option<i64> {
         // Would require JewishCalendar implementation
         None
     }
 
-    fn get_zman_molad(&self) -> Option<f64> {
+    fn get_zman_molad(&self) -> Option<i64> {
         // Would require JewishCalendar implementation
         None
     }
 
     fn get_tchilas_zman_kidush_levana_7_days(
         &self,
-        _alos: Option<f64>,
-        _tzais: Option<f64>,
-    ) -> Option<f64> {
+        _alos: Option<i64>,
+        _tzais: Option<i64>,
+    ) -> Option<i64> {
         // Would require JewishCalendar implementation
         None
     }
 
-    fn get_tchilas_zman_kidush_levana_7_days_default(&self) -> Option<f64> {
+    fn get_tchilas_zman_kidush_levana_7_days_default(&self) -> Option<i64> {
         self.get_tchilas_zman_kidush_levana_7_days(None, None)
     }
 
     // Chametz methods
-    fn get_sof_zman_achilas_chametz_gra(&self) -> Option<f64> {
+    fn get_sof_zman_achilas_chametz_gra(&self) -> Option<i64> {
         self.get_zmanim_calendar().get_sof_zman_tfila_gra()
     }
 
-    fn get_sof_zman_achilas_chametz_mga_72_minutes(&self) -> Option<f64> {
+    fn get_sof_zman_achilas_chametz_mga_72_minutes(&self) -> Option<i64> {
         self.get_sof_zman_tfila_mga_72_minutes()
     }
 
-    fn get_sof_zman_achilas_chametz_mga_72_minutes_zmanis(&self) -> Option<f64> {
+    fn get_sof_zman_achilas_chametz_mga_72_minutes_zmanis(&self) -> Option<i64> {
         // Would need Jewish calendar check for Nissan 14
         self.get_sof_zman_tfila_mga_72_minutes_zmanis()
     }
 
-    fn get_sof_zman_achilas_chametz_mga_16_point_1_degrees(&self) -> Option<f64> {
+    fn get_sof_zman_achilas_chametz_mga_16_point_1_degrees(&self) -> Option<i64> {
         self.get_sof_zman_tfila_mga_16_point_1_degrees()
     }
 
-    fn get_sof_zman_biur_chametz_gra(&self) -> Option<f64> {
+    fn get_sof_zman_biur_chametz_gra(&self) -> Option<i64> {
         let sunrise = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise()?;
         let shaah_zmanis = self.get_zmanim_calendar().get_shaah_zmanis_gra()? as f64;
-        Some(sunrise + (shaah_zmanis * 5.0))
+        Some(sunrise + (shaah_zmanis * 5.0) as i64)
     }
 
-    fn get_sof_zman_biur_chametz_mga_72_minutes(&self) -> Option<f64> {
+    fn get_sof_zman_biur_chametz_mga_72_minutes(&self) -> Option<i64> {
         let alos = self.get_zmanim_calendar().get_alos72()?;
         let shaah_zmanis = self.get_zmanim_calendar().get_shaah_zmanis_mga()? as f64;
-        Some(alos + (shaah_zmanis * 5.0))
+        Some(alos + (shaah_zmanis * 5.0) as i64)
     }
 
-    fn get_sof_zman_biur_chametz_mga_72_minutes_zmanis(&self) -> Option<f64> {
+    fn get_sof_zman_biur_chametz_mga_72_minutes_zmanis(&self) -> Option<i64> {
         let alos = self.get_alos_72_zmanis()?;
         let shaah_zmanis = self.get_shaah_zmanis_72_minutes_zmanis()? as f64;
-        Some(alos + (shaah_zmanis * 5.0))
+        Some(alos + (shaah_zmanis * 5.0) as i64)
     }
 
-    fn get_sof_zman_biur_chametz_mga_16_point_1_degrees(&self) -> Option<f64> {
+    fn get_sof_zman_biur_chametz_mga_16_point_1_degrees(&self) -> Option<i64> {
         let alos = self.get_alos_16_point_1_degrees()?;
         let shaah_zmanis = self.get_shaah_zmanis_16_point_1_degrees()? as f64;
-        Some(alos + (shaah_zmanis * 5.0))
+        Some(alos + (shaah_zmanis * 5.0) as i64)
     }
 
-    fn get_sof_zman_achilas_chametz_baal_hatanya(&self) -> Option<f64> {
+    fn get_sof_zman_achilas_chametz_baal_hatanya(&self) -> Option<i64> {
         self.get_sof_zman_tfila_baal_hatanya()
     }
 
-    fn get_sof_zman_biur_chametz_baal_hatanya(&self) -> Option<f64> {
+    fn get_sof_zman_biur_chametz_baal_hatanya(&self) -> Option<i64> {
         let sunrise = self
             .get_zmanim_calendar()
             .get_astronomical_calendar()
             .get_sunrise_offset_by_degrees(ZENITH_6_DEGREES)?;
         let shaah_zmanis = self.get_shaah_zmanis_baal_hatanya()? as f64;
-        Some(sunrise + (shaah_zmanis * 5.0))
+        Some(sunrise + (shaah_zmanis * 5.0) as i64)
     }
 
     // Samuch Le Mincha Ketana methods
-    fn get_samuch_le_mincha_ketana_gra(&self) -> Option<f64> {
+    fn get_samuch_le_mincha_ketana_gra(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_samuch_le_mincha_ketana(
             Some(
                 self.get_zmanim_calendar()
@@ -1562,82 +1562,78 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_samuch_le_mincha_ketana_16_point_1_degrees(&self) -> Option<f64> {
+    fn get_samuch_le_mincha_ketana_16_point_1_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_samuch_le_mincha_ketana(
-            Some(self.get_alos_16_point_1_degrees()?),
+            self.get_alos_16_point_1_degrees(),
             self.get_tzais_16_point_1_degrees()?,
             true,
         )
     }
 
-    fn get_samuch_le_mincha_ketana_72_minutes(&self) -> Option<f64> {
+    fn get_samuch_le_mincha_ketana_72_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_samuch_le_mincha_ketana(
-            Some(self.get_zmanim_calendar().get_alos72()?),
+            self.get_zmanim_calendar().get_alos72(),
             self.get_zmanim_calendar().get_tzais72()?,
             true,
         )
     }
 
     // Ateret Torah sunset offset getter/setter
-    fn get_ateret_torah_sunset_offset(&self) -> f64 {
+    fn get_ateret_torah_sunset_offset(&self) -> i64 {
         self.ateret_torah_sunset_offset
     }
 
-    fn set_ateret_torah_sunset_offset(&mut self, offset: f64) {
-        self.ateret_torah_sunset_offset = offset;
-    }
-
     // Deprecated alias methods (for compatibility)
-    fn get_bain_hasmashosrt_13_point_24_degrees(&self) -> Option<f64> {
+    fn get_bain_hasmashosrt_13_point_24_degrees(&self) -> Option<i64> {
         self.get_bain_hashmashos_rt_13_point_24_degrees()
     }
 
-    fn get_bain_hasmashosrt_58_point_5_minutes(&self) -> Option<f64> {
+    fn get_bain_hasmashosrt_58_point_5_minutes(&self) -> Option<i64> {
         self.get_bain_hashmashos_rt_58_point_5_minutes()
     }
 
-    fn get_bain_hasmashosrt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<f64> {
+    fn get_bain_hasmashosrt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<i64> {
         self.get_bain_hashmashos_rt_13_point_5_minutes_before_7_point_083_degrees()
     }
 
-    fn get_bain_hasmashosrt_2_stars(&self) -> Option<f64> {
+    fn get_bain_hasmashosrt_2_stars(&self) -> Option<i64> {
         self.get_bain_hashmashos_rt_2_stars()
     }
 
-    fn get_bain_hasmashosyereim_18_minutes(&self) -> Option<f64> {
+    fn get_bain_hasmashosyereim_18_minutes(&self) -> Option<i64> {
         self.get_bain_hashmashos_yereim_18_minutes()
     }
 
-    fn get_bain_hasmashosyereim_3_point_05_degrees(&self) -> Option<f64> {
+    fn get_bain_hasmashosyereim_3_point_05_degrees(&self) -> Option<i64> {
         self.get_bain_hashmashos_yereim_3_point_05_degrees()
     }
 
-    fn get_bain_hasmashosyereim_16_point_875_minutes(&self) -> Option<f64> {
+    fn get_bain_hasmashosyereim_16_point_875_minutes(&self) -> Option<i64> {
         self.get_bain_hashmashos_yereim_16_point_875_minutes()
     }
 
-    fn get_bain_hasmashosyereim_2_point_8_degrees(&self) -> Option<f64> {
+    fn get_bain_hasmashosyereim_2_point_8_degrees(&self) -> Option<i64> {
         self.get_bain_hashmashos_yereim_2_point_8_degrees()
     }
 
-    fn get_bain_hasmashosyereim_13_point_5_minutes(&self) -> Option<f64> {
+    fn get_bain_hasmashosyereim_13_point_5_minutes(&self) -> Option<i64> {
         self.get_bain_hashmashos_yereim_13_point_5_minutes()
     }
 
-    fn get_bain_hasmashosyereim_2_point_1_degrees(&self) -> Option<f64> {
+    fn get_bain_hasmashosyereim_2_point_1_degrees(&self) -> Option<i64> {
         self.get_bain_hashmashos_yereim_2_point_1_degrees()
     }
 
-    fn get_sof_zman_tfilah_ateret_torah(&self) -> Option<f64> {
+    fn get_sof_zman_tfilah_ateret_torah(&self) -> Option<i64> {
         self.get_sof_zman_tfila_ateret_torah()
     }
 
     fn get_fixed_local_chatzos_based_zmanim(
         &self,
-        start_of_half_day: f64,
-        end_of_half_day: f64,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
         hours: f64,
-    ) -> Option<f64> {
+    ) -> Option<i64> {
         self.zmanim_calendar
             .get_half_day_based_zman(start_of_half_day, end_of_half_day, hours)
     }
