@@ -176,54 +176,54 @@ mod tests {
             let (rust_molad, rust_molad_data) = rust_date.get_molad();
             let (java_molad, java_molad_data) = JewishDateTrait::get_molad(&java_date);
 
-            // // Compare molad dates
-            // assert_eq!(
-            //     rust_molad.get_jewish_year(),
-            //     java_molad.get_jewish_year(),
-            //     "Molad Jewish year mismatch for timestamp: {}, tz_offset: {}",
-            //     timestamp,
-            //     tz_offset
-            // );
+            // Compare molad dates
+            assert_eq!(
+                rust_molad.get_jewish_year(),
+                java_molad.get_jewish_year(),
+                "Molad Jewish year mismatch for timestamp: {}, tz_offset: {}",
+                timestamp,
+                tz_offset
+            );
 
-            // assert_eq!(
-            //     rust_molad.get_jewish_month() as i32,
-            //     java_molad.get_jewish_month() as i32,
-            //     "Molad Jewish month mismatch for timestamp: {}, tz_offset: {}",
-            //     timestamp,
-            //     tz_offset
-            // );
+            assert_eq!(
+                rust_molad.get_jewish_month() as i32,
+                java_molad.get_jewish_month() as i32,
+                "Molad Jewish month mismatch for timestamp: {}, tz_offset: {}",
+                timestamp,
+                tz_offset
+            );
 
-            // assert_eq!(
-            //     rust_molad.get_jewish_day_of_month(),
-            //     java_molad.get_jewish_day_of_month(),
-            //     "Molad Jewish day of month mismatch for timestamp: {}, tz_offset: {}",
-            //     timestamp,
-            //     tz_offset
-            // );
+            assert_eq!(
+                rust_molad.get_jewish_day_of_month(),
+                java_molad.get_jewish_day_of_month(),
+                "Molad Jewish day of month mismatch for timestamp: {}, tz_offset: {}",
+                timestamp,
+                tz_offset
+            );
 
-            // assert_eq!(
-            //     rust_molad.get_gregorian_year(),
-            //     java_molad.get_gregorian_year(),
-            //     "Molad Gregorian year mismatch for timestamp: {}, tz_offset: {}",
-            //     timestamp,
-            //     tz_offset
-            // );
+            assert_eq!(
+                rust_molad.get_gregorian_year(),
+                java_molad.get_gregorian_year(),
+                "Molad Gregorian year mismatch for timestamp: {}, tz_offset: {}",
+                timestamp,
+                tz_offset
+            );
 
-            // assert_eq!(
-            //     rust_molad.get_gregorian_month(),
-            //     java_molad.get_gregorian_month(),
-            //     "Molad Gregorian month mismatch for timestamp: {}, tz_offset: {}",
-            //     timestamp,
-            //     tz_offset
-            // );
+            assert_eq!(
+                rust_molad.get_gregorian_month(),
+                java_molad.get_gregorian_month(),
+                "Molad Gregorian month mismatch for timestamp: {}, tz_offset: {}",
+                timestamp,
+                tz_offset
+            );
 
-            // assert_eq!(
-            //     rust_molad.get_gregorian_day_of_month(),
-            //     java_molad.get_gregorian_day_of_month(),
-            //     "Molad Gregorian day of month mismatch for timestamp: {}, tz_offset: {}",
-            //     timestamp,
-            //     tz_offset
-            // );
+            assert_eq!(
+                rust_molad.get_gregorian_day_of_month(),
+                java_molad.get_gregorian_day_of_month(),
+                "Molad Gregorian day of month mismatch for timestamp: {}, tz_offset: {}",
+                timestamp,
+                tz_offset
+            );
 
             // Compare molad time data
             assert_eq!(

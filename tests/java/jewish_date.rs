@@ -164,14 +164,6 @@ impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewi
         self.jvm.to_rust(result).unwrap()
     }
 
-    fn get_abs_date(&self) -> i32 {
-        let result = self
-            .jvm
-            .invoke(&self.instance, "getAbsDate", InvocationArg::empty())
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
     fn get_molad(
         &self,
     ) -> (
@@ -187,7 +179,7 @@ impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewi
             jvm: self.jvm,
             instance: molad_date,
         };
-        let moladHoursResult = self
+        let molad_hours_result = self
             .jvm
             .invoke(
                 &molad_date.instance,
@@ -195,8 +187,8 @@ impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewi
                 InvocationArg::empty(),
             )
             .unwrap();
-        let moladHours: i64 = self.jvm.to_rust(moladHoursResult).unwrap();
-        let moladMinutesResult = self
+        let molad_hours: i64 = self.jvm.to_rust(molad_hours_result).unwrap();
+        let molad_minutes_result = self
             .jvm
             .invoke(
                 &molad_date.instance,
@@ -204,8 +196,8 @@ impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewi
                 InvocationArg::empty(),
             )
             .unwrap();
-        let moladMinutes: i64 = self.jvm.to_rust(moladMinutesResult).unwrap();
-        let moladChalakimResult = self
+        let molad_minutes: i64 = self.jvm.to_rust(molad_minutes_result).unwrap();
+        let molad_chalakim_result = self
             .jvm
             .invoke(
                 &molad_date.instance,
@@ -213,13 +205,13 @@ impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewi
                 InvocationArg::empty(),
             )
             .unwrap();
-        let moladChalakim: i64 = self.jvm.to_rust(moladChalakimResult).unwrap();
+        let molad_chalakim: i64 = self.jvm.to_rust(molad_chalakim_result).unwrap();
         (
             molad_date,
             MoladData {
-                hours: moladHours,
-                minutes: moladMinutes,
-                chalakim: moladChalakim,
+                hours: molad_hours,
+                minutes: molad_minutes,
+                chalakim: molad_chalakim,
             },
         )
     }

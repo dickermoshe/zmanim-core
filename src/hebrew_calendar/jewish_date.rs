@@ -1,9 +1,9 @@
 use chrono::DateTime;
 use chrono::Datelike;
-use chrono::Duration;
+use chrono::Duration as ChronoDuration;
 use icu_calendar::Gregorian;
 use icu_calendar::cal::Hebrew;
-use icu_calendar::{Date, types::Weekday};
+use icu_calendar::{Date, DateDuration, types::Weekday};
 
 pub enum JewishMonth {
     NISSAN = 1,
@@ -156,9 +156,6 @@ pub trait JewishDateTrait {
     /// Get the chalakim since molad tohu
     fn get_chalakim_since_molad_tohu(&self) -> i64;
 
-    /// Get absolute date
-    fn get_abs_date(&self) -> i32;
-
     /// Get molad
     fn get_molad(&self) -> (impl JewishDateTrait, MoladData);
 }
@@ -171,7 +168,7 @@ pub struct JewishDate {
 impl JewishDate {
     pub fn new(timestamp: i64, tz_offset: i64) -> Option<Self> {
         let chrono_date =
-            DateTime::from_timestamp_millis(timestamp)? + Duration::milliseconds(tz_offset);
+            DateTime::from_timestamp_millis(timestamp)? + ChronoDuration::milliseconds(tz_offset);
         let year = chrono_date.year();
         let month = chrono_date.month();
         let day = chrono_date.day();
@@ -284,21 +281,21 @@ impl JewishDateTrait for JewishDate {
         Self::get_chalakim_since_molad_tohu_static(year, month)
     }
 
-    fn get_abs_date(&self) -> i32 {
-        todo!()
-    }
-
     fn get_molad(&self) -> (impl JewishDateTrait, MoladData) {
         let chalakim_since_molad_tohu = self.get_chalakim_since_molad_tohu();
         let abs_date = Self::molad_to_abs_date(chalakim_since_molad_tohu);
-        let gregorian_date = Self::abs_date_to_date(abs_date);
+        let mut gregorian_date = Self::abs_date_to_date(abs_date);
         let conjunction_day = chalakim_since_molad_tohu / constants::CHALAKIM_PER_DAY;
         let conjunction_parts =
             chalakim_since_molad_tohu - conjunction_day * constants::CHALAKIM_PER_DAY;
-        let hours = conjunction_parts / constants::CHALAKIM_PER_HOUR;
+        let mut hours = conjunction_parts / constants::CHALAKIM_PER_HOUR;
         let adjusted_conjunction_parts = conjunction_parts - (hours * constants::CHALAKIM_PER_HOUR);
         let minutes = adjusted_conjunction_parts / constants::CHALAKIM_PER_MINUTE;
         let chalakim = adjusted_conjunction_parts - (minutes * constants::CHALAKIM_PER_MINUTE);
+        if hours >= 6 {
+            gregorian_date.add(DateDuration::new(0, 0, 0, 1));
+        }
+        hours = (hours + 18) % 24;
         let molad_date = Self::from_gregorian_date(gregorian_date);
         (
             molad_date,
