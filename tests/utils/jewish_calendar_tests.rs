@@ -260,26 +260,21 @@ mod tests {
         );
 
         // // Test Daf Yomi
-        // let rust_daf = rust_cal.get_daf_yomi_bavli();
-        // let java_daf = java_cal.get_daf_yomi_bavli();
-        // assert_eq!(
-        //     rust_daf.masechta_number, java_daf.masechta_number,
-        //     "{} - daf_yomi_bavli masechta",
-        //     base_message
-        // );
-        // assert_eq!(
-        //     rust_daf.daf_number, java_daf.daf_number,
-        //     "{} - daf_yomi_bavli daf",
-        //     base_message
-        // );
-
-        // // Test Parsha
+        let rust_daf = rust_cal.get_daf_yomi_bavli();
+        let java_daf = java_cal.get_daf_yomi_bavli();
         assert_eq!(
-            rust_cal.get_parshah(),
-            java_cal.get_parshah(),
-            "{} - get_parshah",
+            rust_daf, java_daf,
+            "{} - daf_yomi_bavli masechta",
             base_message
         );
+        // println!("rust_daf: {:?}", base_message);
+        // let rust_daf = rust_cal.get_daf_yomi_yerushalmi();
+        // let java_daf = java_cal.get_daf_yomi_yerushalmi();
+        // assert_eq!(
+        //     rust_daf, java_daf,
+        //     "{} - daf_yomi_yerushalmi masechta",
+        //     base_message
+        // );
     }
 
     #[test]

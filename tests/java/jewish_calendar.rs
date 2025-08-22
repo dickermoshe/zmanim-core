@@ -2,15 +2,26 @@
 pub struct JavaJewishCalendar<'a> {
     pub jvm: &'a Jvm,
     pub instance: Instance,
+    pub timestamp: i64,
+    pub tz_offset: i64,
 }
 
-use j4rs::{Instance, InvocationArg, Jvm};
+use j4rs::{Instance, InvocationArg, Jvm, Null};
 use zmanim_core::hebrew_calendar::parsha::Parsha;
-use zmanim_core::hebrew_calendar::{Daf, DayOfWeek, Holiday, JewishCalendarTrait, JewishMonth};
+use zmanim_core::hebrew_calendar::{
+    BavliTractate, Daf, DayOfWeek, Holiday, JewishCalendarTrait, JewishMonth, Mesachta,
+    YerushalmiTractate,
+};
 
 use crate::java::calendar::create_calendar;
 
 use super::jewish_date::JavaJewishDate;
+
+impl Clone for JavaJewishCalendar<'_> {
+    fn clone(&self) -> Self {
+        JavaJewishCalendar::from_date(self.jvm, self.timestamp, self.tz_offset)
+    }
+}
 
 impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
     fn get_yom_tov_index(&self) -> Option<Holiday> {
@@ -275,18 +286,19 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
         self.jvm.to_rust(result).unwrap()
     }
 
-    fn get_daf_yomi_bavli(&self) -> Daf {
+    fn get_daf_yomi_bavli(&self) -> Option<Daf> {
         let result = self
             .jvm
-            .invoke(&self.instance, "getDafYomiBavli", InvocationArg::empty())
-            .unwrap();
+            .invoke(&self.instance, "getDafYomiBavli", InvocationArg::empty());
+
+        let result = result.ok()?;
 
         // Extract Daf information from the Java Daf object
         let masechta_result = self
             .jvm
             .invoke(&result, "getMasechtaNumber", InvocationArg::empty())
             .unwrap();
-        let masechta_number: i32 = self.jvm.to_rust(masechta_result).unwrap();
+        let masechta_number: u32 = self.jvm.to_rust(masechta_result).unwrap();
 
         let daf_result = self
             .jvm
@@ -294,7 +306,10 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
             .unwrap();
         let daf_number: i32 = self.jvm.to_rust(daf_result).unwrap();
 
-        Daf::new(masechta_number, daf_number)
+        Some(Daf::new(
+            Mesachta::Bavli(BavliTractate::from(masechta_number as i32)),
+            daf_number,
+        ))
     }
 
     fn get_parshah(&self) -> Parsha {
@@ -381,6 +396,34 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
             _ => Parsha::NONE,
         }
     }
+
+    // fn get_daf_yomi_yerushalmi(&self) -> Option<Daf> {
+    //     let result = self.jvm.invoke_static(
+    //         "com.kosherjava.zmanim.hebrewcalendar.YerushalmiYomiCalculator",
+    //         "getDafYomiYerushalmi",
+    //         &[InvocationArg::from(self.clone().instance)],
+    //     );
+
+    //     let result = result.ok()?;
+
+    //     let masechta_result = self
+    //         .jvm
+    //         .invoke(&result, "getMasechtaNumber", InvocationArg::empty())
+    //         .unwrap();
+
+    //     let masechta_number: u32 = self.jvm.to_rust(masechta_result).unwrap();
+
+    //     let daf_result = self
+    //         .jvm
+    //         .invoke(&result, "getDaf", InvocationArg::empty())
+    //         .unwrap();
+    //     let daf_number: i32 = self.jvm.to_rust(daf_result).unwrap();
+
+    //     Some(Daf::new(
+    //         Mesachta::Yerushalmi(YerushalmiTractate::from(masechta_number as u32)),
+    //         daf_number,
+    //     ))
+    // }
 }
 
 impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewishCalendar<'a> {
@@ -601,96 +644,12 @@ impl<'a> JavaJewishCalendar<'a> {
             )
             .unwrap();
 
-        Self { jvm, instance }
-    }
-
-    /// Create a JewishCalendar from Java Calendar
-    pub fn from_calendar(jvm: &'a Jvm, calendar_instance: Instance) -> Self {
-        let instance = jvm
-            .create_instance(
-                "com.kosherjava.zmanim.hebrewcalendar.JewishCalendar",
-                &[InvocationArg::from(calendar_instance)],
-            )
-            .unwrap();
-
-        Self { jvm, instance }
-    }
-
-    /// Create a JewishCalendar with default values (current date)
-    pub fn new(jvm: &'a Jvm) -> Self {
-        let instance = jvm
-            .create_instance(
-                "com.kosherjava.zmanim.hebrewcalendar.JewishCalendar",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-
-        Self { jvm, instance }
-    }
-
-    /// Create a JewishCalendar with specific Jewish date
-    pub fn from_jewish_date(
-        jvm: &'a Jvm,
-        jewish_year: i32,
-        jewish_month: i32,
-        jewish_day: i32,
-    ) -> Self {
-        let instance = jvm
-            .create_instance(
-                "com.kosherjava.zmanim.hebrewcalendar.JewishCalendar",
-                &[
-                    InvocationArg::try_from(jewish_year)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                    InvocationArg::try_from(jewish_month)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                    InvocationArg::try_from(jewish_day)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                ],
-            )
-            .unwrap();
-
-        Self { jvm, instance }
-    }
-
-    /// Create a JewishCalendar with specific Jewish date and Israel setting
-    pub fn from_jewish_date_with_israel(
-        jvm: &'a Jvm,
-        jewish_year: i32,
-        jewish_month: i32,
-        jewish_day: i32,
-        in_israel: bool,
-    ) -> Self {
-        let instance = jvm
-            .create_instance(
-                "com.kosherjava.zmanim.hebrewcalendar.JewishCalendar",
-                &[
-                    InvocationArg::try_from(jewish_year)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                    InvocationArg::try_from(jewish_month)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                    InvocationArg::try_from(jewish_day)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                    InvocationArg::try_from(in_israel)
-                        .unwrap()
-                        .into_primitive()
-                        .unwrap(),
-                ],
-            )
-            .unwrap();
-
-        Self { jvm, instance }
+        Self {
+            jvm,
+            instance,
+            timestamp,
+            tz_offset,
+        }
     }
 
     // Configuration methods

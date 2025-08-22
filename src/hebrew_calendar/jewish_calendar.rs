@@ -1,6 +1,7 @@
+use chrono::{DateTime, NaiveDate, NaiveDateTime};
 use heapless::Vec;
 
-use crate::hebrew_calendar::parsha::*;
+use crate::hebrew_calendar::{parsha::*, YomiCalculator};
 
 use super::daf::Daf;
 use super::jewish_date::{constants, DayOfWeek, JewishDate, JewishDateTrait, JewishMonth};
@@ -96,7 +97,10 @@ pub trait JewishCalendarTrait {
     fn is_tisha_beav(&self) -> bool;
 
     /// Get the Daf Yomi Bavli
-    fn get_daf_yomi_bavli(&self) -> Daf;
+    fn get_daf_yomi_bavli(&self) -> Option<Daf>;
+
+    // /// Get the Daf Yomi Yerushalmi
+    // fn get_daf_yomi_yerushalmi(&self) -> Option<Daf>;
 
     /// Get the Parsha for this Shabbos
     fn get_parshah(&self) -> Parsha;
@@ -850,10 +854,21 @@ impl JewishCalendarTrait for JewishCalendar {
         self.get_yom_tov_index() == Some(Holiday::TISHA_BEAV)
     }
 
-    fn get_daf_yomi_bavli(&self) -> Daf {
-        // This would need the full Daf Yomi calculation implementation
-        // For now, return a placeholder
-        Daf::new(0, 0)
+    fn get_daf_yomi_bavli(&self) -> Option<Daf> {
+        let day = self.jewish_date.gregorian_date.day_of_month().0;
+        let month = self.jewish_date.gregorian_date.month().ordinal;
+        let year = self
+            .jewish_date
+            .gregorian_date
+            .year()
+            .era_year_or_related_iso();
+        let timestamp = NaiveDate::from_ymd_opt(year, month as u32, day as u32)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_utc()
+            .timestamp_millis();
+        YomiCalculator::get_daf_yomi_bavli(timestamp)
     }
 
     fn get_parshah(&self) -> Parsha {
@@ -890,4 +905,21 @@ impl JewishCalendarTrait for JewishCalendar {
             _ => Parsha::NONE,
         }
     }
+
+    // fn get_daf_yomi_yerushalmi(&self) -> Option<Daf> {
+    //     let day = self.jewish_date.gregorian_date.day_of_month().0;
+    //     let month = self.jewish_date.gregorian_date.month().ordinal;
+    //     let year = self
+    //         .jewish_date
+    //         .gregorian_date
+    //         .year()
+    //         .era_year_or_related_iso();
+    //     let timestamp = NaiveDate::from_ymd_opt(year, month as u32, day as u32)
+    //         .unwrap()
+    //         .and_hms_opt(0, 0, 0)
+    //         .unwrap()
+    //         .and_utc()
+    //         .timestamp_millis();
+    //     YomiCalculator::get_daf_yomi_yerushalmi(timestamp)
+    // }
 }
