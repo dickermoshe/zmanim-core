@@ -1,6 +1,7 @@
 extern crate alloc;
 
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, Utc};
+use libm::floor;
 
 use crate::hebrew_calendar::daf::{BavliTractate, Daf, Mesachta, YerushalmiTractate};
 
@@ -303,8 +304,8 @@ fn get_julian_day(date: &DateTime<Utc>) -> i32 {
     }
     let a = year / 100;
     let b = 2 - a + a / 4;
-    return ((365.25 * (year + 4716) as f64).floor()
-        + (30.6001 * (month + 1) as f64).floor()
+    return (floor(365.25 * (year + 4716) as f64)
+        + floor(30.6001 * (month + 1) as f64)
         + day as f64
         + b as f64
         - 1524.5) as i32;
