@@ -20,9 +20,9 @@ serde = { version = "1.0", features = ["derive"] }
 
 [lib]
 crate-type = [
-    "staticlib", # Ensure it gets compiled as a (static) C library
-    # "cdylib",     # If you want a shared/dynamic C library (advanced)
-    "lib", # For `generate-headers`, `examples/`, `tests/` etc.
+    # "staticlib", 
+    "cdylib",
+    "lib",
 ]
 
 [[bin]]
@@ -30,5 +30,9 @@ name = "generate-headers"
 required-features = ["ffi"] # Do not build unless generating headers.
 
 [features]
-headers = ["safer-ffi/headers"]
+# For regular use within Rust
+default = []
+# For building a shared library
 ffi = []
+# For generating headers for the shared library
+headers = ["safer-ffi/headers", "ffi"]
