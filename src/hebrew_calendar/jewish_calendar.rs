@@ -1,9 +1,10 @@
 use chrono::NaiveDate;
+use safer_ffi::derive_ReprC;
 
 use crate::hebrew_calendar::{parsha::*, YomiCalculator};
 
-use super::daf::Daf;
-use super::jewish_date::{constants, DayOfWeek, JewishDate, JewishDateTrait, JewishMonth};
+use super::daf::BavliDaf;
+use super::jewish_date::{date_constants, DayOfWeek, JewishDate, JewishDateTrait, JewishMonth};
 
 pub trait JewishCalendarTrait {
     fn get_yom_tov_index(&self) -> Option<Holiday>;
@@ -64,7 +65,7 @@ pub trait JewishCalendarTrait {
 
     fn is_tisha_beav(&self) -> bool;
 
-    fn get_daf_yomi_bavli(&self) -> Option<Daf>;
+    fn get_daf_yomi_bavli(&self) -> Option<BavliDaf>;
 
     fn get_parshah(&self) -> Parsha;
 }
@@ -83,6 +84,8 @@ pub struct JewishCalendar {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive_ReprC]
+#[repr(u8)]
 pub enum Holiday {
     #[allow(non_camel_case_types)]
     EREV_PESACH = 0,
@@ -203,7 +206,7 @@ impl Holiday {
 }
 
 impl JewishCalendar {
-    pub fn new_with_timestamp(
+    pub fn new(
         timestamp: i64,
         tz_offset: i64,
         in_israel: bool,
@@ -650,17 +653,17 @@ impl JewishCalendarTrait for JewishCalendar {
         let month = self.jewish_date.get_jewish_month() as i32;
         let day = self.jewish_date.get_jewish_day_of_month();
 
-        (month == constants::TISHREI && (day == 1))
+        (month == date_constants::TISHREI.into() && (day == 1))
             || (!self.in_israel
-                && ((month == constants::NISSAN && (day == 15 || day == 21))
-                    || (month == constants::TISHREI && (day == 15 || day == 22))
-                    || (month == constants::SIVAN && day == 6)))
+                && ((month == date_constants::NISSAN.into() && (day == 15 || day == 21))
+                    || (month == date_constants::TISHREI.into() && (day == 15 || day == 22))
+                    || (month == date_constants::SIVAN.into() && day == 6)))
     }
 
     fn is_aseres_yemei_teshuva(&self) -> bool {
         let month = self.jewish_date.get_jewish_month() as i32;
         let day = self.jewish_date.get_jewish_day_of_month();
-        month == constants::TISHREI && day <= 10
+        month == date_constants::TISHREI.into() && day <= 10
     }
 
     fn is_pesach(&self) -> bool {
@@ -736,7 +739,7 @@ impl JewishCalendarTrait for JewishCalendar {
     fn is_rosh_chodesh(&self) -> bool {
         let day = self.jewish_date.get_jewish_day_of_month();
         let month = self.jewish_date.get_jewish_month() as i32;
-        (day == 1 && month != constants::TISHREI) || day == 30
+        (day == 1 && month != date_constants::TISHREI.into()) || day == 30
     }
 
     fn is_isru_chag(&self) -> bool {
@@ -761,7 +764,7 @@ impl JewishCalendarTrait for JewishCalendar {
         let day_of_week = self.jewish_date.get_day_of_week() as i32;
         let month = self.jewish_date.get_jewish_month() as i32;
 
-        month == constants::NISSAN
+        month == date_constants::NISSAN.into()
             && ((day == 14 && day_of_week != 7) || (day == 12 && day_of_week == 5))
     }
 
@@ -773,7 +776,7 @@ impl JewishCalendarTrait for JewishCalendar {
         let month = self.jewish_date.get_jewish_month() as i32;
         let day = self.jewish_date.get_jewish_day_of_month();
 
-        if month == constants::KISLEV {
+        if month == date_constants::KISLEV.into() {
             day - 24
         } else {
             if self.jewish_date.is_kislev_short() {
@@ -800,11 +803,11 @@ impl JewishCalendarTrait for JewishCalendar {
         let month = self.jewish_date.get_jewish_month() as i32;
         let day = self.jewish_date.get_jewish_day_of_month();
 
-        if month == constants::NISSAN && day >= 16 {
+        if month == date_constants::NISSAN.into() && day >= 16 {
             day - 15
-        } else if month == constants::IYAR {
+        } else if month == date_constants::IYAR.into() {
             day + 15
-        } else if month == constants::SIVAN && day < 6 {
+        } else if month == date_constants::SIVAN.into() && day < 6 {
             day + 44
         } else {
             -1
@@ -815,7 +818,7 @@ impl JewishCalendarTrait for JewishCalendar {
         self.get_yom_tov_index() == Some(Holiday::TISHA_BEAV)
     }
 
-    fn get_daf_yomi_bavli(&self) -> Option<Daf> {
+    fn get_daf_yomi_bavli(&self) -> Option<BavliDaf> {
         let day = self.jewish_date.gregorian_date.day_of_month().0;
         let month = self.jewish_date.gregorian_date.month().ordinal;
         let year = self
@@ -863,5 +866,153 @@ impl JewishCalendarTrait for JewishCalendar {
             Some(16) => PARSHA_LIST_16[(day / 7) as usize],
             _ => Parsha::NONE,
         }
+    }
+}
+
+// FFI module - only compiled when FFI is needed
+#[cfg(feature = "ffi")]
+pub mod ffi {
+    use super::*;
+    use safer_ffi::{ffi_export, option::TaggedOption};
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive_ReprC]
+    #[repr(C)]
+    pub struct JewishCalendarData {
+        // Jewish date information
+        pub jewish_year: i32,
+        pub jewish_month: JewishMonth,
+        pub jewish_day_of_month: i32,
+        pub gregorian_year: i32,
+        pub gregorian_month: i32,
+        pub gregorian_day_of_month: i32,
+        pub day_of_week: DayOfWeek,
+        pub is_jewish_leap_year: bool,
+        pub days_in_jewish_year: i32,
+        pub days_in_jewish_month: i32,
+        pub is_cheshvan_long: bool,
+        pub is_kislev_short: bool,
+        pub cheshvan_kislev_kviah: i32, // Using i32 instead of YearLengthType for FFI compatibility
+        pub days_since_start_of_jewish_year: i32,
+        pub chalakim_since_molad_tohu: i64,
+
+        // Calendar configuration
+        pub in_israel: bool,
+        pub use_modern_holidays: bool,
+
+        // Holiday and special day information
+        pub yom_tov_index: TaggedOption<i32>, // Holiday index or None
+        pub is_yom_tov: bool,
+        pub is_yom_tov_assur_bemelacha: bool,
+        pub is_assur_bemelacha: bool,
+        pub has_candle_lighting: bool,
+        pub is_tomorrow_shabbos_or_yom_tov: bool,
+        pub is_erev_yom_tov_sheni: bool,
+        pub is_aseres_yemei_teshuva: bool,
+        pub is_pesach: bool,
+        pub is_chol_hamoed_pesach: bool,
+        pub is_shavuos: bool,
+        pub is_rosh_hashana: bool,
+        pub is_yom_kippur: bool,
+        pub is_succos: bool,
+        pub is_hoshana_rabba: bool,
+        pub is_shemini_atzeres: bool,
+        pub is_simchas_torah: bool,
+        pub is_chol_hamoed_succos: bool,
+        pub is_chol_hamoed: bool,
+        pub is_erev_yom_tov: bool,
+        pub is_rosh_chodesh: bool,
+        pub is_isru_chag: bool,
+        pub is_taanis: bool,
+        pub is_taanis_bechoros: bool,
+        pub day_of_chanukah: i32,
+        pub is_chanukah: bool,
+        pub is_purim: bool,
+        pub day_of_omer: i32,
+        pub is_tisha_beav: bool,
+
+        // Additional information
+        pub daf_yomi_bavli: TaggedOption<i32>, // Daf index or None
+        pub parshah: i32,                      // Parsha index
+    }
+
+    impl JewishCalendarData {
+        pub fn from_jewish_calendar(calendar: JewishCalendar) -> Self {
+            let jewish_date = calendar.get_jewish_date();
+
+            Self {
+                // Jewish date information
+                jewish_year: jewish_date.get_jewish_year(),
+                jewish_month: jewish_date.get_jewish_month(),
+                jewish_day_of_month: jewish_date.get_jewish_day_of_month(),
+                gregorian_year: jewish_date.get_gregorian_year(),
+                gregorian_month: jewish_date.get_gregorian_month(),
+                gregorian_day_of_month: jewish_date.get_gregorian_day_of_month(),
+                day_of_week: jewish_date.get_day_of_week(),
+                is_jewish_leap_year: jewish_date.is_jewish_leap_year(),
+                days_in_jewish_year: jewish_date.get_days_in_jewish_year(),
+                days_in_jewish_month: jewish_date.get_days_in_jewish_month(),
+                is_cheshvan_long: jewish_date.is_cheshvan_long(),
+                is_kislev_short: jewish_date.is_kislev_short(),
+                cheshvan_kislev_kviah: jewish_date.get_cheshvan_kislev_kviah() as i32,
+                days_since_start_of_jewish_year: jewish_date.get_days_since_start_of_jewish_year(),
+                chalakim_since_molad_tohu: jewish_date.get_chalakim_since_molad_tohu(),
+
+                // Calendar configuration
+                in_israel: calendar.in_israel,
+                use_modern_holidays: calendar.use_modern_holidays,
+
+                // Holiday and special day information
+                yom_tov_index: calendar.get_yom_tov_index().map(|h| h as i32).into(),
+                is_yom_tov: calendar.is_yom_tov(),
+                is_yom_tov_assur_bemelacha: calendar.is_yom_tov_assur_bemelacha(),
+                is_assur_bemelacha: calendar.is_assur_bemelacha(),
+                has_candle_lighting: calendar.has_candle_lighting(),
+                is_tomorrow_shabbos_or_yom_tov: calendar.is_tomorrow_shabbos_or_yom_tov(),
+                is_erev_yom_tov_sheni: calendar.is_erev_yom_tov_sheni(),
+                is_aseres_yemei_teshuva: calendar.is_aseres_yemei_teshuva(),
+                is_pesach: calendar.is_pesach(),
+                is_chol_hamoed_pesach: calendar.is_chol_hamoed_pesach(),
+                is_shavuos: calendar.is_shavuos(),
+                is_rosh_hashana: calendar.is_rosh_hashana(),
+                is_yom_kippur: calendar.is_yom_kippur(),
+                is_succos: calendar.is_succos(),
+                is_hoshana_rabba: calendar.is_hoshana_rabba(),
+                is_shemini_atzeres: calendar.is_shemini_atzeres(),
+                is_simchas_torah: calendar.is_simchas_torah(),
+                is_chol_hamoed_succos: calendar.is_chol_hamoed_succos(),
+                is_chol_hamoed: calendar.is_chol_hamoed(),
+                is_erev_yom_tov: calendar.is_erev_yom_tov(),
+                is_rosh_chodesh: calendar.is_rosh_chodesh(),
+                is_isru_chag: calendar.is_isru_chag(),
+                is_taanis: calendar.is_taanis(),
+                is_taanis_bechoros: calendar.is_taanis_bechoros(),
+                day_of_chanukah: calendar.get_day_of_chanukah(),
+                is_chanukah: calendar.is_chanukah(),
+                is_purim: calendar.is_purim(),
+                day_of_omer: calendar.get_day_of_omer(),
+                is_tisha_beav: calendar.is_tisha_beav(),
+
+                // Additional information
+                daf_yomi_bavli: calendar
+                    .get_daf_yomi_bavli()
+                    .map(|d| (d.masechta as i32) * 1000 + d.daf)
+                    .into(),
+                parshah: calendar.get_parshah() as i32,
+            }
+        }
+    }
+
+    #[ffi_export]
+    pub fn jewish_calendar_data_from_timestamp(
+        timestamp: i64,
+        tz_offset: i64,
+        in_israel: bool,
+        use_modern_holidays: bool,
+    ) -> TaggedOption<JewishCalendarData> {
+        let calendar = JewishCalendar::new(timestamp, tz_offset, in_israel, use_modern_holidays);
+        calendar
+            .map(|c| JewishCalendarData::from_jewish_calendar(c))
+            .into()
     }
 }

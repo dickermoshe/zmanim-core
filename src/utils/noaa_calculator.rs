@@ -1,12 +1,22 @@
-use crate::GeoLocationTrait;
+use crate::{GeoLocation, GeoLocationTrait};
+use ::safer_ffi::prelude::*;
 use chrono::{DateTime, Datelike, Timelike};
 use core::f64;
 use core::f64::consts::PI;
 use libm::{acos, asin, cos, floor, fmod, sin, tan};
+use safer_ffi::option::TaggedOption;
 
-pub struct AstronomicalCalculator;
+#[derive_ReprC]
+#[repr(C)]
+pub struct AstronomicalCalculator {
+    __: i32,
+}
 
-pub struct NOAACalculator;
+#[derive_ReprC]
+#[repr(C)]
+pub struct NOAACalculator {
+    __: i32,
+}
 
 const JULIAN_DAY_JAN_1_2000: f64 = 2451545.0;
 const JULIAN_DAYS_PER_CENTURY: f64 = 36525.0;
@@ -16,6 +26,8 @@ const SOLAR_RADIUS: f64 = 16.0 / 60.0;
 const REFRACTION: f64 = 34.0 / 60.0;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive_ReprC]
+#[repr(u8)]
 pub enum SolarEvent {
     Sunrise,
     Sunset,
@@ -25,8 +37,9 @@ pub enum SolarEvent {
 
 impl NOAACalculator {
     pub fn new() -> Self {
-        Self {}
+        Self { __: 0 }
     }
+
     fn get_elevation_adjustment(&self, elevation: f64) -> f64 {
         let elevation_adjustment =
             acos(EARTH_RADIUS / (EARTH_RADIUS + (elevation / 1000.0))).to_degrees();
@@ -417,5 +430,82 @@ impl NOAACalculatorTrait for NOAACalculator {
         geo_location: &crate::utils::geolocation::GeoLocation,
     ) -> Option<f64> {
         self.get_solar_elevation_azimuth(timestamp, geo_location, true)
+    }
+}
+
+// Public functions for FFI
+
+#[ffi_export]
+fn get_utc_sunrise(
+    calculator: &NOAACalculator,
+    timestamp: i64,
+    geo_location: &GeoLocation,
+    zenith: f64,
+    adjust_for_elevation: bool,
+) -> TaggedOption<f64> {
+    calculator
+        .get_utc_sunrise(timestamp, geo_location, zenith, adjust_for_elevation)
+        .into()
+}
+
+#[ffi_export]
+fn get_utc_sunset(
+    calculator: &NOAACalculator,
+    timestamp: i64,
+    geo_location: &GeoLocation,
+    zenith: f64,
+    adjust_for_elevation: bool,
+) -> TaggedOption<f64> {
+    calculator
+        .get_utc_sunset(timestamp, geo_location, zenith, adjust_for_elevation)
+        .into()
+}
+
+#[cfg(feature = "ffi")]
+pub mod noaa_calculator_ffi {
+    use super::*;
+    use safer_ffi::option::TaggedOption;
+
+    #[ffi_export]
+    fn get_solar_elevation(
+        calculator: &NOAACalculator,
+        timestamp: i64,
+        geo_location: &GeoLocation,
+    ) -> TaggedOption<f64> {
+        calculator
+            .get_solar_elevation(timestamp, geo_location)
+            .into()
+    }
+
+    #[ffi_export]
+    fn get_solar_azimuth(
+        calculator: &NOAACalculator,
+        timestamp: i64,
+        geo_location: &GeoLocation,
+    ) -> TaggedOption<f64> {
+        calculator.get_solar_azimuth(timestamp, geo_location).into()
+    }
+
+    #[ffi_export]
+    fn get_utc_noon(
+        calculator: &NOAACalculator,
+        timestamp: i64,
+        geo_location: &GeoLocation,
+    ) -> TaggedOption<f64> {
+        calculator.get_utc_noon(timestamp, geo_location).into()
+    }
+
+    #[ffi_export]
+    fn get_utc_midnight(
+        calculator: &NOAACalculator,
+        timestamp: i64,
+        geo_location: &GeoLocation,
+    ) -> TaggedOption<f64> {
+        calculator.get_utc_midnight(timestamp, geo_location).into()
+    }
+
+    #[ffi_export]
+    fn noaacalculator_new() -> NOAACalculator {
+        NOAACalculator::new()
     }
 }

@@ -8,20 +8,27 @@ version = "0.1.0"
 libm = "0.2.15"
 heapless = "0.8.0"
 icu_calendar = { version = "2.0.3", default-features = false }
-
-[dependencies.chrono]
-version = "0.4.41"
-default-features = false
+chrono = { version = "0.4.41", default-features = false }
+safer-ffi = { version = "0.1.13", default-features = false }
 
 
 [dev-dependencies]
 j4rs = "0.22.0"
 rand = "0.9.2"
 serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 
-[dev-dependencies.serde]
-version = "1.0"
-features = ["derive"]
+[lib]
+crate-type = [
+    "staticlib", # Ensure it gets compiled as a (static) C library
+    # "cdylib",     # If you want a shared/dynamic C library (advanced)
+    "lib", # For `generate-headers`, `examples/`, `tests/` etc.
+]
 
-[build-dependencies]
-cbindgen = "0.24.0"
+[[bin]]
+name = "generate-headers"
+required-features = ["ffi"] # Do not build unless generating headers.
+
+[features]
+headers = ["safer-ffi/headers"]
+ffi = []

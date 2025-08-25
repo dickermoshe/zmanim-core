@@ -3,7 +3,7 @@ extern crate alloc;
 use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use libm::floor;
 
-use crate::hebrew_calendar::daf::{BavliTractate, Daf, Mesachta};
+use crate::hebrew_calendar::daf::{BavliDaf, BavliTractate};
 
 pub struct YomiCalculator;
 
@@ -20,7 +20,7 @@ impl YomiCalculator {
         .expect("Invalid time for SHEKALIM_CHANGE_DAY")
         .and_utc();
 
-    pub fn get_daf_yomi_bavli(timestamp: i64) -> Option<Daf> {
+    pub fn get_daf_yomi_bavli(timestamp: i64) -> Option<BavliDaf> {
         let date = DateTime::from_timestamp_millis(timestamp)?;
 
         let daf_yomi_julian_start = get_julian_day(&Self::DAF_YOMI_START_DAY);
@@ -71,51 +71,9 @@ impl YomiCalculator {
             }
         }
 
-        let tractate = match masechta {
-            0 => BavliTractate::Berachos,
-            1 => BavliTractate::Shabbos,
-            2 => BavliTractate::Eruvin,
-            3 => BavliTractate::Pesachim,
-            4 => BavliTractate::Shekalim,
-            5 => BavliTractate::Yoma,
-            6 => BavliTractate::Sukkah,
-            7 => BavliTractate::Beitzah,
-            8 => BavliTractate::RoshHashana,
-            9 => BavliTractate::Taanis,
-            10 => BavliTractate::Megillah,
-            11 => BavliTractate::MoedKatan,
-            12 => BavliTractate::Chagigah,
-            13 => BavliTractate::Yevamos,
-            14 => BavliTractate::Kesubos,
-            15 => BavliTractate::Nedarim,
-            16 => BavliTractate::Nazir,
-            17 => BavliTractate::Sotah,
-            18 => BavliTractate::Gitin,
-            19 => BavliTractate::Kiddushin,
-            20 => BavliTractate::BavaKamma,
-            21 => BavliTractate::BavaMetzia,
-            22 => BavliTractate::BavaBasra,
-            23 => BavliTractate::Sanhedrin,
-            24 => BavliTractate::Makkos,
-            25 => BavliTractate::Shevuos,
-            26 => BavliTractate::AvodahZarah,
-            27 => BavliTractate::Horiyos,
-            28 => BavliTractate::Zevachim,
-            29 => BavliTractate::Menachos,
-            30 => BavliTractate::Chullin,
-            31 => BavliTractate::Bechoros,
-            32 => BavliTractate::Arachin,
-            33 => BavliTractate::Temurah,
-            34 => BavliTractate::Kerisos,
-            35 => BavliTractate::Meilah,
-            36 => BavliTractate::Kinnim,
-            37 => BavliTractate::Tamid,
-            38 => BavliTractate::Midos,
-            39 => BavliTractate::Niddah,
-            _ => panic!("Invalid masechta index: {}", masechta),
-        };
+        let tractate: BavliTractate = masechta.into();
 
-        Some(Daf::new(Mesachta::Bavli(tractate), blatt))
+        Some(BavliDaf::new(tractate, blatt))
     }
 }
 

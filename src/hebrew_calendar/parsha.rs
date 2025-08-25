@@ -1,4 +1,8 @@
+use safer_ffi::derive_ReprC;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive_ReprC]
+#[repr(u8)]
 pub enum Parsha {
     NONE = 0,
     BERESHIS = 1,

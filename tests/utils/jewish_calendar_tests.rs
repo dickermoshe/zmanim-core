@@ -282,41 +282,37 @@ mod tests {
             let mut java_cal = JavaJewishCalendar::from_date(&jvm, timestamp, tz_offset);
 
             // 1) Diaspora, modern holidays off
-            let rust_cal_1 =
-                match JewishCalendar::new_with_timestamp(timestamp, tz_offset, false, false) {
-                    Some(c) => c,
-                    None => continue,
-                };
+            let rust_cal_1 = match JewishCalendar::new(timestamp, tz_offset, false, false) {
+                Some(c) => c,
+                None => continue,
+            };
             java_cal.set_in_israel(false);
             java_cal.set_use_modern_holidays(false);
             compare_calendar_methods(&rust_cal_1, &java_cal, timestamp, tz_offset);
 
             // 2) Israel, modern holidays off
-            let rust_cal_2 =
-                match JewishCalendar::new_with_timestamp(timestamp, tz_offset, true, false) {
-                    Some(c) => c,
-                    None => continue,
-                };
+            let rust_cal_2 = match JewishCalendar::new(timestamp, tz_offset, true, false) {
+                Some(c) => c,
+                None => continue,
+            };
             java_cal.set_in_israel(true);
             java_cal.set_use_modern_holidays(false);
             compare_calendar_methods(&rust_cal_2, &java_cal, timestamp, tz_offset);
 
             // 3) Diaspora, modern holidays on
-            let rust_cal_3 =
-                match JewishCalendar::new_with_timestamp(timestamp, tz_offset, false, true) {
-                    Some(c) => c,
-                    None => continue,
-                };
+            let rust_cal_3 = match JewishCalendar::new(timestamp, tz_offset, false, true) {
+                Some(c) => c,
+                None => continue,
+            };
             java_cal.set_in_israel(false);
             java_cal.set_use_modern_holidays(true);
             compare_calendar_methods(&rust_cal_3, &java_cal, timestamp, tz_offset);
 
             // 4) Israel, modern holidays on
-            let rust_cal_4 =
-                match JewishCalendar::new_with_timestamp(timestamp, tz_offset, true, true) {
-                    Some(c) => c,
-                    None => continue,
-                };
+            let rust_cal_4 = match JewishCalendar::new(timestamp, tz_offset, true, true) {
+                Some(c) => c,
+                None => continue,
+            };
             java_cal.set_in_israel(true);
             java_cal.set_use_modern_holidays(true);
             compare_calendar_methods(&rust_cal_4, &java_cal, timestamp, tz_offset);

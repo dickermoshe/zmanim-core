@@ -6,9 +6,10 @@ pub struct JavaJewishCalendar<'a> {
 }
 
 use j4rs::{Instance, InvocationArg, Jvm};
+use zmanim_core::hebrew_calendar::daf::BavliDaf;
 use zmanim_core::hebrew_calendar::parsha::Parsha;
 use zmanim_core::hebrew_calendar::{
-    BavliTractate, Daf, DayOfWeek, Holiday, JewishCalendarTrait, JewishMonth, Mesachta,
+    BavliTractate, DayOfWeek, Holiday, JewishCalendarTrait, JewishMonth,
 };
 
 use crate::java::calendar::create_calendar;
@@ -282,7 +283,7 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
         self.jvm.to_rust(result).unwrap()
     }
 
-    fn get_daf_yomi_bavli(&self) -> Option<Daf> {
+    fn get_daf_yomi_bavli(&self) -> Option<BavliDaf> {
         let result = self
             .jvm
             .invoke(&self.instance, "getDafYomiBavli", InvocationArg::empty());
@@ -301,8 +302,8 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
             .unwrap();
         let daf_number: i32 = self.jvm.to_rust(daf_result).unwrap();
 
-        Some(Daf::new(
-            Mesachta::Bavli(BavliTractate::from(masechta_number as i32)),
+        Some(BavliDaf::new(
+            BavliTractate::from(masechta_number as i32),
             daf_number,
         ))
     }

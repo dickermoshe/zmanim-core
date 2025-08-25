@@ -2,14 +2,18 @@ use crate::{
     astronomical_calendar::{
         AstronomicalCalendar, AstronomicalCalendarTrait, GEOMETRIC_ZENITH, MINUTE_MILLIS,
     },
-    GeoLocationTrait,
+    geolocation::GeoLocation,
 };
+
+use safer_ffi::prelude::*;
 
 const ZENITH_16_POINT_1: f64 = GEOMETRIC_ZENITH + 16.1;
 const ZENITH_8_POINT_5: f64 = GEOMETRIC_ZENITH + 8.5;
 
-pub struct ZmanimCalendar<'a> {
-    astronomical_calendar: AstronomicalCalendar<'a>,
+#[derive_ReprC]
+#[repr(C)]
+pub struct ZmanimCalendar {
+    astronomical_calendar: AstronomicalCalendar,
     use_astronomical_chatzos: bool,
     use_astronomical_chatzos_for_other_zmanim: bool,
     candle_lighting_offset: i64,
@@ -95,10 +99,10 @@ pub trait ZmanimCalendarTrait {
     fn get_shaah_zmanis_mga(&self) -> Option<i64>;
 }
 
-impl<'a> ZmanimCalendar<'a> {
+impl ZmanimCalendar {
     pub fn new(
         timestamp: i64,
-        geo_location: &'a dyn GeoLocationTrait,
+        geo_location: GeoLocation,
 
         use_astronomical_chatzos: bool,
         use_astronomical_chatzos_for_other_zmanim: bool,
@@ -111,12 +115,12 @@ impl<'a> ZmanimCalendar<'a> {
             candle_lighting_offset,
         }
     }
-    pub fn get_astronomical_calendar(&self) -> &AstronomicalCalendar<'a> {
+    pub fn get_astronomical_calendar(&self) -> &AstronomicalCalendar {
         &self.astronomical_calendar
     }
 }
 
-impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
+impl ZmanimCalendarTrait for ZmanimCalendar {
     fn get_tzais(&self) -> Option<i64> {
         self.astronomical_calendar
             .get_sunset_offset_by_degrees(ZENITH_8_POINT_5)
@@ -387,5 +391,227 @@ impl<'a> ZmanimCalendarTrait for ZmanimCalendar<'a> {
     fn get_shaah_zmanis_mga(&self) -> Option<i64> {
         self.astronomical_calendar
             .get_temporal_hour_with_start_and_end_times(self.get_alos72()?, self.get_tzais72()?)
+    }
+}
+
+// FFI Functions for ZmanimCalendar
+#[cfg(feature = "ffi")]
+pub mod zmanim_calendar_ffi {
+    use super::*;
+    use safer_ffi::option::TaggedOption;
+
+    #[ffi_export]
+    pub fn zmanim_calendar_new(
+        timestamp: i64,
+        geo_location: GeoLocation,
+        use_astronomical_chatzos: bool,
+        use_astronomical_chatzos_for_other_zmanim: bool,
+        candle_lighting_offset: i64,
+    ) -> ZmanimCalendar {
+        ZmanimCalendar::new(
+            timestamp,
+            geo_location,
+            use_astronomical_chatzos,
+            use_astronomical_chatzos_for_other_zmanim,
+            candle_lighting_offset,
+        )
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_tzais(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_tzais().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_alos_hashachar(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_alos_hashachar().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_alos72(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_alos72().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_chatzos(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_chatzos().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_chatzos_as_half_day(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_chatzos_as_half_day().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_percent_of_shaah_zmanis_from_degrees(
+        calendar: &ZmanimCalendar,
+        degrees: f64,
+        sunset: bool,
+    ) -> TaggedOption<f64> {
+        calendar
+            .get_percent_of_shaah_zmanis_from_degrees(degrees, sunset)
+            .into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_half_day_based_zman(
+        calendar: &ZmanimCalendar,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
+        hours: f64,
+    ) -> TaggedOption<i64> {
+        calendar
+            .get_half_day_based_zman(start_of_half_day, end_of_half_day, hours)
+            .into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_half_day_based_shaah_zmanis(
+        calendar: &ZmanimCalendar,
+        start_of_half_day: i64,
+        end_of_half_day: i64,
+    ) -> TaggedOption<i64> {
+        calendar
+            .get_half_day_based_shaah_zmanis(start_of_half_day, end_of_half_day)
+            .into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_shaah_zmanis_based_zman(
+        calendar: &ZmanimCalendar,
+        start_of_day: i64,
+        end_of_day: i64,
+        hours: f64,
+    ) -> TaggedOption<i64> {
+        calendar
+            .get_shaah_zmanis_based_zman(start_of_day, end_of_day, hours)
+            .into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_sof_zman_shma_simple(
+        calendar: &ZmanimCalendar,
+        start_of_day: i64,
+        end_of_day: i64,
+    ) -> TaggedOption<i64> {
+        calendar
+            .get_sof_zman_shma_simple(start_of_day, end_of_day)
+            .into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_sof_zman_shma_gra(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_sof_zman_shma_gra().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_sof_zman_shma_mga(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_sof_zman_shma_mga().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_tzais72(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_tzais72().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_candle_lighting(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_candle_lighting().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_sof_zman_tfila_simple(
+        calendar: &ZmanimCalendar,
+        start_of_day: i64,
+        end_of_day: i64,
+    ) -> TaggedOption<i64> {
+        calendar
+            .get_sof_zman_tfila_simple(start_of_day, end_of_day)
+            .into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_sof_zman_tfila_gra(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_sof_zman_tfila_gra().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_sof_zman_tfila_mga(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_sof_zman_tfila_mga().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_mincha_gedola_simple(
+        calendar: &ZmanimCalendar,
+        start_of_day: i64,
+        end_of_day: i64,
+    ) -> TaggedOption<i64> {
+        calendar
+            .get_mincha_gedola_simple(start_of_day, end_of_day)
+            .into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_mincha_gedola_default(
+        calendar: &ZmanimCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_mincha_gedola_default().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_samuch_le_mincha_ketana_simple(
+        calendar: &ZmanimCalendar,
+        start_of_day: i64,
+        end_of_day: i64,
+    ) -> TaggedOption<i64> {
+        calendar
+            .get_samuch_le_mincha_ketana_simple(start_of_day, end_of_day)
+            .into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_mincha_ketana_simple(
+        calendar: &ZmanimCalendar,
+        start_of_day: i64,
+        end_of_day: i64,
+    ) -> TaggedOption<i64> {
+        calendar
+            .get_mincha_ketana_simple(start_of_day, end_of_day)
+            .into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_mincha_ketana_default(
+        calendar: &ZmanimCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_mincha_ketana_default().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_plag_hamincha_simple(
+        calendar: &ZmanimCalendar,
+        start_of_day: i64,
+        end_of_day: i64,
+    ) -> TaggedOption<i64> {
+        calendar
+            .get_plag_hamincha_simple(start_of_day, end_of_day)
+            .into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_plag_hamincha_default(
+        calendar: &ZmanimCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_plag_hamincha_default().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_shaah_zmanis_gra(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_shaah_zmanis_gra().into()
+    }
+
+    #[ffi_export]
+    pub fn zmanim_calendar_get_shaah_zmanis_mga(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
+        calendar.get_shaah_zmanis_mga().into()
     }
 }

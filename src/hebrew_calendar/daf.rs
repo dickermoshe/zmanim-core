@@ -1,4 +1,8 @@
+use safer_ffi::derive_ReprC;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive_ReprC]
+#[repr(u8)]
 pub enum BavliTractate {
     Berachos = 0,
     Shabbos = 1,
@@ -89,110 +93,16 @@ impl From<i32> for BavliTractate {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum YerushalmiTractate {
-    Berachos = 0,
-    Peah = 1,
-    Demai = 2,
-    Kilayim = 3,
-    Sheviis = 4,
-    Terumos = 5,
-    Maasros = 6,
-    MaaserSheni = 7,
-    Chalah = 8,
-    Orlah = 9,
-    Bikurim = 10,
-    Shabbos = 11,
-    Eruvin = 12,
-    Pesachim = 13,
-    Beitzah = 14,
-    RoshHashanah = 15,
-    Yoma = 16,
-    Sukah = 17,
-    Taanis = 18,
-    Shekalim = 19,
-    Megilah = 20,
-    Chagigah = 21,
-    MoedKatan = 22,
-    Yevamos = 23,
-    Kesuvos = 24,
-    Sotah = 25,
-    Nedarim = 26,
-    Nazir = 27,
-    Gitin = 28,
-    Kidushin = 29,
-    BavaKama = 30,
-    BavaMetzia = 31,
-    BavaBasra = 32,
-    Shevuos = 33,
-    Makos = 34,
-    Sanhedrin = 35,
-    AvodahZarah = 36,
-    Horayos = 37,
-    Nidah = 38,
-}
-
-impl From<u32> for YerushalmiTractate {
-    fn from(value: u32) -> Self {
-        match value {
-            0 => YerushalmiTractate::Berachos,
-            1 => YerushalmiTractate::Peah,
-            2 => YerushalmiTractate::Demai,
-            3 => YerushalmiTractate::Kilayim,
-            4 => YerushalmiTractate::Sheviis,
-            5 => YerushalmiTractate::Terumos,
-            6 => YerushalmiTractate::Maasros,
-            7 => YerushalmiTractate::MaaserSheni,
-            8 => YerushalmiTractate::Chalah,
-            9 => YerushalmiTractate::Orlah,
-            10 => YerushalmiTractate::Bikurim,
-            11 => YerushalmiTractate::Shabbos,
-            12 => YerushalmiTractate::Eruvin,
-            13 => YerushalmiTractate::Pesachim,
-            14 => YerushalmiTractate::Beitzah,
-            15 => YerushalmiTractate::RoshHashanah,
-            16 => YerushalmiTractate::Yoma,
-            17 => YerushalmiTractate::Sukah,
-            18 => YerushalmiTractate::Taanis,
-            19 => YerushalmiTractate::Shekalim,
-            20 => YerushalmiTractate::Megilah,
-            21 => YerushalmiTractate::Chagigah,
-            22 => YerushalmiTractate::MoedKatan,
-            23 => YerushalmiTractate::Yevamos,
-            24 => YerushalmiTractate::Kesuvos,
-            25 => YerushalmiTractate::Sotah,
-            26 => YerushalmiTractate::Nedarim,
-            27 => YerushalmiTractate::Nazir,
-            28 => YerushalmiTractate::Gitin,
-            29 => YerushalmiTractate::Kidushin,
-            30 => YerushalmiTractate::BavaKama,
-            31 => YerushalmiTractate::BavaMetzia,
-            32 => YerushalmiTractate::BavaBasra,
-            33 => YerushalmiTractate::Shevuos,
-            34 => YerushalmiTractate::Makos,
-            35 => YerushalmiTractate::Sanhedrin,
-            36 => YerushalmiTractate::AvodahZarah,
-            37 => YerushalmiTractate::Horayos,
-            38 => YerushalmiTractate::Nidah,
-            _ => panic!("Invalid Yerushalmi tractate number: {}", value),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Mesachta {
-    Bavli(BavliTractate),
-    Yerushalmi(YerushalmiTractate),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Daf {
-    pub masechta: Mesachta,
+#[derive_ReprC]
+#[repr(C)]
+pub struct BavliDaf {
+    pub masechta: BavliTractate,
     pub daf: i32,
 }
 
-impl Daf {
-    pub fn new(masechta: Mesachta, daf: i32) -> Self {
+impl BavliDaf {
+    pub fn new(masechta: BavliTractate, daf: i32) -> Self {
         Self { masechta, daf }
     }
 }

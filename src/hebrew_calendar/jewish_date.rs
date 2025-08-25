@@ -4,22 +4,25 @@ use chrono::Duration as ChronoDuration;
 use icu_calendar::cal::Hebrew;
 use icu_calendar::Gregorian;
 use icu_calendar::{types::Weekday, Date, DateDuration};
+use safer_ffi::derive_ReprC;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive_ReprC]
+#[repr(u8)]
 pub enum JewishMonth {
-    NISSAN = 1,
-    IYAR = 2,
-    SIVAN = 3,
-    TAMMUZ = 4,
-    AV = 5,
-    ELUL = 6,
-    TISHREI = 7,
-    CHESHVAN = 8,
-    KISLEV = 9,
-    TEVES = 10,
-    SHEVAT = 11,
-    ADAR = 12,
-    ADARII = 13,
+    NISSAN = date_constants::NISSAN,
+    IYAR = date_constants::IYAR,
+    SIVAN = date_constants::SIVAN,
+    TAMMUZ = date_constants::TAMMUZ,
+    AV = date_constants::AV,
+    ELUL = date_constants::ELUL,
+    TISHREI = date_constants::TISHREI,
+    CHESHVAN = date_constants::CHESHVAN,
+    KISLEV = date_constants::KISLEV,
+    TEVES = date_constants::TEVES,
+    SHEVAT = date_constants::SHEVAT,
+    ADAR = date_constants::ADAR,
+    ADARII = date_constants::ADAR_II,
 }
 impl From<JewishMonth> for i32 {
     fn from(month: JewishMonth) -> Self {
@@ -46,6 +49,10 @@ impl From<i32> for JewishMonth {
         }
     }
 }
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive_ReprC]
+#[repr(u8)]
 pub enum YearLengthType {
     CHASERIM = 0,
     KESIDRAN = 1,
@@ -67,6 +74,8 @@ impl From<YearLengthType> for i32 {
     }
 }
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive_ReprC]
+#[repr(u8)]
 pub enum DayOfWeek {
     Sunday = 1,
     Monday = 2,
@@ -104,6 +113,8 @@ impl From<Weekday> for DayOfWeek {
     }
 }
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive_ReprC]
+#[repr(C)]
 pub struct MoladData {
     pub hours: i64,
     pub minutes: i64,
@@ -267,13 +278,14 @@ impl JewishDateTrait for JewishDate {
         let chalakim_since_molad_tohu = self.get_chalakim_since_molad_tohu();
         let abs_date = Self::molad_to_abs_date(chalakim_since_molad_tohu);
         let mut gregorian_date = Self::abs_date_to_date(abs_date)?;
-        let conjunction_day = chalakim_since_molad_tohu / constants::CHALAKIM_PER_DAY;
+        let conjunction_day = chalakim_since_molad_tohu / date_constants::CHALAKIM_PER_DAY;
         let conjunction_parts =
-            chalakim_since_molad_tohu - conjunction_day * constants::CHALAKIM_PER_DAY;
-        let mut hours = conjunction_parts / constants::CHALAKIM_PER_HOUR;
-        let adjusted_conjunction_parts = conjunction_parts - (hours * constants::CHALAKIM_PER_HOUR);
-        let minutes = adjusted_conjunction_parts / constants::CHALAKIM_PER_MINUTE;
-        let chalakim = adjusted_conjunction_parts - (minutes * constants::CHALAKIM_PER_MINUTE);
+            chalakim_since_molad_tohu - conjunction_day * date_constants::CHALAKIM_PER_DAY;
+        let mut hours = conjunction_parts / date_constants::CHALAKIM_PER_HOUR;
+        let adjusted_conjunction_parts =
+            conjunction_parts - (hours * date_constants::CHALAKIM_PER_HOUR);
+        let minutes = adjusted_conjunction_parts / date_constants::CHALAKIM_PER_MINUTE;
+        let chalakim = adjusted_conjunction_parts - (minutes * date_constants::CHALAKIM_PER_MINUTE);
         if hours >= 6 {
             gregorian_date.add(DateDuration::new(0, 0, 0, 1));
         }
@@ -305,8 +317,8 @@ impl JewishDate {
             + ((7 * ((year - 1) % 19) + 1) / 19)
             + (month_of_year - 1);
 
-        constants::CHALAKIM_MOLAD_TOHU as i64
-            + (constants::CHALAKIM_PER_MONTH * months_elapsed as i64)
+        date_constants::CHALAKIM_MOLAD_TOHU as i64
+            + (date_constants::CHALAKIM_PER_MONTH * months_elapsed as i64)
     }
 
     fn get_jewish_month_of_year(year: i32, month: i32) -> i32 {
@@ -349,15 +361,17 @@ impl JewishDate {
     fn get_days_since_start_of_jewish_year_static(year: i32, month: i32, day_of_month: i32) -> i32 {
         let mut elapsed_days = day_of_month;
 
-        if month < constants::TISHREI {
-            for m in constants::TISHREI..=JewishDate::get_last_month_of_jewish_year(year) {
+        if month < date_constants::TISHREI.into() {
+            for m in
+                date_constants::TISHREI.into()..=JewishDate::get_last_month_of_jewish_year(year)
+            {
                 elapsed_days += JewishDate::get_days_in_jewish_month_static(m, year);
             }
-            for m in constants::NISSAN..month {
+            for m in date_constants::NISSAN.into()..month {
                 elapsed_days += JewishDate::get_days_in_jewish_month_static(m, year);
             }
         } else {
-            for m in constants::TISHREI..month {
+            for m in date_constants::TISHREI.into()..month {
                 elapsed_days += JewishDate::get_days_in_jewish_month_static(m, year);
             }
         }
@@ -377,10 +391,11 @@ impl JewishDate {
         }
     }
     pub fn get_jewish_calendar_elapsed_days(year: i32) -> i32 {
-        let chalakim_since = Self::get_chalakim_since_molad_tohu_static(year, constants::TISHREI);
-        let molad_day = (chalakim_since / constants::CHALAKIM_PER_DAY as i64) as i32;
+        let chalakim_since =
+            Self::get_chalakim_since_molad_tohu_static(year, date_constants::TISHREI.into());
+        let molad_day = (chalakim_since / date_constants::CHALAKIM_PER_DAY as i64) as i32;
         let molad_parts =
-            (chalakim_since - molad_day as i64 * constants::CHALAKIM_PER_DAY as i64) as i32;
+            (chalakim_since - molad_day as i64 * date_constants::CHALAKIM_PER_DAY as i64) as i32;
 
         Self::add_dechiyos(year, molad_day, molad_parts)
     }
@@ -389,35 +404,38 @@ impl JewishDate {
             - Self::get_jewish_calendar_elapsed_days(year)
     }
     fn get_days_in_jewish_month_static(month: i32, year: i32) -> i32 {
-        match month {
-            constants::IYAR | constants::TAMMUZ | constants::ELUL | constants::TEVES => 29,
-            constants::CHESHVAN => {
+        match month.try_into().unwrap() {
+            date_constants::IYAR
+            | date_constants::TAMMUZ
+            | date_constants::ELUL
+            | date_constants::TEVES => 29,
+            date_constants::CHESHVAN => {
                 if Self::is_cheshvan_long_static(year) {
                     30
                 } else {
                     29
                 }
             }
-            constants::KISLEV => {
+            date_constants::KISLEV => {
                 if Self::is_kislev_short_static(year) {
                     29
                 } else {
                     30
                 }
             }
-            constants::ADAR => {
+            date_constants::ADAR => {
                 if Self::is_jewish_leap_year_static(year) {
                     30
                 } else {
                     29
                 }
             }
-            constants::ADAR_II => 29,
+            date_constants::ADAR_II => 29,
             _ => 30,
         }
     }
     fn molad_to_abs_date(chalakim: i64) -> i64 {
-        return constants::JEWISH_EPOCH + (chalakim / constants::CHALAKIM_PER_DAY as i64);
+        return date_constants::JEWISH_EPOCH + (chalakim / date_constants::CHALAKIM_PER_DAY as i64);
     }
     fn gregorian_date_to_abs_date(year: i64, month: i64, day_of_month: i64) -> i64 {
         let mut abs_date = day_of_month;
@@ -460,20 +478,20 @@ impl JewishDate {
     }
 }
 
-pub mod constants {
-    pub const NISSAN: i32 = 1;
-    pub const IYAR: i32 = 2;
-    pub const SIVAN: i32 = 3;
-    pub const TAMMUZ: i32 = 4;
-    pub const AV: i32 = 5;
-    pub const ELUL: i32 = 6;
-    pub const TISHREI: i32 = 7;
-    pub const CHESHVAN: i32 = 8;
-    pub const KISLEV: i32 = 9;
-    pub const TEVES: i32 = 10;
-    pub const SHEVAT: i32 = 11;
-    pub const ADAR: i32 = 12;
-    pub const ADAR_II: i32 = 13;
+pub mod date_constants {
+    pub const NISSAN: u8 = 1;
+    pub const IYAR: u8 = 2;
+    pub const SIVAN: u8 = 3;
+    pub const TAMMUZ: u8 = 4;
+    pub const AV: u8 = 5;
+    pub const ELUL: u8 = 6;
+    pub const TISHREI: u8 = 7;
+    pub const CHESHVAN: u8 = 8;
+    pub const KISLEV: u8 = 9;
+    pub const TEVES: u8 = 10;
+    pub const SHEVAT: u8 = 11;
+    pub const ADAR: u8 = 12;
+    pub const ADAR_II: u8 = 13;
 
     pub const CHALAKIM_PER_MINUTE: i64 = 18;
     pub const CHALAKIM_PER_HOUR: i64 = 1080;
@@ -481,8 +499,118 @@ pub mod constants {
     pub const CHALAKIM_PER_MONTH: i64 = 765433;
     pub const CHALAKIM_MOLAD_TOHU: i64 = 31524;
     pub const JEWISH_EPOCH: i64 = -1373429;
+}
 
-    pub const CHASERIM: i32 = 0;
-    pub const KESIDRAN: i32 = 1;
-    pub const SHELAIMIM: i32 = 2;
+#[cfg(feature = "ffi")]
+pub mod jewish_date_ffi {
+    use super::*;
+    use safer_ffi::{ffi_export, option::TaggedOption};
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive_ReprC]
+    #[repr(C)]
+    pub struct JewishDateData {
+        pub jewish_year: i32,
+        pub jewish_month: JewishMonth,
+        pub jewish_day_of_month: i32,
+        pub gregorian_year: i32,
+        pub gregorian_month: i32,
+        pub gregorian_day_of_month: i32,
+        pub day_of_week: DayOfWeek,
+        pub is_jewish_leap_year: bool,
+        pub days_in_jewish_year: i32,
+        pub days_in_jewish_month: i32,
+        pub is_cheshvan_long: bool,
+        pub is_kislev_short: bool,
+        pub cheshvan_kislev_kviah: YearLengthType,
+        pub days_since_start_of_jewish_year: i32,
+        pub chalakim_since_molad_tohu: i64,
+        pub molad: TaggedOption<MoladDateData>,
+    }
+    impl JewishDateData {
+        pub fn from_jewish_date(jewish_date: JewishDate) -> Self {
+            let molad_option = jewish_date.get_molad();
+            let molad: TaggedOption<MoladDateData> = molad_option
+                .map(|molad| MoladDateData::from_molad(molad.0, molad.1))
+                .into();
+
+            Self {
+                jewish_year: jewish_date.get_jewish_year(),
+                jewish_month: jewish_date.get_jewish_month(),
+                jewish_day_of_month: jewish_date.get_jewish_day_of_month(),
+                gregorian_year: jewish_date.get_gregorian_year(),
+                gregorian_month: jewish_date.get_gregorian_month(),
+                gregorian_day_of_month: jewish_date.get_gregorian_day_of_month(),
+                day_of_week: jewish_date.get_day_of_week(),
+                is_jewish_leap_year: jewish_date.is_jewish_leap_year(),
+                days_in_jewish_year: jewish_date.get_days_in_jewish_year(),
+                days_in_jewish_month: jewish_date.get_days_in_jewish_month(),
+                is_cheshvan_long: jewish_date.is_cheshvan_long(),
+                is_kislev_short: jewish_date.is_kislev_short(),
+                cheshvan_kislev_kviah: jewish_date.get_cheshvan_kislev_kviah(),
+                days_since_start_of_jewish_year: jewish_date.get_days_since_start_of_jewish_year(),
+                chalakim_since_molad_tohu: jewish_date.get_chalakim_since_molad_tohu(),
+
+                molad: molad,
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive_ReprC]
+    #[repr(C)]
+    pub struct MoladDateData {
+        pub jewish_year: i32,
+        pub jewish_month: JewishMonth,
+        pub jewish_day_of_month: i32,
+        pub gregorian_year: i32,
+        pub gregorian_month: i32,
+        pub gregorian_day_of_month: i32,
+        pub day_of_week: DayOfWeek,
+        pub is_jewish_leap_year: bool,
+        pub days_in_jewish_year: i32,
+        pub days_in_jewish_month: i32,
+        pub is_cheshvan_long: bool,
+        pub is_kislev_short: bool,
+        pub cheshvan_kislev_kviah: YearLengthType,
+        pub days_since_start_of_jewish_year: i32,
+        pub chalakim_since_molad_tohu: i64,
+        pub hours: i64,
+        pub minutes: i64,
+        pub chalakim: i64,
+    }
+
+    impl MoladDateData {
+        pub fn from_molad(jewish_date: impl JewishDateTrait, molad: MoladData) -> Self {
+            Self {
+                jewish_year: jewish_date.get_jewish_year(),
+                jewish_month: jewish_date.get_jewish_month(),
+                jewish_day_of_month: jewish_date.get_jewish_day_of_month(),
+                gregorian_year: jewish_date.get_gregorian_year(),
+                gregorian_month: jewish_date.get_gregorian_month(),
+                gregorian_day_of_month: jewish_date.get_gregorian_day_of_month(),
+                day_of_week: jewish_date.get_day_of_week(),
+                is_jewish_leap_year: jewish_date.is_jewish_leap_year(),
+                days_in_jewish_year: jewish_date.get_days_in_jewish_year(),
+                days_in_jewish_month: jewish_date.get_days_in_jewish_month(),
+                is_cheshvan_long: jewish_date.is_cheshvan_long(),
+                is_kislev_short: jewish_date.is_kislev_short(),
+                cheshvan_kislev_kviah: jewish_date.get_cheshvan_kislev_kviah(),
+                days_since_start_of_jewish_year: jewish_date.get_days_since_start_of_jewish_year(),
+                chalakim_since_molad_tohu: jewish_date.get_chalakim_since_molad_tohu(),
+                hours: molad.hours,
+                minutes: molad.minutes,
+                chalakim: molad.chalakim,
+            }
+        }
+    }
+
+    #[ffi_export]
+    pub fn jewish_date_data_from_timestamp(
+        timestamp: i64,
+        tz_offset: i64,
+    ) -> TaggedOption<JewishDateData> {
+        let jewish_date = JewishDate::new(timestamp, tz_offset).unwrap();
+        TaggedOption::Some(JewishDateData::from_jewish_date(jewish_date))
+    }
 }

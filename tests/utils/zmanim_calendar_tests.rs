@@ -52,18 +52,19 @@ fn test_zmanim_calendar() {
 
         let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
             .expect("Failed to create Rust GeoLocation");
-        let zmanim_calendar = ZmanimCalendar::new(
-            test_case.timestamp,
-            &geo_location,
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-        );
+
         let java_zmanim_calendar = JavaZmanimCalendar::new(
             &jvm,
             test_case.timestamp,
             &geo_location,
             JavaNOAACalculator::new(&jvm),
+            test_case.use_astronomical_chatzos,
+            test_case.use_astronomical_chatzos_for_other_zmanim,
+            test_case.candle_lighting_offset,
+        );
+        let zmanim_calendar = ZmanimCalendar::new(
+            test_case.timestamp,
+            geo_location.clone(),
             test_case.use_astronomical_chatzos,
             test_case.use_astronomical_chatzos_for_other_zmanim,
             test_case.candle_lighting_offset,

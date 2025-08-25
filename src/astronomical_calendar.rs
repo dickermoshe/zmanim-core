@@ -1,10 +1,13 @@
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
+use safer_ffi::derive_ReprC;
 
-use crate::{GeoLocationTrait, NOAACalculator, NOAACalculatorTrait, SolarEvent};
+use crate::{GeoLocation, GeoLocationTrait, NOAACalculator, NOAACalculatorTrait, SolarEvent};
 
-pub struct AstronomicalCalendar<'a> {
+#[derive_ReprC] // <- `::safer_ffi`'s attribute
+#[repr(C)]
+pub struct AstronomicalCalendar {
     timestamp: i64,
-    geo_location: &'a dyn GeoLocationTrait,
+    geo_location: GeoLocation,
     noaa_calculator: NOAACalculator,
 }
 
@@ -51,8 +54,8 @@ pub trait AstronomicalCalendarTrait {
     ) -> Option<i64>;
 }
 
-impl<'a> AstronomicalCalendar<'a> {
-    pub fn new(timestamp: i64, geo_location: &'a dyn GeoLocationTrait) -> Self {
+impl AstronomicalCalendar {
+    pub fn new(timestamp: i64, geo_location: GeoLocation) -> Self {
         Self {
             timestamp,
             geo_location,
@@ -114,25 +117,25 @@ impl<'a> AstronomicalCalendar<'a> {
     }
 }
 
-impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
+impl AstronomicalCalendarTrait for AstronomicalCalendar {
     fn get_utc_sunset(&self, zenith: f64) -> Option<f64> {
         self.noaa_calculator
-            .get_utc_sunset(self.timestamp, self.geo_location, zenith, true)
+            .get_utc_sunset(self.timestamp, &self.geo_location, zenith, true)
     }
 
     fn get_utc_sunrise(&self, zenith: f64) -> Option<f64> {
         self.noaa_calculator
-            .get_utc_sunrise(self.timestamp, self.geo_location, zenith, true)
+            .get_utc_sunrise(self.timestamp, &self.geo_location, zenith, true)
     }
 
     fn get_utc_sea_level_sunrise(&self, zenith: f64) -> Option<f64> {
         self.noaa_calculator
-            .get_utc_sunrise(self.timestamp, self.geo_location, zenith, false)
+            .get_utc_sunrise(self.timestamp, &self.geo_location, zenith, false)
     }
 
     fn get_utc_sea_level_sunset(&self, zenith: f64) -> Option<f64> {
         self.noaa_calculator
-            .get_utc_sunset(self.timestamp, self.geo_location, zenith, false)
+            .get_utc_sunset(self.timestamp, &self.geo_location, zenith, false)
     }
 
     fn get_sea_level_sunset(&self) -> Option<i64> {
@@ -212,7 +215,7 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
     fn get_sun_transit(&self) -> Option<i64> {
         let noon = self
             .noaa_calculator
-            .get_utc_noon(self.timestamp, self.geo_location)?;
+            .get_utc_noon(self.timestamp, &self.geo_location)?;
         if noon.is_nan() {
             return None;
         }
@@ -231,10 +234,184 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
     fn get_solar_midnight(&self) -> Option<i64> {
         let midnight = self
             .noaa_calculator
-            .get_utc_midnight(self.timestamp, self.geo_location)?;
+            .get_utc_midnight(self.timestamp, &self.geo_location)?;
         if midnight.is_nan() {
             return None;
         }
         return self.get_date_from_time(midnight, SolarEvent::Midnight);
+    }
+}
+
+// FFI Functions for AstronomicalCalendar
+
+#[cfg(feature = "ffi")]
+pub mod astronomical_calendar_ffi {
+    use super::*;
+    use safer_ffi::option::TaggedOption;
+    use safer_ffi::prelude::*;
+
+    #[ffi_export]
+    pub fn astronomical_calendar_new(
+        timestamp: i64,
+        geo_location: GeoLocation,
+    ) -> AstronomicalCalendar {
+        AstronomicalCalendar::new(timestamp, geo_location)
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_utc_sunset(
+        calendar: &AstronomicalCalendar,
+        zenith: f64,
+    ) -> TaggedOption<f64> {
+        calendar.get_utc_sunset(zenith).into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_utc_sunrise(
+        calendar: &AstronomicalCalendar,
+        zenith: f64,
+    ) -> TaggedOption<f64> {
+        calendar.get_utc_sunrise(zenith).into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_utc_sea_level_sunrise(
+        calendar: &AstronomicalCalendar,
+        zenith: f64,
+    ) -> TaggedOption<f64> {
+        calendar.get_utc_sea_level_sunrise(zenith).into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_utc_sea_level_sunset(
+        calendar: &AstronomicalCalendar,
+        zenith: f64,
+    ) -> TaggedOption<f64> {
+        calendar.get_utc_sea_level_sunset(zenith).into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_sea_level_sunset(
+        calendar: &AstronomicalCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_sea_level_sunset().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_sunset(calendar: &AstronomicalCalendar) -> TaggedOption<i64> {
+        calendar.get_sunset().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_sunrise(calendar: &AstronomicalCalendar) -> TaggedOption<i64> {
+        calendar.get_sunrise().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_sea_level_sunrise(
+        calendar: &AstronomicalCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_sea_level_sunrise().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_sunrise_offset_by_degrees(
+        calendar: &AstronomicalCalendar,
+        degrees: f64,
+    ) -> TaggedOption<i64> {
+        calendar.get_sunrise_offset_by_degrees(degrees).into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_sunset_offset_by_degrees(
+        calendar: &AstronomicalCalendar,
+        degrees: f64,
+    ) -> TaggedOption<i64> {
+        calendar.get_sunset_offset_by_degrees(degrees).into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_begin_civil_twilight(
+        calendar: &AstronomicalCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_begin_civil_twilight().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_begin_nautical_twilight(
+        calendar: &AstronomicalCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_begin_nautical_twilight().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_begin_astronomical_twilight(
+        calendar: &AstronomicalCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_begin_astronomical_twilight().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_end_civil_twilight(
+        calendar: &AstronomicalCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_end_civil_twilight().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_end_nautical_twilight(
+        calendar: &AstronomicalCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_end_nautical_twilight().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_end_astronomical_twilight(
+        calendar: &AstronomicalCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_end_astronomical_twilight().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_temporal_hour(
+        calendar: &AstronomicalCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_temporal_hour().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_sun_transit(
+        calendar: &AstronomicalCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_sun_transit().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_solar_midnight(
+        calendar: &AstronomicalCalendar,
+    ) -> TaggedOption<i64> {
+        calendar.get_solar_midnight().into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_temporal_hour_with_start_and_end_times(
+        calendar: &AstronomicalCalendar,
+        start_time: i64,
+        end_time: i64,
+    ) -> TaggedOption<i64> {
+        calendar
+            .get_temporal_hour_with_start_and_end_times(start_time, end_time)
+            .into()
+    }
+
+    #[ffi_export]
+    pub fn astronomical_calendar_get_sun_transit_with_start_and_end_times(
+        calendar: &AstronomicalCalendar,
+        start_time: i64,
+        end_time: i64,
+    ) -> TaggedOption<i64> {
+        calendar
+            .get_sun_transit_with_start_and_end_times(start_time, end_time)
+            .into()
     }
 }
