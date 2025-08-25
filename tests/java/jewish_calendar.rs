@@ -1,4 +1,3 @@
-/// Java JewishCalendar wrapper using JNI
 pub struct JavaJewishCalendar<'a> {
     pub jvm: &'a Jvm,
     pub instance: Instance,
@@ -6,11 +5,10 @@ pub struct JavaJewishCalendar<'a> {
     pub tz_offset: i64,
 }
 
-use j4rs::{Instance, InvocationArg, Jvm, Null};
+use j4rs::{Instance, InvocationArg, Jvm};
 use zmanim_core::hebrew_calendar::parsha::Parsha;
 use zmanim_core::hebrew_calendar::{
     BavliTractate, Daf, DayOfWeek, Holiday, JewishCalendarTrait, JewishMonth, Mesachta,
-    YerushalmiTractate,
 };
 
 use crate::java::calendar::create_calendar;
@@ -250,8 +248,6 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
     }
 
     fn is_purim(&self) -> bool {
-        // Java's isPurim() depends on Mukaf Choma; Rust's is_purim() is true for Purim OR Shushan Purim.
-        // Emulate Rust semantics by checking either condition on the Java side.
         let purim_result = self
             .jvm
             .invoke(&self.instance, "isPurim", InvocationArg::empty())
@@ -266,7 +262,7 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
             .invoke(&self.instance, "getYomTovIndex", InvocationArg::empty())
             .unwrap();
         let idx: i32 = self.jvm.to_rust(yom_tov_idx).unwrap();
-        // 26 == SHUSHAN_PURIM per Java constants
+
         idx == 26
     }
 
@@ -293,7 +289,6 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
 
         let result = result.ok()?;
 
-        // Extract Daf information from the Java Daf object
         let masechta_result = self
             .jvm
             .invoke(&result, "getMasechtaNumber", InvocationArg::empty())
@@ -320,7 +315,6 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
 
         let parsha_name: String = self.jvm.to_rust(result).unwrap();
 
-        // Convert Java Parsha enum to Rust Parsha enum
         match parsha_name.as_str() {
             "NONE" => Parsha::NONE,
             "BERESHIS" => Parsha::BERESHIS,
@@ -396,34 +390,6 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
             _ => Parsha::NONE,
         }
     }
-
-    // fn get_daf_yomi_yerushalmi(&self) -> Option<Daf> {
-    //     let result = self.jvm.invoke_static(
-    //         "com.kosherjava.zmanim.hebrewcalendar.YerushalmiYomiCalculator",
-    //         "getDafYomiYerushalmi",
-    //         &[InvocationArg::from(self.clone().instance)],
-    //     );
-
-    //     let result = result.ok()?;
-
-    //     let masechta_result = self
-    //         .jvm
-    //         .invoke(&result, "getMasechtaNumber", InvocationArg::empty())
-    //         .unwrap();
-
-    //     let masechta_number: u32 = self.jvm.to_rust(masechta_result).unwrap();
-
-    //     let daf_result = self
-    //         .jvm
-    //         .invoke(&result, "getDaf", InvocationArg::empty())
-    //         .unwrap();
-    //     let daf_number: i32 = self.jvm.to_rust(daf_result).unwrap();
-
-    //     Some(Daf::new(
-    //         Mesachta::Yerushalmi(YerushalmiTractate::from(masechta_number as u32)),
-    //         daf_number,
-    //     ))
-    // }
 }
 
 impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewishCalendar<'a> {
@@ -634,7 +600,6 @@ impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewi
 }
 
 impl<'a> JavaJewishCalendar<'a> {
-    /// Create a JewishCalendar from Java Date
     pub fn from_date(jvm: &'a Jvm, timestamp: i64, tz_offset: i64) -> Self {
         let date_instance = create_calendar(jvm, timestamp + tz_offset);
         let instance = jvm
@@ -652,7 +617,6 @@ impl<'a> JavaJewishCalendar<'a> {
         }
     }
 
-    // Configuration methods
     pub fn set_in_israel(&mut self, in_israel: bool) {
         let _ = self.jvm.invoke(
             &self.instance,
@@ -695,7 +659,6 @@ impl<'a> JavaJewishCalendar<'a> {
         self.jvm.to_rust(result).unwrap()
     }
 
-    // Additional convenience methods
     pub fn get_jewish_year(&self) -> i32 {
         let result = self
             .jvm

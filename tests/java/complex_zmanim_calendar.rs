@@ -88,7 +88,7 @@ impl<'a> JavaComplexZmanimCalendar<'a> {
             ],
         )
         .unwrap();
-        // We always use elevation
+        
         jvm.invoke(
             &instance,
             "setUseElevation",
@@ -104,7 +104,7 @@ impl<'a> JavaComplexZmanimCalendar<'a> {
 }
 
 impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
-    // Shaah Zmanis methods
+    
     fn get_shaah_zmanis_19_point_8_degrees(&self) -> Option<i64> {
         java_long_to_i64(
             &self.jvm,
@@ -326,7 +326,7 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    // Alos methods
+    
     fn get_alos_60(&self) -> Option<i64> {
         java_date_to_i64(
             &self.jvm,
@@ -475,7 +475,7 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    // Misheyakir methods
+    
     fn get_misheyakir_11_point_5_degrees(&self) -> Option<i64> {
         java_date_to_i64(
             &self.jvm,
@@ -546,7 +546,7 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    // Sof Zman Shma methods
+    
     fn get_sof_zman_shma_mga_19_point_8_degrees(&self) -> Option<i64> {
         java_date_to_i64(
             &self.jvm,
@@ -841,7 +841,7 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    // Remaining methods - implementing key ones, others can be added as needed
+    
     fn get_sof_zman_tfila_mga_19_point_8_degrees(&self) -> Option<i64> {
         java_date_to_i64(
             &self.jvm,
@@ -1038,10 +1038,10 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    // For brevity, implementing key methods and placeholders for others
-    // All other methods can be implemented following the same pattern
+    
+    
 
-    // Mincha Gedola methods - implementing with proper JNI calls
+    
     fn get_mincha_gedola_30_minutes(&self) -> Option<i64> {
         java_date_to_i64(
             &self.jvm,
@@ -1618,7 +1618,7 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    // Key tzais methods
+    
     fn get_tzais_geonim_3_point_7_degrees(&self) -> Option<i64> {
         java_date_to_i64(
             &self.jvm,
@@ -1995,7 +1995,7 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    // Fixed Local Chatzos methods - implementing with proper JNI calls
+    
     fn get_fixed_local_chatzos(&self) -> Option<i64> {
         java_date_to_i64(
             &self.jvm,
@@ -2263,7 +2263,7 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         (self.jvm.to_rust::<f64>(result).unwrap() * 1000.0 * 60.0) as i64
     }
 
-    // Deprecated alias methods (for compatibility)
+    
     fn get_bain_hasmashosrt_13_point_24_degrees(&self) -> Option<i64> {
         java_date_to_i64(
             &self.jvm,
@@ -2447,7 +2447,7 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
     }
 }
 
-// Implement the base traits that ComplexZmanimCalendarTrait extends
+
 impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
     fn get_tzais(&self) -> Option<i64> {
         java_date_to_i64(
@@ -2606,8 +2606,8 @@ impl<'a> ZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         end_of_day: Option<i64>,
         synchronous: bool,
     ) -> Option<i64> {
-        // For now, use a simplified implementation that doesn't handle null end_of_day
-        // This can be enhanced later if needed
+        
+        
         if let Some(end_day) = end_of_day {
             let result = self
                 .jvm
@@ -3262,7 +3262,7 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
     }
 }
 
-// Helper functions
+
 fn java_date_to_i64(jvm: &Jvm, value: &Instance) -> Option<i64> {
     if jvm
         .check_equals(

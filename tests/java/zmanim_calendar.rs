@@ -1,5 +1,5 @@
 use j4rs::{Instance, InvocationArg, Jvm, Null};
-use zmanim_core::{GeoLocationTrait, zmanim_calendar::ZmanimCalendarTrait};
+use zmanim_core::{zmanim_calendar::ZmanimCalendarTrait, GeoLocationTrait};
 
 use crate::java::{
     calendar::create_calendar, date::create_date, geolocation::JavaGeoLocation,
@@ -72,7 +72,7 @@ impl<'a> JavaZmanimCalendar<'a> {
             ],
         )
         .unwrap();
-        // We always use elevation
+
         jvm.invoke(
             &instance,
             "setUseElevation",
@@ -162,7 +162,11 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
             .unwrap();
         let value: f64 = self.jvm.to_rust(result).unwrap();
 
-        if value == 5e-324 { None } else { Some(value) }
+        if value == 5e-324 {
+            None
+        } else {
+            Some(value)
+        }
     }
 
     fn get_half_day_based_zman(

@@ -8,12 +8,10 @@ use crate::{
     },
 };
 
-// Tested Against b3fedc6c2d028f9aecd61e775e56ac253dbb1548
 #[test]
 fn test_geolocation() {
     let jvm = create_jvm();
 
-    // Test with shuffled locations
     for _ in 0..DEFAULT_TEST_ITERATIONS {
         let test_geo = random_test_geolocation();
         let other_test_geo = random_test_geolocation();
@@ -84,6 +82,5 @@ fn test_geolocation() {
             DEFAULT_FLOAT_TOLERANCE,
             &message,
         );
-        // java_geolocation will be automatically dropped when it goes out of scope
     }
 }

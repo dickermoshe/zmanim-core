@@ -1,4 +1,4 @@
-/// Parsha enum representing weekly Torah portions
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Parsha {
     NONE,

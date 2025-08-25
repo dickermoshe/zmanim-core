@@ -1,9 +1,8 @@
-use rand::Rng;
 use zmanim_core::{
-    GeoLocation,
     astronomical_calendar::AstronomicalCalendarTrait,
     complex_zmanim_calendar::{ComplexZmanimCalendar, ComplexZmanimCalendarTrait},
     zmanim_calendar::ZmanimCalendarTrait,
+    GeoLocation,
 };
 
 use crate::{
@@ -11,50 +10,16 @@ use crate::{
         complex_zmanim_calendar::JavaComplexZmanimCalendar, noaa_calculator::JavaNOAACalculator,
     },
     test_utils::{
-        assert_almost_equal_i64, assert_almost_equal_i64_option, create_jvm,
-        random_test_geolocation, random_test_timestamp,
+        assert_almost_equal_i64, assert_almost_equal_i64_option, create_jvm, TestCase,
+        DEFAULT_TEST_ITERATIONS,
     },
 };
 
-#[derive(Debug)]
-struct TestCase {
-    lat: f64,
-    lon: f64,
-    elevation: f64,
-    timestamp: i64,
-    use_astronomical_chatzos: bool,
-    use_astronomical_chatzos_for_other_zmanim: bool,
-    candle_lighting_offset: i64,
-    ateret_torah_sunset_offset: i64,
-}
-
-impl TestCase {
-    fn new() -> Self {
-        let test_geo = random_test_geolocation();
-        let test_timestamp = random_test_timestamp();
-        let test_use_astronomical_chatzos = rand::rng().random_range(0.0..=1.0) > 0.5;
-        let test_use_astronomical_chatzos_for_other_zmanim =
-            rand::rng().random_range(0.0..=1.0) > 0.5;
-        let test_candle_lighting_offset = rand::rng().random_range(0..=60 * 1000);
-        let ateret_torah_sunset_offset = rand::rng().random_range(0..=60 * 1000);
-        Self {
-            lat: test_geo.lat,
-            lon: test_geo.lon,
-            elevation: test_geo.elevation,
-            timestamp: test_timestamp,
-            use_astronomical_chatzos: test_use_astronomical_chatzos,
-            use_astronomical_chatzos_for_other_zmanim:
-                test_use_astronomical_chatzos_for_other_zmanim,
-            candle_lighting_offset: test_candle_lighting_offset,
-            ateret_torah_sunset_offset,
-        }
-    }
-}
-
 #[test]
-fn test_complex_zmanim_calendar_shaah_zmanis() {
+fn test_complex_zmanim_calendar_comprehensive() {
     let jvm = create_jvm();
-    for _ in 0..1_000 {
+    let mut passed_tests = 0;
+    for _ in 0..DEFAULT_TEST_ITERATIONS {
         let test_case = TestCase::new();
 
         let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
@@ -78,7 +43,7 @@ fn test_complex_zmanim_calendar_shaah_zmanis() {
             test_case.ateret_torah_sunset_offset,
         );
 
-        let message = format!("test_case: {:?}", test_case);
+        let message = format!("Passed {passed_tests} - test_case: {:?}", test_case);
 
         // Test Shaah Zmanis methods
         assert_almost_equal_i64_option(
@@ -136,37 +101,6 @@ fn test_complex_zmanim_calendar_shaah_zmanis() {
             1,
             &message,
         );
-    }
-}
-
-#[test]
-fn test_complex_zmanim_calendar_alos() {
-    let jvm = create_jvm();
-    for _ in 0..1_000 {
-        let test_case = TestCase::new();
-
-        let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
-            .expect("Failed to create Rust GeoLocation");
-        let complex_zmanim_calendar = ComplexZmanimCalendar::new(
-            test_case.timestamp,
-            &geo_location,
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-        let java_complex_zmanim_calendar = JavaComplexZmanimCalendar::new(
-            &jvm,
-            test_case.timestamp,
-            &geo_location,
-            JavaNOAACalculator::new(&jvm),
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-
-        let message = format!("test_case: {:?}", test_case);
 
         // Test Alos methods
         assert_almost_equal_i64_option(
@@ -245,37 +179,6 @@ fn test_complex_zmanim_calendar_alos() {
             1,
             &message,
         );
-    }
-}
-
-#[test]
-fn test_complex_zmanim_calendar_misheyakir() {
-    let jvm = create_jvm();
-    for _ in 0..1_000 {
-        let test_case = TestCase::new();
-
-        let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
-            .expect("Failed to create Rust GeoLocation");
-        let complex_zmanim_calendar = ComplexZmanimCalendar::new(
-            test_case.timestamp,
-            &geo_location,
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-        let java_complex_zmanim_calendar = JavaComplexZmanimCalendar::new(
-            &jvm,
-            test_case.timestamp,
-            &geo_location,
-            JavaNOAACalculator::new(&jvm),
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-
-        let message = format!("test_case: {:?}", test_case);
 
         // Test Misheyakir methods
         assert_almost_equal_i64_option(
@@ -312,37 +215,6 @@ fn test_complex_zmanim_calendar_misheyakir() {
             1,
             &message,
         );
-    }
-}
-
-#[test]
-fn test_complex_zmanim_calendar_sof_zman_shma() {
-    let jvm = create_jvm();
-    for _ in 0..1_000 {
-        let test_case = TestCase::new();
-
-        let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
-            .expect("Failed to create Rust GeoLocation");
-        let complex_zmanim_calendar = ComplexZmanimCalendar::new(
-            test_case.timestamp,
-            &geo_location,
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-        let java_complex_zmanim_calendar = JavaComplexZmanimCalendar::new(
-            &jvm,
-            test_case.timestamp,
-            &geo_location,
-            JavaNOAACalculator::new(&jvm),
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-
-        let message = format!("test_case: {:?}", test_case);
 
         // Test Sof Zman Shma methods
         assert_almost_equal_i64_option(
@@ -400,37 +272,6 @@ fn test_complex_zmanim_calendar_sof_zman_shma() {
             1,
             &message,
         );
-    }
-}
-
-#[test]
-fn test_complex_zmanim_calendar_sof_zman_tfila() {
-    let jvm = create_jvm();
-    for _ in 0..1_000 {
-        let test_case = TestCase::new();
-
-        let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
-            .expect("Failed to create Rust GeoLocation");
-        let complex_zmanim_calendar = ComplexZmanimCalendar::new(
-            test_case.timestamp,
-            &geo_location,
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-        let java_complex_zmanim_calendar = JavaComplexZmanimCalendar::new(
-            &jvm,
-            test_case.timestamp,
-            &geo_location,
-            JavaNOAACalculator::new(&jvm),
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-
-        let message = format!("test_case: {:?}", test_case);
 
         // Test Sof Zman Tfila methods
         assert_almost_equal_i64_option(
@@ -474,37 +315,6 @@ fn test_complex_zmanim_calendar_sof_zman_tfila() {
             1,
             &message,
         );
-    }
-}
-
-#[test]
-fn test_complex_zmanim_calendar_tzais() {
-    let jvm = create_jvm();
-    for _ in 0..1_000 {
-        let test_case = TestCase::new();
-
-        let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
-            .expect("Failed to create Rust GeoLocation");
-        let complex_zmanim_calendar = ComplexZmanimCalendar::new(
-            test_case.timestamp,
-            &geo_location,
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-        let java_complex_zmanim_calendar = JavaComplexZmanimCalendar::new(
-            &jvm,
-            test_case.timestamp,
-            &geo_location,
-            JavaNOAACalculator::new(&jvm),
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-
-        let message = format!("test_case: {:?}", test_case);
 
         // Test Tzais methods
         assert_almost_equal_i64_option(
@@ -604,75 +414,6 @@ fn test_complex_zmanim_calendar_tzais() {
             1,
             &message,
         );
-    }
-}
-
-#[test]
-fn test_complex_zmanim_calendar_ateret_torah_offset() {
-    let jvm = create_jvm();
-    for _ in 0..100 {
-        let test_case = TestCase::new();
-
-        let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
-            .expect("Failed to create Rust GeoLocation");
-        let complex_zmanim_calendar = ComplexZmanimCalendar::new(
-            test_case.timestamp,
-            &geo_location,
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-        let java_complex_zmanim_calendar = JavaComplexZmanimCalendar::new(
-            &jvm,
-            test_case.timestamp,
-            &geo_location,
-            JavaNOAACalculator::new(&jvm),
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-
-        let message = format!("test_case: {:?}", test_case);
-
-        assert_almost_equal_i64(
-            complex_zmanim_calendar.get_ateret_torah_sunset_offset(),
-            java_complex_zmanim_calendar.get_ateret_torah_sunset_offset(),
-            1,
-            &message,
-        );
-    }
-}
-
-#[test]
-fn test_complex_zmanim_calendar_base_traits() {
-    let jvm = create_jvm();
-    for _ in 0..1_000 {
-        let test_case = TestCase::new();
-
-        let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
-            .expect("Failed to create Rust GeoLocation");
-        let complex_zmanim_calendar = ComplexZmanimCalendar::new(
-            test_case.timestamp,
-            &geo_location,
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-        let java_complex_zmanim_calendar = JavaComplexZmanimCalendar::new(
-            &jvm,
-            test_case.timestamp,
-            &geo_location,
-            JavaNOAACalculator::new(&jvm),
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-
-        let message = format!("test_case: {:?}", test_case);
 
         // Test inherited ZmanimCalendarTrait methods through composition
         assert_almost_equal_i64_option(
@@ -754,41 +495,95 @@ fn test_complex_zmanim_calendar_base_traits() {
             1,
             &message,
         );
-    }
-}
 
-#[test]
-fn test_complex_zmanim_calendar_comprehensive() {
-    let jvm = create_jvm();
-    for _ in 0..500 {
-        let test_case = TestCase::new();
-
-        let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
-            .expect("Failed to create Rust GeoLocation");
-        let complex_zmanim_calendar = ComplexZmanimCalendar::new(
-            test_case.timestamp,
-            &geo_location,
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-        let java_complex_zmanim_calendar = JavaComplexZmanimCalendar::new(
-            &jvm,
-            test_case.timestamp,
-            &geo_location,
-            JavaNOAACalculator::new(&jvm),
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
+        // Test Ateret Torah offset
+        assert_almost_equal_i64(
+            complex_zmanim_calendar.get_ateret_torah_sunset_offset(),
+            java_complex_zmanim_calendar.get_ateret_torah_sunset_offset(),
+            1,
+            &message,
         );
 
-        let message = format!("test_case: {:?}", test_case);
+        // Test Mincha Gedola methods
+        assert_almost_equal_i64_option(
+            &complex_zmanim_calendar.get_mincha_gedola_30_minutes(),
+            &java_complex_zmanim_calendar.get_mincha_gedola_30_minutes(),
+            1,
+            &message,
+        );
 
-        // Test a comprehensive set of methods across different categories
+        assert_almost_equal_i64_option(
+            &complex_zmanim_calendar.get_mincha_gedola_72_minutes(),
+            &java_complex_zmanim_calendar.get_mincha_gedola_72_minutes(),
+            1,
+            &message,
+        );
 
-        // Geonim Tzais methods
+        assert_almost_equal_i64_option(
+            &complex_zmanim_calendar.get_mincha_gedola_16_point_1_degrees(),
+            &java_complex_zmanim_calendar.get_mincha_gedola_16_point_1_degrees(),
+            1,
+            &message,
+        );
+
+        assert_almost_equal_i64_option(
+            &complex_zmanim_calendar.get_mincha_gedola_greater_than_30(),
+            &java_complex_zmanim_calendar.get_mincha_gedola_greater_than_30(),
+            1,
+            &message,
+        );
+
+        assert_almost_equal_i64_option(
+            &complex_zmanim_calendar.get_mincha_gedola_ateret_torah(),
+            &java_complex_zmanim_calendar.get_mincha_gedola_ateret_torah(),
+            10,
+            &message,
+        );
+
+        assert_almost_equal_i64_option(
+            &complex_zmanim_calendar.get_mincha_gedola_baal_hatanya(),
+            &java_complex_zmanim_calendar.get_mincha_gedola_baal_hatanya(),
+            1,
+            &message,
+        );
+
+        // Test Bain Hashmashos methods
+        assert_almost_equal_i64_option(
+            &complex_zmanim_calendar.get_bain_hashmashos_rt_13_point_24_degrees(),
+            &java_complex_zmanim_calendar.get_bain_hashmashos_rt_13_point_24_degrees(),
+            1,
+            &message,
+        );
+
+        assert_almost_equal_i64_option(
+            &complex_zmanim_calendar.get_bain_hashmashos_rt_58_point_5_minutes(),
+            &java_complex_zmanim_calendar.get_bain_hashmashos_rt_58_point_5_minutes(),
+            1,
+            &message,
+        );
+
+        assert_almost_equal_i64_option(
+            &complex_zmanim_calendar.get_bain_hashmashos_rt_2_stars(),
+            &java_complex_zmanim_calendar.get_bain_hashmashos_rt_2_stars(),
+            1,
+            &message,
+        );
+
+        assert_almost_equal_i64_option(
+            &complex_zmanim_calendar.get_bain_hashmashos_yereim_18_minutes(),
+            &java_complex_zmanim_calendar.get_bain_hashmashos_yereim_18_minutes(),
+            1,
+            &message,
+        );
+
+        assert_almost_equal_i64_option(
+            &complex_zmanim_calendar.get_bain_hashmashos_yereim_3_point_05_degrees(),
+            &java_complex_zmanim_calendar.get_bain_hashmashos_yereim_3_point_05_degrees(),
+            1,
+            &message,
+        );
+
+        // Additional tzais methods from the second comprehensive test
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.get_tzais_geonim_4_point_37_degrees(),
             &java_complex_zmanim_calendar.get_tzais_geonim_4_point_37_degrees(),
@@ -881,146 +676,7 @@ fn test_complex_zmanim_calendar_comprehensive() {
             1,
             &message,
         );
-    }
-}
 
-#[test]
-fn test_complex_zmanim_calendar_mincha_gedola() {
-    let jvm = create_jvm();
-    for _ in 0..500 {
-        let test_case = TestCase::new();
-
-        let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
-            .expect("Failed to create Rust GeoLocation");
-        let complex_zmanim_calendar = ComplexZmanimCalendar::new(
-            test_case.timestamp,
-            &geo_location,
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-        let java_complex_zmanim_calendar = JavaComplexZmanimCalendar::new(
-            &jvm,
-            test_case.timestamp,
-            &geo_location,
-            JavaNOAACalculator::new(&jvm),
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-
-        let message = format!("test_case: {:?}", test_case);
-
-        // Test Mincha Gedola methods
-        assert_almost_equal_i64_option(
-            &complex_zmanim_calendar.get_mincha_gedola_30_minutes(),
-            &java_complex_zmanim_calendar.get_mincha_gedola_30_minutes(),
-            1,
-            &message,
-        );
-
-        assert_almost_equal_i64_option(
-            &complex_zmanim_calendar.get_mincha_gedola_72_minutes(),
-            &java_complex_zmanim_calendar.get_mincha_gedola_72_minutes(),
-            1,
-            &message,
-        );
-
-        assert_almost_equal_i64_option(
-            &complex_zmanim_calendar.get_mincha_gedola_16_point_1_degrees(),
-            &java_complex_zmanim_calendar.get_mincha_gedola_16_point_1_degrees(),
-            1,
-            &message,
-        );
-
-        assert_almost_equal_i64_option(
-            &complex_zmanim_calendar.get_mincha_gedola_greater_than_30(),
-            &java_complex_zmanim_calendar.get_mincha_gedola_greater_than_30(),
-            1,
-            &message,
-        );
-
-        assert_almost_equal_i64_option(
-            &complex_zmanim_calendar.get_mincha_gedola_ateret_torah(),
-            &java_complex_zmanim_calendar.get_mincha_gedola_ateret_torah(),
-            10,
-            &message,
-        );
-
-        assert_almost_equal_i64_option(
-            &complex_zmanim_calendar.get_mincha_gedola_baal_hatanya(),
-            &java_complex_zmanim_calendar.get_mincha_gedola_baal_hatanya(),
-            1,
-            &message,
-        );
-    }
-}
-
-#[test]
-fn test_complex_zmanim_calendar_bain_hashmashos() {
-    let jvm = create_jvm();
-    for _ in 0..500 {
-        let test_case = TestCase::new();
-
-        let geo_location = GeoLocation::new(test_case.lat, test_case.lon, test_case.elevation)
-            .expect("Failed to create Rust GeoLocation");
-        let complex_zmanim_calendar = ComplexZmanimCalendar::new(
-            test_case.timestamp,
-            &geo_location,
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-        let java_complex_zmanim_calendar = JavaComplexZmanimCalendar::new(
-            &jvm,
-            test_case.timestamp,
-            &geo_location,
-            JavaNOAACalculator::new(&jvm),
-            test_case.use_astronomical_chatzos,
-            test_case.use_astronomical_chatzos_for_other_zmanim,
-            test_case.candle_lighting_offset,
-            test_case.ateret_torah_sunset_offset,
-        );
-
-        let message = format!("test_case: {:?}", test_case);
-
-        // Test Bain Hashmashos methods
-        assert_almost_equal_i64_option(
-            &complex_zmanim_calendar.get_bain_hashmashos_rt_13_point_24_degrees(),
-            &java_complex_zmanim_calendar.get_bain_hashmashos_rt_13_point_24_degrees(),
-            1,
-            &message,
-        );
-
-        assert_almost_equal_i64_option(
-            &complex_zmanim_calendar.get_bain_hashmashos_rt_58_point_5_minutes(),
-            &java_complex_zmanim_calendar.get_bain_hashmashos_rt_58_point_5_minutes(),
-            1,
-            &message,
-        );
-
-        assert_almost_equal_i64_option(
-            &complex_zmanim_calendar.get_bain_hashmashos_rt_2_stars(),
-            &java_complex_zmanim_calendar.get_bain_hashmashos_rt_2_stars(),
-            1,
-            &message,
-        );
-
-        assert_almost_equal_i64_option(
-            &complex_zmanim_calendar.get_bain_hashmashos_yereim_18_minutes(),
-            &java_complex_zmanim_calendar.get_bain_hashmashos_yereim_18_minutes(),
-            1,
-            &message,
-        );
-
-        assert_almost_equal_i64_option(
-            &complex_zmanim_calendar.get_bain_hashmashos_yereim_3_point_05_degrees(),
-            &java_complex_zmanim_calendar.get_bain_hashmashos_yereim_3_point_05_degrees(),
-            1,
-            &message,
-        );
+        passed_tests += 1;
     }
 }

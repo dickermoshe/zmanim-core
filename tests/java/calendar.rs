@@ -1,7 +1,6 @@
 use j4rs::{Instance, InvocationArg, Jvm};
 
 pub fn create_calendar(jvm: &Jvm, timestamp: i64) -> Instance {
-    // Get a Calendar instance using the static getInstance() method
     let calendar_instance = jvm
         .invoke_static("java.util.Calendar", "getInstance", InvocationArg::empty())
         .unwrap();
@@ -20,8 +19,6 @@ pub fn create_calendar(jvm: &Jvm, timestamp: i64) -> Instance {
         &[InvocationArg::try_from(timezone_instance).unwrap()],
     )
     .unwrap();
-
-    // Set the time in milliseconds
     jvm.invoke(
         &calendar_instance,
         "setTimeInMillis",

@@ -1,4 +1,3 @@
-/// Represents a tractate in the Babylonian Talmud (Bavli)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BavliTractate {
     Berachos = 0,
@@ -90,7 +89,6 @@ impl From<i32> for BavliTractate {
     }
 }
 
-/// Represents a tractate in the Jerusalem Talmud (Yerushalmi)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum YerushalmiTractate {
     Berachos = 0,
@@ -187,8 +185,6 @@ pub enum Mesachta {
     Yerushalmi(YerushalmiTractate),
 }
 
-/// Represents a Daf (page) in the Babylonian Talmud
-/// Each daf consists of a Masechta (tractate) and a page number
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Daf {
     pub masechta: Mesachta,
@@ -196,7 +192,6 @@ pub struct Daf {
 }
 
 impl Daf {
-    /// Create a new Daf with the given masechta number and daf number
     pub fn new(masechta: Mesachta, daf: i32) -> Self {
         Self { masechta, daf }
     }

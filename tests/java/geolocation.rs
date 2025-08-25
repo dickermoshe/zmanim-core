@@ -34,7 +34,7 @@ impl<'a> JavaGeoLocation<'a> {
             .unwrap();
         Self { jvm, instance }
     }
-    /// Helper method to invoke a method with another GeoLocation parameter
+
     pub fn invoke_with_geolocation(
         &self,
         method_name: &str,

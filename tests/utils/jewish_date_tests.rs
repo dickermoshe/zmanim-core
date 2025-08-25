@@ -4,7 +4,7 @@ mod tests {
 
     use super::*;
     use crate::java::jewish_date::JavaJewishDate;
-    use crate::test_utils;
+    use crate::test_utils::{self, DEFAULT_TEST_ITERATIONS};
 
     #[test]
     fn test_rust_java_jewish_date_comparison() {
@@ -12,7 +12,7 @@ mod tests {
         let jvm = test_utils::create_jvm();
 
         // Test with multiple random timestamps and timezone offsets
-        for _ in 0..10000 {
+        for _ in 0..DEFAULT_TEST_ITERATIONS {
             let timestamp = test_utils::random_test_timestamp();
 
             let tz_offset = test_utils::random_test_timestamp() % (24 * 60 * 60 * 1000); // Random offset within 24 hours
@@ -148,27 +148,6 @@ mod tests {
                 timestamp,
                 tz_offset
             );
-        }
-    }
-
-    #[test]
-    fn test_get_molad_comparison() {
-        // Initialize JVM for Java implementation
-        let jvm = test_utils::create_jvm();
-
-        // Test with multiple random timestamps and timezone offsets
-        for _ in 0..1000 {
-            let timestamp = test_utils::random_test_timestamp();
-            let tz_offset = test_utils::random_test_timestamp() % (24 * 60 * 60 * 1000);
-
-            // Create Rust implementation
-            let rust_date = match JewishDate::new(timestamp, tz_offset) {
-                Some(date) => date,
-                None => continue, // Skip invalid timestamps
-            };
-
-            // Create Java implementation
-            let java_date = JavaJewishDate::from_date(&jvm, timestamp, tz_offset);
 
             // Get molad from both implementations
             let (rust_molad, rust_molad_data) = rust_date.get_molad();

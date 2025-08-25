@@ -110,54 +110,54 @@ pub struct MoladData {
     pub chalakim: i64,
 }
 
-/// Trait defining the interface for JewishDate operations
+
 pub trait JewishDateTrait {
-    /// Get the Jewish year
+    
     fn get_jewish_year(&self) -> i32;
 
-    /// Get the Jewish month (1-based)
+    
     fn get_jewish_month(&self) -> JewishMonth;
 
-    /// Get the Jewish day of month
+    
     fn get_jewish_day_of_month(&self) -> i32;
 
-    /// Get the Gregorian year
+    
     fn get_gregorian_year(&self) -> i32;
 
-    /// Get the Gregorian month (0-based)
+    
     fn get_gregorian_month(&self) -> i32;
 
-    /// Get the Gregorian day of month
+    
     fn get_gregorian_day_of_month(&self) -> i32;
 
-    /// Get the day of week (1 = Sunday, 7 = Saturday)
+    
     fn get_day_of_week(&self) -> DayOfWeek;
 
-    /// Check if it's a Jewish leap year
+    
     fn is_jewish_leap_year(&self) -> bool;
 
-    /// Get the days in the Jewish year
+    
     fn get_days_in_jewish_year(&self) -> i32;
 
-    /// Get the days in the Jewish month
+    
     fn get_days_in_jewish_month(&self) -> i32;
 
-    /// Check if Cheshvan is long
+    
     fn is_cheshvan_long(&self) -> bool;
 
-    /// Check if Kislev is short
+    
     fn is_kislev_short(&self) -> bool;
 
-    /// Get Cheshvan/Kislev kviah
+    
     fn get_cheshvan_kislev_kviah(&self) -> YearLengthType;
 
-    /// Get the days since start of Jewish year
+    
     fn get_days_since_start_of_jewish_year(&self) -> i32;
 
-    /// Get the chalakim since molad tohu
+    
     fn get_chalakim_since_molad_tohu(&self) -> i64;
 
-    /// Get molad
+    
     fn get_molad(&self) -> (impl JewishDateTrait, MoladData);
 }
 
@@ -174,10 +174,10 @@ impl JewishDate {
         let year = chrono_date.year();
         let month = chrono_date.month();
         let day = chrono_date.day();
-        // very gregorian day spans two jewish dates. This API will consider the 1st date to be the correct one.
-        // meaning that a timestamp at 8:00 PM will be considered the previous day's hebrew date.
-        // for instance, Thursday, August 21, 2025 11:06:53 PM/1755817613000 is after shkia, so it's technically the the next day,
-        // however we don't care. It's we still return 27 Av even though it's technically 28 Av.
+        
+        
+        
+        
         let gregorian_date = Date::try_new_gregorian(year as i32, month as u8, day as u8).ok()?;
         let hebrew_date = gregorian_date.to_calendar(Hebrew);
 
@@ -201,9 +201,9 @@ impl JewishDateTrait for JewishDate {
             "M03" => JewishMonth::KISLEV,
             "M04" => JewishMonth::TEVES,
             "M05" => JewishMonth::SHEVAT,
-            "M05L" => JewishMonth::ADAR,   // Adar I in leap years
-            "M06" => JewishMonth::ADAR,    // Adar in non-leap years, or Adar II in leap years?
-            "M06L" => JewishMonth::ADARII, // Adar II in leap years
+            "M05L" => JewishMonth::ADAR,   
+            "M06" => JewishMonth::ADAR,    
+            "M06L" => JewishMonth::ADARII, 
             "M07" => JewishMonth::NISSAN,
             "M08" => JewishMonth::IYAR,
             "M09" => JewishMonth::SIVAN,
@@ -225,7 +225,7 @@ impl JewishDateTrait for JewishDate {
     }
 
     fn get_gregorian_month(&self) -> i32 {
-        self.gregorian_date.month().ordinal as i32 - 1 // Convert to 0-based
+        self.gregorian_date.month().ordinal as i32 - 1 
     }
 
     fn get_gregorian_day_of_month(&self) -> i32 {
@@ -310,7 +310,7 @@ impl JewishDateTrait for JewishDate {
     }
 }
 
-// Helper functions for Jewish calendar calculations
+
 impl JewishDate {
     fn from_gregorian_date(gregorian_date: Date<Gregorian>) -> Self {
         let hebrew_date = gregorian_date.to_calendar(Hebrew);
@@ -320,7 +320,7 @@ impl JewishDate {
         }
     }
     fn get_chalakim_since_molad_tohu_static(year: i32, month: i32) -> i64 {
-        // Get the month of year (1-12 or 1-13 in leap years)
+        
         let month_of_year = Self::get_jewish_month_of_year(year, month);
         let months_elapsed = (235 * ((year - 1) / 19))
             + (12 * ((year - 1) % 19))
@@ -339,7 +339,7 @@ impl JewishDate {
     fn add_dechiyos(year: i32, molad_day: i32, molad_parts: i32) -> i32 {
         let mut rosh_hashana_day = molad_day;
 
-        // Apply the four dechiyos (postponements)
+        
         if (molad_parts >= 19440)
             || (((molad_day % 7) == 2)
                 && (molad_parts >= 9924)
@@ -351,7 +351,7 @@ impl JewishDate {
             rosh_hashana_day += 1;
         }
 
-        // ADU: Rosh Hashana cannot fall on Sunday, Wednesday, or Friday
+        
         if ((rosh_hashana_day % 7) == 0)
             || ((rosh_hashana_day % 7) == 3)
             || ((rosh_hashana_day % 7) == 5)
@@ -374,8 +374,8 @@ impl JewishDate {
         let mut elapsed_days = day_of_month;
 
         if month < constants::TISHREI {
-            // If we're before Tishrei, we need to add days from Tishrei to end of year
-            // and then from Nissan to current month
+            
+            
             for m in constants::TISHREI..=JewishDate::get_last_month_of_jewish_year(year) {
                 elapsed_days += JewishDate::get_days_in_jewish_month_static(m, year);
             }
@@ -383,7 +383,7 @@ impl JewishDate {
                 elapsed_days += JewishDate::get_days_in_jewish_month_static(m, year);
             }
         } else {
-            // From Tishrei to current month
+            
             for m in constants::TISHREI..month {
                 elapsed_days += JewishDate::get_days_in_jewish_month_static(m, year);
             }
@@ -393,16 +393,16 @@ impl JewishDate {
     }
 
     fn is_jewish_leap_year_static(year: i32) -> bool {
-        // Jewish leap year calculation: every 19 years, add 7 leap years
-        // Years 3, 6, 8, 11, 14, 17, 19 in the cycle are leap years
+        
+        
         let year_in_cycle = ((year - 1) % 19) + 1;
         matches!(year_in_cycle, 3 | 6 | 8 | 11 | 14 | 17 | 19)
     }
     fn get_last_month_of_jewish_year(year: i32) -> i32 {
         if Self::is_jewish_leap_year_static(year) {
-            13 // Adar II
+            13 
         } else {
-            12 // Adar
+            12 
         }
     }
     pub fn get_jewish_calendar_elapsed_days(year: i32) -> i32 {
@@ -442,7 +442,7 @@ impl JewishDate {
                 }
             }
             constants::ADAR_II => 29,
-            _ => 30, // Default for other months (Nissan, Sivan, Av, Tishrei, Shevat)
+            _ => 30, 
         }
     }
     fn molad_to_abs_date(chalakim: i64) -> i64 {
@@ -470,7 +470,7 @@ impl JewishDate {
         }
     }
     fn abs_date_to_date(abs_date: i64) -> Date<Gregorian> {
-        let mut year: i64 = abs_date / 366; // Search forward year by year from approximate year
+        let mut year: i64 = abs_date / 366; 
         while abs_date >= Self::gregorian_date_to_abs_date(year + 1, 1, 1) {
             year += 1;
         }
@@ -489,7 +489,7 @@ impl JewishDate {
     }
 }
 
-// Constants for the Jewish calendar
+
 pub mod constants {
     pub const NISSAN: i32 = 1;
     pub const IYAR: i32 = 2;

@@ -2,27 +2,22 @@ use core::f64;
 use core::f64::consts::PI;
 use libm::{atan, atan2, cos, log, sin, sqrt, tan};
 
-/// A struct that contains location information such as latitude and longitude required for astronomical calculations.
-/// The elevation field may not be used by some calculation engines and would be ignored if set.
 #[derive(Debug, Clone, PartialEq)]
 
 pub struct GeoLocation {
-    /// The latitude, for example 40.096 for Lakewood, NJ.
     pub latitude: f64,
-    /// The longitude, for example -74.222 for Lakewood, NJ.
+
     pub longitude: f64,
-    /// The elevation in Meters above sea level.
+
     pub elevation: f64,
 }
 
-/// Constants for calculation types
 pub enum Formula {
     Distance,
     InitialBearing,
     FinalBearing,
 }
 
-/// Error type for GeoLocation creation and updates.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GeoLocationError {
     InvalidLatitude,
@@ -87,7 +82,7 @@ impl GeoLocationTrait for GeoLocation {
     ) -> Result<f64, GeoLocationError> {
         let major_semi_axis = 6378137.0;
         let minor_semi_axis = 6356752.3142;
-        let f = 1.0 / 298.257223563; // WGS-84 ellipsoid
+        let f = 1.0 / 298.257223563;
         let l = (location.longitude - self.longitude).to_radians();
         let u1 = atan((1.0 - f) * tan(self.latitude.to_radians()));
         let u2 = atan((1.0 - f) * tan(location.latitude.to_radians()));
@@ -119,7 +114,7 @@ impl GeoLocationTrait for GeoLocation {
             );
 
             if sin_sigma == 0.0 {
-                return Ok(0.0); // co-incident points
+                return Ok(0.0);
             }
 
             cos_sigma = sin_u1 * sin_u2 + cos_u1 * cos_u2 * cos_lambda;
@@ -129,7 +124,7 @@ impl GeoLocationTrait for GeoLocation {
             cos2_sigma_m = cos_sigma - 2.0 * sin_u1 * sin_u2 / cos_sq_alpha;
 
             if cos2_sigma_m.is_nan() {
-                cos2_sigma_m = 0.0; // equatorial line: cosSqAlpha=0 (§6)
+                cos2_sigma_m = 0.0;
             }
 
             let c = f / 16.0 * cos_sq_alpha * (4.0 + f * (4.0 - 3.0 * cos_sq_alpha));
@@ -166,13 +161,12 @@ impl GeoLocationTrait for GeoLocation {
                             * (-3.0 + 4.0 * cos2_sigma_m * cos2_sigma_m)));
         let distance = minor_semi_axis * a * (sigma - delta_sigma);
 
-        // initial bearing
         let fwd_az = atan2(
             cos_u2 * sin_lambda,
             cos_u1 * sin_u2 - sin_u1 * cos_u2 * cos_lambda,
         )
         .to_degrees();
-        // final bearing
+
         let rev_az = atan2(
             cos_u1 * sin_lambda,
             -sin_u1 * cos_u2 + cos_u1 * sin_u2 * cos_lambda,
@@ -203,7 +197,7 @@ impl GeoLocationTrait for GeoLocation {
     }
 
     fn rhumb_line_distance(&self, location: &GeoLocation) -> f64 {
-        let earth_radius = 6378137.0; // Earth's radius in meters (WGS-84)
+        let earth_radius = 6378137.0;
         let d_lat = location.latitude.to_radians() - self.latitude.to_radians();
         let mut d_lon = (location.longitude.to_radians() - self.longitude.to_radians()).abs();
         let d_phi = log(tan(location.latitude.to_radians() / 2.0 + PI / 4.0))
@@ -214,7 +208,6 @@ impl GeoLocationTrait for GeoLocation {
             q = cos(self.latitude.to_radians());
         }
 
-        // if dLon over 180° take shorter rhumb across 180° meridian:
         if d_lon > PI {
             d_lon = 2.0 * PI - d_lon;
         }

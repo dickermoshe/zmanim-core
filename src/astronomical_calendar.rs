@@ -67,10 +67,10 @@ impl<'a> AstronomicalCalendar<'a> {
 
         let mut calculated_time = time;
 
-        // Get the adjusted calendar (base date from timestamp)
+        
         let adjusted_dt = DateTime::from_timestamp_millis(self.timestamp)?;
 
-        // Create a new UTC datetime with the same date components
+        
         let mut cal = Utc
             .with_ymd_and_hms(
                 adjusted_dt.year(),
@@ -82,22 +82,22 @@ impl<'a> AstronomicalCalendar<'a> {
             )
             .unwrap();
 
-        // Extract hours, minutes, seconds from the calculated time
+        
         let hours = calculated_time as i32;
         calculated_time -= hours as f64;
 
-        calculated_time *= 60.0; // This matches Java's calculatedTime *= 60
+        calculated_time *= 60.0; 
         let minutes = calculated_time as i32;
         calculated_time -= minutes as f64;
 
-        calculated_time *= 60.0; // This matches Java's calculatedTime *= 60
+        calculated_time *= 60.0; 
         let seconds = calculated_time as i32;
         calculated_time -= seconds as f64;
 
-        // Calculate local time offset based on longitude
+        
         let local_time_hours = (self.geo_location.get_longitude() / 15.0) as i32;
 
-        // Adjust date based on solar event and local time
+        
         if solar_event == SolarEvent::Sunrise && local_time_hours + hours > 18 {
             cal = cal - chrono::Duration::days(1);
         } else if solar_event == SolarEvent::Sunset && local_time_hours + hours < 6 {
@@ -106,14 +106,14 @@ impl<'a> AstronomicalCalendar<'a> {
             cal = cal + chrono::Duration::days(1);
         }
 
-        // Set the time components
+        
         cal = cal
             .with_hour(hours as u32)
             .and_then(|dt| dt.with_minute(minutes as u32))
             .and_then(|dt| dt.with_second(seconds as u32))
             .and_then(|dt| dt.with_nanosecond((calculated_time * 1_000_000_000.0) as u32))?;
 
-        // Return timestamp in milliseconds
+        
         Some(cal.timestamp_millis())
     }
 }

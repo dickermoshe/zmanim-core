@@ -4,7 +4,7 @@ use crate::{
     zmanim_calendar::{ZmanimCalendar, ZmanimCalendarTrait},
 };
 
-// Zenith constants
+
 const ZENITH_3_POINT_7: f64 = GEOMETRIC_ZENITH + 3.7;
 const ZENITH_3_POINT_8: f64 = GEOMETRIC_ZENITH + 3.8;
 const ZENITH_5_POINT_95: f64 = GEOMETRIC_ZENITH + 5.95;
@@ -35,7 +35,7 @@ const ZENITH_MINUS_2_POINT_1: f64 = GEOMETRIC_ZENITH - 2.1;
 const ZENITH_MINUS_2_POINT_8: f64 = GEOMETRIC_ZENITH - 2.8;
 const ZENITH_MINUS_3_POINT_05: f64 = GEOMETRIC_ZENITH - 3.05;
 
-// Additional constants from Java code
+
 const ZENITH_8_POINT_5: f64 = GEOMETRIC_ZENITH + 8.5;
 const ZENITH_16_POINT_1: f64 = GEOMETRIC_ZENITH + 16.1;
 const ASTRONOMICAL_ZENITH: f64 = 108.0;
@@ -68,7 +68,7 @@ impl<'a> ComplexZmanimCalendar<'a> {
         &self.zmanim_calendar
     }
 
-    // Helper methods
+    
     fn get_zmanis_based_offset(&self, hours: f64) -> Option<i64> {
         let shaah_zmanis = self.get_zmanim_calendar().get_shaah_zmanis_gra()? as f64;
         if hours == 0.0 {
@@ -103,7 +103,7 @@ impl<'a> ComplexZmanimCalendar<'a> {
     }
 }
 pub trait ComplexZmanimCalendarTrait {
-    // Shaah Zmanis methods
+    
     fn get_shaah_zmanis_19_point_8_degrees(&self) -> Option<i64>;
     fn get_shaah_zmanis_18_degrees(&self) -> Option<i64>;
     fn get_shaah_zmanis_26_degrees(&self) -> Option<i64>;
@@ -122,7 +122,7 @@ pub trait ComplexZmanimCalendarTrait {
     fn get_shaah_zmanis_120_minutes_zmanis(&self) -> Option<i64>;
     fn get_shaah_zmanis_baal_hatanya(&self) -> Option<i64>;
 
-    // Alos methods
+    
     fn get_alos_60(&self) -> Option<i64>;
     fn get_alos_72_zmanis(&self) -> Option<i64>;
     fn get_alos_96(&self) -> Option<i64>;
@@ -138,14 +138,14 @@ pub trait ComplexZmanimCalendarTrait {
     fn get_alos_16_point_1_degrees(&self) -> Option<i64>;
     fn get_alos_baal_hatanya(&self) -> Option<i64>;
 
-    // Misheyakir methods
+    
     fn get_misheyakir_11_point_5_degrees(&self) -> Option<i64>;
     fn get_misheyakir_11_degrees(&self) -> Option<i64>;
     fn get_misheyakir_10_point_2_degrees(&self) -> Option<i64>;
     fn get_misheyakir_7_point_65_degrees(&self) -> Option<i64>;
     fn get_misheyakir_9_point_5_degrees(&self) -> Option<i64>;
 
-    // Sof Zman Shma methods
+    
     fn get_sof_zman_shma_mga_19_point_8_degrees(&self) -> Option<i64>;
     fn get_sof_zman_shma_mga_16_point_1_degrees(&self) -> Option<i64>;
     fn get_sof_zman_shma_mga_18_degrees(&self) -> Option<i64>;
@@ -168,7 +168,7 @@ pub trait ComplexZmanimCalendarTrait {
     fn get_sof_zman_shma_mga_72_minutes_to_fixed_local_chatzos(&self) -> Option<i64>;
     fn get_sof_zman_shma_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<i64>;
 
-    // Sof Zman Tfila methods
+    
     fn get_sof_zman_tfila_mga_19_point_8_degrees(&self) -> Option<i64>;
     fn get_sof_zman_tfila_mga_16_point_1_degrees(&self) -> Option<i64>;
     fn get_sof_zman_tfila_mga_18_degrees(&self) -> Option<i64>;
@@ -184,7 +184,7 @@ pub trait ComplexZmanimCalendarTrait {
     fn get_sof_zman_tfila_baal_hatanya(&self) -> Option<i64>;
     fn get_sof_zman_tfila_gra_sunrise_to_fixed_local_chatzos(&self) -> Option<i64>;
 
-    // Mincha Gedola methods
+    
     fn get_mincha_gedola_30_minutes(&self) -> Option<i64>;
     fn get_mincha_gedola_72_minutes(&self) -> Option<i64>;
     fn get_mincha_gedola_16_point_1_degrees(&self) -> Option<i64>;
@@ -195,7 +195,7 @@ pub trait ComplexZmanimCalendarTrait {
     fn get_mincha_gedola_baal_hatanya_greater_than_30(&self) -> Option<i64>;
     fn get_mincha_gedola_gra_fixed_local_chatzos_30_minutes(&self) -> Option<i64>;
 
-    // Mincha Ketana methods
+    
     fn get_mincha_ketana_16_point_1_degrees(&self) -> Option<i64>;
     fn get_mincha_ketana_ahavat_shalom(&self) -> Option<i64>;
     fn get_mincha_ketana_72_minutes(&self) -> Option<i64>;
@@ -203,7 +203,7 @@ pub trait ComplexZmanimCalendarTrait {
     fn get_mincha_ketana_baal_hatanya(&self) -> Option<i64>;
     fn get_mincha_ketana_gra_fixed_local_chatzos_to_sunset(&self) -> Option<i64>;
 
-    // Plag Hamincha methods
+    
     fn get_plag_hamincha_60_minutes(&self) -> Option<i64>;
     fn get_plag_hamincha_72_minutes(&self) -> Option<i64>;
     fn get_plag_hamincha_90_minutes(&self) -> Option<i64>;
@@ -224,7 +224,7 @@ pub trait ComplexZmanimCalendarTrait {
     fn get_plag_hamincha_120_minutes(&self) -> Option<i64>;
     fn get_plag_hamincha_gra_fixed_local_chatzos_to_sunset(&self) -> Option<i64>;
 
-    // Bain Hashmashos methods
+    
     fn get_bain_hashmashos_rt_13_point_24_degrees(&self) -> Option<i64>;
     fn get_bain_hashmashos_rt_58_point_5_minutes(&self) -> Option<i64>;
     fn get_bain_hashmashos_rt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<i64>;
@@ -236,7 +236,7 @@ pub trait ComplexZmanimCalendarTrait {
     fn get_bain_hashmashos_yereim_13_point_5_minutes(&self) -> Option<i64>;
     fn get_bain_hashmashos_yereim_2_point_1_degrees(&self) -> Option<i64>;
 
-    // Tzais methods
+    
     fn get_tzais_geonim_3_point_7_degrees(&self) -> Option<i64>;
     fn get_tzais_geonim_3_point_8_degrees(&self) -> Option<i64>;
     fn get_tzais_geonim_5_point_95_degrees(&self) -> Option<i64>;
@@ -268,12 +268,12 @@ pub trait ComplexZmanimCalendarTrait {
     fn get_tzais_50(&self) -> Option<i64>;
     fn get_tzais_baal_hatanya(&self) -> Option<i64>;
 
-    // Fixed Local Chatzos methods
+    
     fn get_fixed_local_chatzos(&self) -> Option<i64>;
     fn get_sof_zman_shma_fixed_local(&self) -> Option<i64>;
     fn get_sof_zman_tfila_fixed_local(&self) -> Option<i64>;
 
-    // Kidush Levana methods
+    
     fn get_sof_zman_kidush_levana_between_moldos(
         &self,
         alos: Option<i64>,
@@ -300,7 +300,7 @@ pub trait ComplexZmanimCalendarTrait {
     ) -> Option<i64>;
     fn get_tchilas_zman_kidush_levana_7_days_default(&self) -> Option<i64>;
 
-    // Chametz methods
+    
     fn get_sof_zman_achilas_chametz_gra(&self) -> Option<i64>;
     fn get_sof_zman_achilas_chametz_mga_72_minutes(&self) -> Option<i64>;
     fn get_sof_zman_achilas_chametz_mga_72_minutes_zmanis(&self) -> Option<i64>;
@@ -312,15 +312,15 @@ pub trait ComplexZmanimCalendarTrait {
     fn get_sof_zman_achilas_chametz_baal_hatanya(&self) -> Option<i64>;
     fn get_sof_zman_biur_chametz_baal_hatanya(&self) -> Option<i64>;
 
-    // Samuch Le Mincha Ketana methods
+    
     fn get_samuch_le_mincha_ketana_gra(&self) -> Option<i64>;
     fn get_samuch_le_mincha_ketana_16_point_1_degrees(&self) -> Option<i64>;
     fn get_samuch_le_mincha_ketana_72_minutes(&self) -> Option<i64>;
 
-    // Ateret Torah sunset offset getter/setter
+    
     fn get_ateret_torah_sunset_offset(&self) -> i64;
 
-    // Deprecated alias methods (for compatibility)
+    
     fn get_bain_hasmashosrt_13_point_24_degrees(&self) -> Option<i64>;
     fn get_bain_hasmashosrt_58_point_5_minutes(&self) -> Option<i64>;
     fn get_bain_hasmashosrt_13_point_5_minutes_before_7_point_083_degrees(&self) -> Option<i64>;
@@ -341,7 +341,7 @@ pub trait ComplexZmanimCalendarTrait {
 }
 
 impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
-    // Shaah Zmanis methods
+    
     fn get_shaah_zmanis_19_point_8_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
@@ -478,7 +478,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
             )
     }
 
-    // Alos methods
+    
     fn get_alos_60(&self) -> Option<i64> {
         let sunrise = self
             .get_zmanim_calendar()
@@ -563,7 +563,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
             .get_sunrise_offset_by_degrees(ZENITH_16_POINT_9)
     }
 
-    // Misheyakir methods
+    
     fn get_misheyakir_11_point_5_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
@@ -594,7 +594,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
             .get_sunrise_offset_by_degrees(ZENITH_9_POINT_5)
     }
 
-    // Sof Zman Shma methods
+    
     fn get_sof_zman_shma_mga_19_point_8_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_shma(
             self.get_alos_19_point_8_degrees()?,
@@ -762,7 +762,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         )
     }
 
-    // Sof Zman Tfila methods
+    
     fn get_sof_zman_tfila_mga_19_point_8_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_sof_zman_tfila(
             self.get_alos_19_point_8_degrees()?,
@@ -870,7 +870,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         )
     }
 
-    // Mincha Gedola methods
+    
     fn get_mincha_gedola_30_minutes(&self) -> Option<i64> {
         let chatzos = self.get_zmanim_calendar().get_chatzos()?;
         Some(chatzos + 30 * MINUTE_MILLIS)
@@ -947,7 +947,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         Some(fixed_local_chatzos + 30 * MINUTE_MILLIS)
     }
 
-    // Mincha Ketana methods
+    
     fn get_mincha_ketana_16_point_1_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_mincha_ketana(
             self.get_alos_16_point_1_degrees(),
@@ -996,7 +996,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         )
     }
 
-    // Plag Hamincha methods
+    
     fn get_plag_hamincha_60_minutes(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_plag_hamincha(
             self.get_alos_60(),
@@ -1151,7 +1151,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         )
     }
 
-    // Bain Hashmashos methods
+    
     fn get_bain_hashmashos_rt_13_point_24_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
@@ -1229,7 +1229,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
             .get_sunset_offset_by_degrees(ZENITH_MINUS_2_POINT_1)
     }
 
-    // Tzais methods
+    
     fn get_tzais_geonim_3_point_7_degrees(&self) -> Option<i64> {
         self.get_zmanim_calendar()
             .get_astronomical_calendar()
@@ -1414,10 +1414,10 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
             .get_sunset_offset_by_degrees(ZENITH_6_DEGREES)
     }
 
-    // Fixed Local Chatzos methods
+    
     fn get_fixed_local_chatzos(&self) -> Option<i64> {
-        // This would require implementing get_local_mean_time which is complex
-        // For now, return None as a placeholder
+        
+        
         None
     }
 
@@ -1431,13 +1431,13 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         Some(chatzos - 120 * MINUTE_MILLIS)
     }
 
-    // Kidush Levana methods (simplified implementations - would need JewishCalendar)
+    
     fn get_sof_zman_kidush_levana_between_moldos(
         &self,
         _alos: Option<i64>,
         _tzais: Option<i64>,
     ) -> Option<i64> {
-        // Would require JewishCalendar implementation
+        
         None
     }
 
@@ -1450,7 +1450,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         _alos: Option<i64>,
         _tzais: Option<i64>,
     ) -> Option<i64> {
-        // Would require JewishCalendar implementation
+        
         None
     }
 
@@ -1467,12 +1467,12 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         _alos: Option<i64>,
         _tzais: Option<i64>,
     ) -> Option<i64> {
-        // Would require JewishCalendar implementation
+        
         None
     }
 
     fn get_zman_molad(&self) -> Option<i64> {
-        // Would require JewishCalendar implementation
+        
         None
     }
 
@@ -1481,7 +1481,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         _alos: Option<i64>,
         _tzais: Option<i64>,
     ) -> Option<i64> {
-        // Would require JewishCalendar implementation
+        
         None
     }
 
@@ -1489,7 +1489,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         self.get_tchilas_zman_kidush_levana_7_days(None, None)
     }
 
-    // Chametz methods
+    
     fn get_sof_zman_achilas_chametz_gra(&self) -> Option<i64> {
         self.get_zmanim_calendar().get_sof_zman_tfila_gra()
     }
@@ -1499,7 +1499,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
     }
 
     fn get_sof_zman_achilas_chametz_mga_72_minutes_zmanis(&self) -> Option<i64> {
-        // Would need Jewish calendar check for Nissan 14
+        
         self.get_sof_zman_tfila_mga_72_minutes_zmanis()
     }
 
@@ -1547,7 +1547,7 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         Some(sunrise + (shaah_zmanis * 5.0) as i64)
     }
 
-    // Samuch Le Mincha Ketana methods
+    
     fn get_samuch_le_mincha_ketana_gra(&self) -> Option<i64> {
         self.get_zmanim_calendar()._get_samuch_le_mincha_ketana(
             Some(
@@ -1578,12 +1578,12 @@ impl<'a> ComplexZmanimCalendarTrait for ComplexZmanimCalendar<'a> {
         )
     }
 
-    // Ateret Torah sunset offset getter/setter
+    
     fn get_ateret_torah_sunset_offset(&self) -> i64 {
         self.ateret_torah_sunset_offset
     }
 
-    // Deprecated alias methods (for compatibility)
+    
     fn get_bain_hasmashosrt_13_point_24_degrees(&self) -> Option<i64> {
         self.get_bain_hashmashos_rt_13_point_24_degrees()
     }

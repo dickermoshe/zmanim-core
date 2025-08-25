@@ -325,6 +325,5 @@ fn test_zmanim_calendar() {
             DEFAULT_INT_TOLERANCE,
             &message,
         );
-        drop(java_zmanim_calendar);
     }
 }

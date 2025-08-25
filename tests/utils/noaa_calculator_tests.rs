@@ -1,57 +1,12 @@
 use crate::{
     java::noaa_calculator::JavaNOAACalculator,
     test_utils::{
-        assert_almost_equal_f64, create_jvm, DEFAULT_FLOAT_TOLERANCE, DEFAULT_TEST_ITERATIONS,
+        assert_almost_equal_f64, create_jvm, TestCase, DEFAULT_FLOAT_TOLERANCE,
+        DEFAULT_TEST_ITERATIONS,
     },
 };
 use rand::Rng;
 use zmanim_core::{GeoLocation, NOAACalculator, NOAACalculatorTrait, SolarEvent};
-#[derive(Debug)]
-struct TestCase {
-    lat: f64,
-    lon: f64,
-    elevation: f64,
-    timestamp: i64,
-    zenith: f64,
-    use_elevation: bool,
-    solar_event: SolarEvent,
-    solar_declination: f64,
-    is_azimuth: bool,
-}
-
-impl TestCase {
-    fn new() -> Self {
-        let mut rng = rand::rng();
-        let lat = rng.random_range(-90.0..=90.0);
-        let lon = rng.random_range(-180.0..=180.0);
-        let elevation = rng.random_range(0.0..=1000.0);
-        let year_in_millis = 1000 * 60 * 60 * 24 * 365;
-        let timestamp = rng.random_range(-50 * year_in_millis..=50 * year_in_millis);
-        let zenith = rng.random_range(0.0..=180.0);
-        let use_elevation = rng.random_bool(0.5);
-        let solar_event = match rng.random_range(0..=3) {
-            0 => SolarEvent::Sunrise,
-            1 => SolarEvent::Sunset,
-            2 => SolarEvent::Noon,
-            3 => SolarEvent::Midnight,
-            _ => unreachable!(),
-        };
-        let solar_declination = rng.random_range(-23.0..=23.0);
-        let is_azimuth = rng.random_bool(0.5);
-
-        TestCase {
-            lat,
-            lon,
-            elevation,
-            timestamp,
-            zenith,
-            use_elevation,
-            solar_event,
-            solar_declination,
-            is_azimuth,
-        }
-    }
-}
 
 #[test]
 fn test_noaa_calculator() {
@@ -227,7 +182,5 @@ fn test_noaa_calculator() {
         let java_result = java_calculator.get_solar_azimuth(test_case.timestamp, &geo_location);
         let rust_result = rust_calculator.get_solar_azimuth(test_case.timestamp, &geo_location);
         assert_almost_equal_f64(java_result, rust_result, DEFAULT_FLOAT_TOLERANCE, &message);
-
-        // java_calculator will be automatically dropped when it goes out of scope
     }
 }

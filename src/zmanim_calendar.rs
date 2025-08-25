@@ -1,8 +1,8 @@
 use crate::{
-    GeoLocationTrait,
     astronomical_calendar::{
         AstronomicalCalendar, AstronomicalCalendarTrait, GEOMETRIC_ZENITH, MINUTE_MILLIS,
     },
+    GeoLocationTrait,
 };
 
 const ZENITH_16_POINT_1: f64 = GEOMETRIC_ZENITH + 16.1;
@@ -74,7 +74,7 @@ pub trait ZmanimCalendarTrait {
         synchronous: bool,
     ) -> Option<i64>;
     fn get_samuch_le_mincha_ketana_simple(&self, start_of_day: i64, end_of_day: i64)
-    -> Option<i64>;
+        -> Option<i64>;
     fn _get_mincha_ketana(
         &self,
         start_of_day: Option<i64>,
