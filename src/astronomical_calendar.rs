@@ -250,6 +250,7 @@ pub mod astronomical_calendar_ffi {
     use safer_ffi::option::TaggedOption;
     use safer_ffi::prelude::*;
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_new(
         timestamp: i64,
@@ -258,6 +259,7 @@ pub mod astronomical_calendar_ffi {
         AstronomicalCalendar::new(timestamp, geo_location)
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_utc_sunset(
         calendar: &AstronomicalCalendar,
@@ -266,6 +268,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_utc_sunset(zenith).into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_utc_sunrise(
         calendar: &AstronomicalCalendar,
@@ -274,6 +277,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_utc_sunrise(zenith).into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_utc_sea_level_sunrise(
         calendar: &AstronomicalCalendar,
@@ -282,6 +286,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_utc_sea_level_sunrise(zenith).into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_utc_sea_level_sunset(
         calendar: &AstronomicalCalendar,
@@ -290,6 +295,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_utc_sea_level_sunset(zenith).into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_sea_level_sunset(
         calendar: &AstronomicalCalendar,
@@ -297,16 +303,19 @@ pub mod astronomical_calendar_ffi {
         calendar.get_sea_level_sunset().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_sunset(calendar: &AstronomicalCalendar) -> TaggedOption<i64> {
         calendar.get_sunset().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_sunrise(calendar: &AstronomicalCalendar) -> TaggedOption<i64> {
         calendar.get_sunrise().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_sea_level_sunrise(
         calendar: &AstronomicalCalendar,
@@ -314,6 +323,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_sea_level_sunrise().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_sunrise_offset_by_degrees(
         calendar: &AstronomicalCalendar,
@@ -322,6 +332,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_sunrise_offset_by_degrees(degrees).into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_sunset_offset_by_degrees(
         calendar: &AstronomicalCalendar,
@@ -330,6 +341,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_sunset_offset_by_degrees(degrees).into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_begin_civil_twilight(
         calendar: &AstronomicalCalendar,
@@ -337,6 +349,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_begin_civil_twilight().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_begin_nautical_twilight(
         calendar: &AstronomicalCalendar,
@@ -344,6 +357,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_begin_nautical_twilight().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_begin_astronomical_twilight(
         calendar: &AstronomicalCalendar,
@@ -351,6 +365,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_begin_astronomical_twilight().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_end_civil_twilight(
         calendar: &AstronomicalCalendar,
@@ -358,6 +373,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_end_civil_twilight().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_end_nautical_twilight(
         calendar: &AstronomicalCalendar,
@@ -365,6 +381,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_end_nautical_twilight().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_end_astronomical_twilight(
         calendar: &AstronomicalCalendar,
@@ -372,6 +389,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_end_astronomical_twilight().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_temporal_hour(
         calendar: &AstronomicalCalendar,
@@ -379,6 +397,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_temporal_hour().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_sun_transit(
         calendar: &AstronomicalCalendar,
@@ -386,6 +405,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_sun_transit().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_solar_midnight(
         calendar: &AstronomicalCalendar,
@@ -393,6 +413,7 @@ pub mod astronomical_calendar_ffi {
         calendar.get_solar_midnight().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_temporal_hour_with_start_and_end_times(
         calendar: &AstronomicalCalendar,
@@ -404,6 +425,7 @@ pub mod astronomical_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn astronomical_calendar_get_sun_transit_with_start_and_end_times(
         calendar: &AstronomicalCalendar,

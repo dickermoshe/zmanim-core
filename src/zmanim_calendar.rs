@@ -400,6 +400,7 @@ pub mod zmanim_calendar_ffi {
     use super::*;
     use safer_ffi::option::TaggedOption;
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_new(
         timestamp: i64,
@@ -417,31 +418,37 @@ pub mod zmanim_calendar_ffi {
         )
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_tzais(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_tzais().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_alos_hashachar(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_alos_hashachar().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_alos72(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_alos72().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_chatzos(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_chatzos().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_chatzos_as_half_day(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_chatzos_as_half_day().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_percent_of_shaah_zmanis_from_degrees(
         calendar: &ZmanimCalendar,
@@ -453,6 +460,7 @@ pub mod zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_half_day_based_zman(
         calendar: &ZmanimCalendar,
@@ -465,6 +473,7 @@ pub mod zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_half_day_based_shaah_zmanis(
         calendar: &ZmanimCalendar,
@@ -476,6 +485,7 @@ pub mod zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_shaah_zmanis_based_zman(
         calendar: &ZmanimCalendar,
@@ -488,6 +498,7 @@ pub mod zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_sof_zman_shma_simple(
         calendar: &ZmanimCalendar,
@@ -499,26 +510,31 @@ pub mod zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_sof_zman_shma_gra(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_sof_zman_shma_gra().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_sof_zman_shma_mga(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_sof_zman_shma_mga().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_tzais72(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_tzais72().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_candle_lighting(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_candle_lighting().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_sof_zman_tfila_simple(
         calendar: &ZmanimCalendar,
@@ -530,16 +546,19 @@ pub mod zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_sof_zman_tfila_gra(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_sof_zman_tfila_gra().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_sof_zman_tfila_mga(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_sof_zman_tfila_mga().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_mincha_gedola_simple(
         calendar: &ZmanimCalendar,
@@ -551,6 +570,7 @@ pub mod zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_mincha_gedola_default(
         calendar: &ZmanimCalendar,
@@ -558,6 +578,7 @@ pub mod zmanim_calendar_ffi {
         calendar.get_mincha_gedola_default().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_samuch_le_mincha_ketana_simple(
         calendar: &ZmanimCalendar,
@@ -569,6 +590,7 @@ pub mod zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_mincha_ketana_simple(
         calendar: &ZmanimCalendar,
@@ -580,6 +602,7 @@ pub mod zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_mincha_ketana_default(
         calendar: &ZmanimCalendar,
@@ -587,6 +610,7 @@ pub mod zmanim_calendar_ffi {
         calendar.get_mincha_ketana_default().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_plag_hamincha_simple(
         calendar: &ZmanimCalendar,
@@ -598,6 +622,7 @@ pub mod zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_plag_hamincha_default(
         calendar: &ZmanimCalendar,
@@ -605,11 +630,13 @@ pub mod zmanim_calendar_ffi {
         calendar.get_plag_hamincha_default().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_shaah_zmanis_gra(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_shaah_zmanis_gra().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn zmanim_calendar_get_shaah_zmanis_mga(calendar: &ZmanimCalendar) -> TaggedOption<i64> {
         calendar.get_shaah_zmanis_mga().into()

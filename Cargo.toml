@@ -27,12 +27,20 @@ crate-type = [
 
 [[bin]]
 name = "generate-headers"
-required-features = ["ffi"] # Do not build unless generating headers.
+required-features = ["headers"] # Do not build unless generating headers.
 
 [features]
-# For regular use within Rust
-default = []
-# For building a shared library
-ffi = []
-# For generating headers for the shared library
-headers = ["safer-ffi/headers", "ffi"]
+std = [] # To enable the standard library
+ffi = [] # To include all the exported ffi functions
+headers = [
+    "safer-ffi/headers",
+    "std",
+    "ffi",
+] # For generating headers for the shared library
+
+[workspace]
+members = ["example/rust"]
+
+[profile.release]
+strip = true
+lto = true

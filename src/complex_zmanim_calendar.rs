@@ -1607,6 +1607,7 @@ pub mod complex_zmanim_calendar_ffi {
     use safer_ffi::option::TaggedOption;
     use safer_ffi::prelude::*;
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_new(
         timestamp: i64,
@@ -1626,6 +1627,7 @@ pub mod complex_zmanim_calendar_ffi {
         )
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_19_point_8_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1633,6 +1635,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_19_point_8_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_18_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1640,6 +1643,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_18_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_26_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1647,6 +1651,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_26_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_16_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1654,6 +1659,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_16_point_1_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_60_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -1661,6 +1667,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_60_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_72_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -1668,6 +1675,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_72_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_72_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -1675,6 +1683,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_72_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_90_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -1682,6 +1691,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_90_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_90_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -1689,6 +1699,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_90_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_96_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -1696,6 +1707,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_96_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_ateret_torah(
         calendar: &ComplexZmanimCalendar,
@@ -1703,6 +1715,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_ateret_torah().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_alos_16_point_1_to_tzais_3_point_8(
         calendar: &ComplexZmanimCalendar,
@@ -1712,6 +1725,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_alos_16_point_1_to_tzais_3_point_7(
         calendar: &ComplexZmanimCalendar,
@@ -1721,6 +1735,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_96_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -1728,6 +1743,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_96_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_120_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -1735,6 +1751,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_120_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_120_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -1742,6 +1759,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_120_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_shaah_zmanis_baal_hatanya(
         calendar: &ComplexZmanimCalendar,
@@ -1749,6 +1767,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_shaah_zmanis_baal_hatanya().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_60(
         calendar: &ComplexZmanimCalendar,
@@ -1756,6 +1775,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_60().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_72_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -1763,6 +1783,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_72_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_96(
         calendar: &ComplexZmanimCalendar,
@@ -1770,6 +1791,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_96().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_90_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -1777,6 +1799,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_90_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_96_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -1784,6 +1807,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_96_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_90(
         calendar: &ComplexZmanimCalendar,
@@ -1791,6 +1815,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_90().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_120(
         calendar: &ComplexZmanimCalendar,
@@ -1798,6 +1823,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_120().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_120_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -1805,6 +1831,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_120_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_26_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1812,6 +1839,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_26_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_18_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1819,6 +1847,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_18_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_19_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1826,6 +1855,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_19_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_19_point_8_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1833,6 +1863,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_19_point_8_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_16_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1840,6 +1871,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_16_point_1_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_alos_baal_hatanya(
         calendar: &ComplexZmanimCalendar,
@@ -1847,6 +1879,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_alos_baal_hatanya().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_misheyakir_11_point_5_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1854,6 +1887,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_misheyakir_11_point_5_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_misheyakir_11_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1861,6 +1895,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_misheyakir_11_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_misheyakir_10_point_2_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1868,6 +1903,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_misheyakir_10_point_2_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_misheyakir_7_point_65_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1875,6 +1911,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_misheyakir_7_point_65_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_misheyakir_9_point_5_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1882,6 +1919,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_misheyakir_9_point_5_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_19_point_8_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1889,6 +1927,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_mga_19_point_8_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_16_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1896,6 +1935,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_mga_16_point_1_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_18_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1903,6 +1943,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_mga_18_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_72_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -1910,6 +1951,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_mga_72_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_72_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -1917,6 +1959,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_mga_72_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_90_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -1924,6 +1967,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_mga_90_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_90_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -1931,6 +1975,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_mga_90_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_96_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -1938,6 +1983,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_mga_96_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_96_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -1945,6 +1991,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_mga_96_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_3_hours_before_chatzos(
         calendar: &ComplexZmanimCalendar,
@@ -1952,6 +1999,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_3_hours_before_chatzos().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_120_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -1959,6 +2007,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_mga_120_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_alos_16_point_1_to_sunset(
         calendar: &ComplexZmanimCalendar,
@@ -1968,6 +2017,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -1977,6 +2027,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_kol_eliyahu(
         calendar: &ComplexZmanimCalendar,
@@ -1984,6 +2035,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_kol_eliyahu().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_ateret_torah(
         calendar: &ComplexZmanimCalendar,
@@ -1991,6 +2043,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_ateret_torah().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_baal_hatanya(
         calendar: &ComplexZmanimCalendar,
@@ -1998,6 +2051,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_baal_hatanya().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_18_degrees_to_fixed_local_chatzos(
         calendar: &ComplexZmanimCalendar,
@@ -2007,6 +2061,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_16_point_1_degrees_to_fixed_local_chatzos(
         calendar: &ComplexZmanimCalendar,
@@ -2016,6 +2071,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_90_minutes_to_fixed_local_chatzos(
         calendar: &ComplexZmanimCalendar,
@@ -2025,6 +2081,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_mga_72_minutes_to_fixed_local_chatzos(
         calendar: &ComplexZmanimCalendar,
@@ -2034,6 +2091,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_gra_sunrise_to_fixed_local_chatzos(
         calendar: &ComplexZmanimCalendar,
@@ -2043,6 +2101,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_mga_19_point_8_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2050,6 +2109,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_mga_19_point_8_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_mga_16_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2057,6 +2117,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_mga_16_point_1_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_mga_18_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2064,6 +2125,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_mga_18_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_mga_72_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2071,6 +2133,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_mga_72_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_mga_72_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2078,6 +2141,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_mga_72_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_mga_90_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2085,6 +2149,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_mga_90_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_mga_90_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2092,6 +2157,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_mga_90_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_mga_96_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2099,6 +2165,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_mga_96_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_mga_96_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2106,6 +2173,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_mga_96_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_mga_120_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2113,6 +2181,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_mga_120_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_2_hours_before_chatzos(
         calendar: &ComplexZmanimCalendar,
@@ -2120,6 +2189,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_2_hours_before_chatzos().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_ateret_torah(
         calendar: &ComplexZmanimCalendar,
@@ -2127,6 +2197,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_ateret_torah().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_baal_hatanya(
         calendar: &ComplexZmanimCalendar,
@@ -2134,6 +2205,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_baal_hatanya().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_gra_sunrise_to_fixed_local_chatzos(
         calendar: &ComplexZmanimCalendar,
@@ -2143,6 +2215,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_gedola_30_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2150,6 +2223,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_mincha_gedola_30_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_gedola_72_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2157,6 +2231,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_mincha_gedola_72_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_gedola_16_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2164,6 +2239,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_mincha_gedola_16_point_1_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_gedola_ahavat_shalom(
         calendar: &ComplexZmanimCalendar,
@@ -2171,6 +2247,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_mincha_gedola_ahavat_shalom().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_gedola_greater_than_30(
         calendar: &ComplexZmanimCalendar,
@@ -2178,6 +2255,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_mincha_gedola_greater_than_30().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_gedola_ateret_torah(
         calendar: &ComplexZmanimCalendar,
@@ -2185,6 +2263,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_mincha_gedola_ateret_torah().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_gedola_baal_hatanya(
         calendar: &ComplexZmanimCalendar,
@@ -2192,6 +2271,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_mincha_gedola_baal_hatanya().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_gedola_baal_hatanya_greater_than_30(
         calendar: &ComplexZmanimCalendar,
@@ -2201,6 +2281,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_gedola_gra_fixed_local_chatzos_30_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2210,6 +2291,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_ketana_16_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2217,6 +2299,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_mincha_ketana_16_point_1_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_ketana_ahavat_shalom(
         calendar: &ComplexZmanimCalendar,
@@ -2224,6 +2307,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_mincha_ketana_ahavat_shalom().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_ketana_72_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2231,6 +2315,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_mincha_ketana_72_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_ketana_ateret_torah(
         calendar: &ComplexZmanimCalendar,
@@ -2238,6 +2323,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_mincha_ketana_ateret_torah().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_ketana_baal_hatanya(
         calendar: &ComplexZmanimCalendar,
@@ -2245,6 +2331,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_mincha_ketana_baal_hatanya().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_mincha_ketana_gra_fixed_local_chatzos_to_sunset(
         calendar: &ComplexZmanimCalendar,
@@ -2254,6 +2341,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_60_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2261,6 +2349,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_60_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_72_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2268,6 +2357,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_72_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_90_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2275,6 +2365,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_90_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_96_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2282,6 +2373,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_96_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_96_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2289,6 +2381,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_96_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_90_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2296,6 +2389,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_90_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_72_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2303,6 +2397,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_72_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_16_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2310,6 +2405,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_16_point_1_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_19_point_8_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2317,6 +2413,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_19_point_8_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_26_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2324,6 +2421,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_26_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_18_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2331,6 +2429,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_18_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_alos_to_sunset(
         calendar: &ComplexZmanimCalendar,
@@ -2338,6 +2437,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_alos_to_sunset().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2347,6 +2447,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_ahavat_shalom(
         calendar: &ComplexZmanimCalendar,
@@ -2354,6 +2455,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_ahavat_shalom().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_ateret_torah(
         calendar: &ComplexZmanimCalendar,
@@ -2361,6 +2463,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_ateret_torah().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_baal_hatanya(
         calendar: &ComplexZmanimCalendar,
@@ -2368,6 +2471,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_baal_hatanya().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_120_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2375,6 +2479,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_120_minutes_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_120_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2382,6 +2487,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_plag_hamincha_120_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_plag_hamincha_gra_fixed_local_chatzos_to_sunset(
         calendar: &ComplexZmanimCalendar,
@@ -2391,6 +2497,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hashmashos_rt_13_point_24_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2398,6 +2505,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_bain_hashmashos_rt_13_point_24_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hashmashos_rt_58_point_5_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2405,6 +2513,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_bain_hashmashos_rt_58_point_5_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hashmashos_rt_13_point_5_minutes_before_7_point_083_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2414,6 +2523,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hashmashos_rt_2_stars(
         calendar: &ComplexZmanimCalendar,
@@ -2421,6 +2531,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_bain_hashmashos_rt_2_stars().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hashmashos_yereim_18_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2428,6 +2539,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_bain_hashmashos_yereim_18_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hashmashos_yereim_3_point_05_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2437,6 +2549,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hashmashos_yereim_16_point_875_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2446,6 +2559,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hashmashos_yereim_2_point_8_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2455,6 +2569,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hashmashos_yereim_13_point_5_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2464,6 +2579,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hashmashos_yereim_2_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2473,6 +2589,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_3_point_7_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2480,6 +2597,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_3_point_7_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_3_point_8_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2487,6 +2605,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_3_point_8_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_5_point_95_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2494,6 +2613,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_5_point_95_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_3_point_65_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2501,6 +2621,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_3_point_65_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_3_point_676_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2508,6 +2629,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_3_point_676_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_4_point_61_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2515,6 +2637,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_4_point_61_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_4_point_37_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2522,6 +2645,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_4_point_37_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_5_point_88_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2529,6 +2653,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_5_point_88_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_4_point_8_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2536,6 +2661,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_4_point_8_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_6_point_45_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2543,6 +2669,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_6_point_45_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_7_point_083_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2550,6 +2677,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_7_point_083_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_7_point_67_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2557,6 +2685,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_7_point_67_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_8_point_5_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2564,6 +2693,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_8_point_5_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_9_point_3_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2571,6 +2701,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_9_point_3_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_geonim_9_point_75_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2578,6 +2709,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_geonim_9_point_75_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_60(
         calendar: &ComplexZmanimCalendar,
@@ -2585,6 +2717,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_60().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_ateret_torah(
         calendar: &ComplexZmanimCalendar,
@@ -2592,6 +2725,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_ateret_torah().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_72_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2599,6 +2733,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_72_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_90_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2606,6 +2741,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_90_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_96_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2613,6 +2749,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_96_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_90(
         calendar: &ComplexZmanimCalendar,
@@ -2620,6 +2757,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_90().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_120(
         calendar: &ComplexZmanimCalendar,
@@ -2627,6 +2765,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_120().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_120_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2634,6 +2773,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_120_zmanis().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_16_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2641,6 +2781,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_16_point_1_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_26_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2648,6 +2789,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_26_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_18_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2655,6 +2797,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_18_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_19_point_8_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2662,6 +2805,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_19_point_8_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_96(
         calendar: &ComplexZmanimCalendar,
@@ -2669,6 +2813,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_96().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_50(
         calendar: &ComplexZmanimCalendar,
@@ -2676,6 +2821,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_50().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tzais_baal_hatanya(
         calendar: &ComplexZmanimCalendar,
@@ -2683,6 +2829,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tzais_baal_hatanya().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_fixed_local_chatzos(
         calendar: &ComplexZmanimCalendar,
@@ -2690,6 +2837,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_fixed_local_chatzos().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_shma_fixed_local(
         calendar: &ComplexZmanimCalendar,
@@ -2697,6 +2845,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_shma_fixed_local().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfila_fixed_local(
         calendar: &ComplexZmanimCalendar,
@@ -2704,6 +2853,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfila_fixed_local().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_kidush_levana_between_moldos(
         calendar: &ComplexZmanimCalendar,
@@ -2715,6 +2865,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_kidush_levana_between_moldos_default(
         calendar: &ComplexZmanimCalendar,
@@ -2724,6 +2875,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_kidush_levana_15_days(
         calendar: &ComplexZmanimCalendar,
@@ -2735,6 +2887,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_kidush_levana_15_days_default(
         calendar: &ComplexZmanimCalendar,
@@ -2742,6 +2895,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_kidush_levana_15_days_default().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tchilas_zman_kidush_levana_3_days(
         calendar: &ComplexZmanimCalendar,
@@ -2749,6 +2903,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_tchilas_zman_kidush_levana_3_days().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tchilas_zman_kidush_levana_3_days_with_times(
         calendar: &ComplexZmanimCalendar,
@@ -2760,6 +2915,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_zman_molad(
         calendar: &ComplexZmanimCalendar,
@@ -2767,6 +2923,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_zman_molad().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tchilas_zman_kidush_levana_7_days(
         calendar: &ComplexZmanimCalendar,
@@ -2778,6 +2935,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_tchilas_zman_kidush_levana_7_days_default(
         calendar: &ComplexZmanimCalendar,
@@ -2787,6 +2945,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_achilas_chametz_gra(
         calendar: &ComplexZmanimCalendar,
@@ -2794,6 +2953,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_achilas_chametz_gra().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_achilas_chametz_mga_72_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2803,6 +2963,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_achilas_chametz_mga_72_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2812,6 +2973,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_achilas_chametz_mga_16_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2821,6 +2983,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_biur_chametz_gra(
         calendar: &ComplexZmanimCalendar,
@@ -2828,6 +2991,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_biur_chametz_gra().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_biur_chametz_mga_72_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2835,6 +2999,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_biur_chametz_mga_72_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_biur_chametz_mga_72_minutes_zmanis(
         calendar: &ComplexZmanimCalendar,
@@ -2844,6 +3009,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_biur_chametz_mga_16_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2853,6 +3019,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_achilas_chametz_baal_hatanya(
         calendar: &ComplexZmanimCalendar,
@@ -2860,6 +3027,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_achilas_chametz_baal_hatanya().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_biur_chametz_baal_hatanya(
         calendar: &ComplexZmanimCalendar,
@@ -2867,6 +3035,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_biur_chametz_baal_hatanya().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_samuch_le_mincha_ketana_gra(
         calendar: &ComplexZmanimCalendar,
@@ -2874,6 +3043,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_samuch_le_mincha_ketana_gra().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_samuch_le_mincha_ketana_16_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2883,6 +3053,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_samuch_le_mincha_ketana_72_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2890,6 +3061,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_samuch_le_mincha_ketana_72_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_ateret_torah_sunset_offset(
         calendar: &ComplexZmanimCalendar,
@@ -2897,6 +3069,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_ateret_torah_sunset_offset()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hasmashosrt_13_point_24_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2904,6 +3077,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_bain_hasmashosrt_13_point_24_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hasmashosrt_58_point_5_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2911,6 +3085,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_bain_hasmashosrt_58_point_5_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hasmashosrt_13_point_5_minutes_before_7_point_083_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2920,6 +3095,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hasmashosrt_2_stars(
         calendar: &ComplexZmanimCalendar,
@@ -2927,6 +3103,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_bain_hasmashosrt_2_stars().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hasmashosyereim_18_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2934,6 +3111,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_bain_hasmashosyereim_18_minutes().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hasmashosyereim_3_point_05_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2943,6 +3121,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hasmashosyereim_16_point_875_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2952,6 +3131,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hasmashosyereim_2_point_8_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2959,6 +3139,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_bain_hasmashosyereim_2_point_8_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hasmashosyereim_13_point_5_minutes(
         calendar: &ComplexZmanimCalendar,
@@ -2968,6 +3149,7 @@ pub mod complex_zmanim_calendar_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_bain_hasmashosyereim_2_point_1_degrees(
         calendar: &ComplexZmanimCalendar,
@@ -2975,6 +3157,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_bain_hasmashosyereim_2_point_1_degrees().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_sof_zman_tfilah_ateret_torah(
         calendar: &ComplexZmanimCalendar,
@@ -2982,6 +3165,7 @@ pub mod complex_zmanim_calendar_ffi {
         calendar.get_sof_zman_tfilah_ateret_torah().into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn complex_zmanim_calendar_get_fixed_local_chatzos_based_zmanim(
         calendar: &ComplexZmanimCalendar,

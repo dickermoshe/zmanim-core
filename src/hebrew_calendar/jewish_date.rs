@@ -605,6 +605,7 @@ pub mod jewish_date_ffi {
         }
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn jewish_date_data_from_timestamp(
         timestamp: i64,

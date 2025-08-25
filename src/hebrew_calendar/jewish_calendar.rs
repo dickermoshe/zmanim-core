@@ -871,7 +871,7 @@ impl JewishCalendarTrait for JewishCalendar {
 
 // FFI module - only compiled when FFI is needed
 #[cfg(feature = "ffi")]
-pub mod ffi {
+pub mod jewish_calendar_ffi {
     use super::*;
     use safer_ffi::{ffi_export, option::TaggedOption};
 
@@ -1003,6 +1003,7 @@ pub mod ffi {
         }
     }
 
+    #[no_mangle]
     #[ffi_export]
     pub fn jewish_calendar_data_from_timestamp(
         timestamp: i64,

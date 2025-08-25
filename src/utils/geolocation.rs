@@ -239,21 +239,25 @@ pub mod geolocation_ffi {
     use super::*;
     use safer_ffi::option::TaggedOption;
 
+    #[no_mangle]
     #[ffi_export]
     fn get_latitude(geo_location: &GeoLocation) -> f64 {
         geo_location.get_latitude()
     }
 
+    #[no_mangle]
     #[ffi_export]
     fn get_longitude(geo_location: &GeoLocation) -> f64 {
         geo_location.get_longitude()
     }
 
+    #[no_mangle]
     #[ffi_export]
     fn get_elevation(geo_location: &GeoLocation) -> f64 {
         geo_location.get_elevation()
     }
 
+    #[no_mangle]
     #[ffi_export]
     fn geodesic_initial_bearing(
         geo_location: &GeoLocation,
@@ -265,6 +269,7 @@ pub mod geolocation_ffi {
         }
     }
 
+    #[no_mangle]
     #[ffi_export]
     fn geodesic_final_bearing(
         geo_location: &GeoLocation,
@@ -276,6 +281,7 @@ pub mod geolocation_ffi {
         }
     }
 
+    #[no_mangle]
     #[ffi_export]
     fn geodesic_distance(geo_location: &GeoLocation, location: &GeoLocation) -> TaggedOption<f64> {
         match geo_location.geodesic_distance(location) {
@@ -284,16 +290,19 @@ pub mod geolocation_ffi {
         }
     }
 
+    #[no_mangle]
     #[ffi_export]
+
     fn rhumb_line_bearing(geo_location: &GeoLocation, location: &GeoLocation) -> f64 {
         geo_location.rhumb_line_bearing(location)
     }
 
+    #[no_mangle]
     #[ffi_export]
     fn rhumb_line_distance(geo_location: &GeoLocation, location: &GeoLocation) -> f64 {
         geo_location.rhumb_line_distance(location)
     }
-
+    #[no_mangle]
     #[ffi_export]
     fn geolocation_new(latitude: f64, longitude: f64, elevation: f64) -> TaggedOption<GeoLocation> {
         let result = GeoLocation::new(latitude, longitude, elevation);

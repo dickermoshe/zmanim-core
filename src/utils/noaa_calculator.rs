@@ -435,6 +435,7 @@ impl NOAACalculatorTrait for NOAACalculator {
 
 // Public functions for FFI
 
+#[no_mangle]
 #[ffi_export]
 fn get_utc_sunrise(
     calculator: &NOAACalculator,
@@ -448,6 +449,7 @@ fn get_utc_sunrise(
         .into()
 }
 
+#[no_mangle]
 #[ffi_export]
 fn get_utc_sunset(
     calculator: &NOAACalculator,
@@ -466,6 +468,7 @@ pub mod noaa_calculator_ffi {
     use super::*;
     use safer_ffi::option::TaggedOption;
 
+    #[no_mangle]
     #[ffi_export]
     fn get_solar_elevation(
         calculator: &NOAACalculator,
@@ -477,6 +480,7 @@ pub mod noaa_calculator_ffi {
             .into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     fn get_solar_azimuth(
         calculator: &NOAACalculator,
@@ -486,6 +490,7 @@ pub mod noaa_calculator_ffi {
         calculator.get_solar_azimuth(timestamp, geo_location).into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     fn get_utc_noon(
         calculator: &NOAACalculator,
@@ -495,6 +500,7 @@ pub mod noaa_calculator_ffi {
         calculator.get_utc_noon(timestamp, geo_location).into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     fn get_utc_midnight(
         calculator: &NOAACalculator,
@@ -504,6 +510,7 @@ pub mod noaa_calculator_ffi {
         calculator.get_utc_midnight(timestamp, geo_location).into()
     }
 
+    #[no_mangle]
     #[ffi_export]
     fn noaacalculator_new() -> NOAACalculator {
         NOAACalculator::new()
