@@ -9,19 +9,19 @@ pub struct YomiCalculator;
 
 impl YomiCalculator {
     const DAF_YOMI_START_DAY: &'static DateTime<Utc> = &NaiveDate::from_ymd_opt(1923, 9, 11)
-        .unwrap()
+        .expect("Invalid date for DAF_YOMI_START_DAY")
         .and_hms_opt(0, 0, 0)
-        .unwrap()
+        .expect("Invalid time for DAF_YOMI_START_DAY")
         .and_utc();
 
     const SHEKALIM_CHANGE_DAY: &'static DateTime<Utc> = &NaiveDate::from_ymd_opt(1975, 6, 24)
-        .unwrap()
+        .expect("Invalid date for SHEKALIM_CHANGE_DAY")
         .and_hms_opt(0, 0, 0)
-        .unwrap()
+        .expect("Invalid time for SHEKALIM_CHANGE_DAY")
         .and_utc();
 
     pub fn get_daf_yomi_bavli(timestamp: i64) -> Option<Daf> {
-        let date = DateTime::from_timestamp_millis(timestamp).unwrap();
+        let date = DateTime::from_timestamp_millis(timestamp)?;
 
         let daf_yomi_julian_start = get_julian_day(&Self::DAF_YOMI_START_DAY);
         let shekalim_julian_change = get_julian_day(&Self::SHEKALIM_CHANGE_DAY);

@@ -7,9 +7,7 @@ use zmanim_core::{
 
 use crate::{
     java::astronomical_calendar::AstronomicalCalendar as JavaAstronomicalCalendar,
-    test_utils::{
-        assert_almost_equal_f64, assert_almost_equal_i64_option, create_jvm, TestCase,
-    },
+    test_utils::{assert_almost_equal_f64, assert_almost_equal_i64_option, create_jvm, TestCase},
 };
 
 #[test]
@@ -27,26 +25,42 @@ fn test_astronomical_calendar() {
 
         let message = format!("test_case: {:?}", test_case);
         assert_almost_equal_f64(
-            rust_calendar.get_utc_sunset(test_case.zenith),
-            java_calendar.get_utc_sunset(test_case.zenith),
+            rust_calendar
+                .get_utc_sunset(test_case.zenith)
+                .expect(&message),
+            java_calendar
+                .get_utc_sunset(test_case.zenith)
+                .expect(&message),
             0.00000001,
             &message,
         );
         assert_almost_equal_f64(
-            rust_calendar.get_utc_sea_level_sunrise(test_case.zenith),
-            java_calendar.get_utc_sea_level_sunrise(test_case.zenith),
+            rust_calendar
+                .get_utc_sea_level_sunrise(test_case.zenith)
+                .expect(&message),
+            java_calendar
+                .get_utc_sea_level_sunrise(test_case.zenith)
+                .expect(&message),
             0.00000001,
             &message,
         );
         assert_almost_equal_f64(
-            rust_calendar.get_utc_sunrise(test_case.zenith),
-            java_calendar.get_utc_sunrise(test_case.zenith),
+            rust_calendar
+                .get_utc_sunrise(test_case.zenith)
+                .expect(&message),
+            java_calendar
+                .get_utc_sunrise(test_case.zenith)
+                .expect(&message),
             0.00000001,
             &message,
         );
         assert_almost_equal_f64(
-            rust_calendar.get_utc_sea_level_sunset(test_case.zenith),
-            java_calendar.get_utc_sea_level_sunset(test_case.zenith),
+            rust_calendar
+                .get_utc_sea_level_sunset(test_case.zenith)
+                .expect(&message),
+            java_calendar
+                .get_utc_sea_level_sunset(test_case.zenith)
+                .expect(&message),
             0.00000001,
             &message,
         );

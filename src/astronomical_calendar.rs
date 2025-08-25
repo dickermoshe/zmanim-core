@@ -19,10 +19,10 @@ const ASTRONOMICAL_ZENITH: f64 = 108.0;
 pub const MINUTE_MILLIS: i64 = 60 * 1000;
 
 pub trait AstronomicalCalendarTrait {
-    fn get_utc_sunset(&self, zenith: f64) -> f64;
-    fn get_utc_sunrise(&self, zenith: f64) -> f64;
-    fn get_utc_sea_level_sunrise(&self, zenith: f64) -> f64;
-    fn get_utc_sea_level_sunset(&self, zenith: f64) -> f64;
+    fn get_utc_sunset(&self, zenith: f64) -> Option<f64>;
+    fn get_utc_sunrise(&self, zenith: f64) -> Option<f64>;
+    fn get_utc_sea_level_sunrise(&self, zenith: f64) -> Option<f64>;
+    fn get_utc_sea_level_sunset(&self, zenith: f64) -> Option<f64>;
 
     fn get_sea_level_sunset(&self) -> Option<i64>;
     fn get_sunset(&self) -> Option<i64>;
@@ -67,37 +67,35 @@ impl<'a> AstronomicalCalendar<'a> {
 
         let mut calculated_time = time;
 
-        
         let adjusted_dt = DateTime::from_timestamp_millis(self.timestamp)?;
 
-        
-        let mut cal = Utc
-            .with_ymd_and_hms(
-                adjusted_dt.year(),
-                adjusted_dt.month(),
-                adjusted_dt.day(),
-                0,
-                0,
-                0,
-            )
-            .unwrap();
+        let cal_result = Utc.with_ymd_and_hms(
+            adjusted_dt.year(),
+            adjusted_dt.month(),
+            adjusted_dt.day(),
+            0,
+            0,
+            0,
+        );
 
-        
+        let mut cal = match cal_result {
+            chrono::LocalResult::Single(dt) => dt,
+            _ => return None,
+        };
+
         let hours = calculated_time as i32;
         calculated_time -= hours as f64;
 
-        calculated_time *= 60.0; 
+        calculated_time *= 60.0;
         let minutes = calculated_time as i32;
         calculated_time -= minutes as f64;
 
-        calculated_time *= 60.0; 
+        calculated_time *= 60.0;
         let seconds = calculated_time as i32;
         calculated_time -= seconds as f64;
 
-        
         let local_time_hours = (self.geo_location.get_longitude() / 15.0) as i32;
 
-        
         if solar_event == SolarEvent::Sunrise && local_time_hours + hours > 18 {
             cal = cal - chrono::Duration::days(1);
         } else if solar_event == SolarEvent::Sunset && local_time_hours + hours < 6 {
@@ -106,76 +104,74 @@ impl<'a> AstronomicalCalendar<'a> {
             cal = cal + chrono::Duration::days(1);
         }
 
-        
         cal = cal
             .with_hour(hours as u32)
             .and_then(|dt| dt.with_minute(minutes as u32))
             .and_then(|dt| dt.with_second(seconds as u32))
             .and_then(|dt| dt.with_nanosecond((calculated_time * 1_000_000_000.0) as u32))?;
 
-        
         Some(cal.timestamp_millis())
     }
 }
 
 impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
-    fn get_utc_sunset(&self, zenith: f64) -> f64 {
+    fn get_utc_sunset(&self, zenith: f64) -> Option<f64> {
         self.noaa_calculator
             .get_utc_sunset(self.timestamp, self.geo_location, zenith, true)
     }
 
-    fn get_utc_sunrise(&self, zenith: f64) -> f64 {
+    fn get_utc_sunrise(&self, zenith: f64) -> Option<f64> {
         self.noaa_calculator
             .get_utc_sunrise(self.timestamp, self.geo_location, zenith, true)
     }
 
-    fn get_utc_sea_level_sunrise(&self, zenith: f64) -> f64 {
+    fn get_utc_sea_level_sunrise(&self, zenith: f64) -> Option<f64> {
         self.noaa_calculator
             .get_utc_sunrise(self.timestamp, self.geo_location, zenith, false)
     }
 
-    fn get_utc_sea_level_sunset(&self, zenith: f64) -> f64 {
+    fn get_utc_sea_level_sunset(&self, zenith: f64) -> Option<f64> {
         self.noaa_calculator
             .get_utc_sunset(self.timestamp, self.geo_location, zenith, false)
     }
 
     fn get_sea_level_sunset(&self) -> Option<i64> {
-        let result = self.get_utc_sea_level_sunset(GEOMETRIC_ZENITH);
+        let result = self.get_utc_sea_level_sunset(GEOMETRIC_ZENITH)?;
         if result.is_nan() {
             return None;
         }
         return self.get_date_from_time(result, SolarEvent::Sunset);
     }
     fn get_sunset(&self) -> Option<i64> {
-        let result = self.get_utc_sunset(GEOMETRIC_ZENITH);
+        let result = self.get_utc_sunset(GEOMETRIC_ZENITH)?;
         if result.is_nan() {
             return None;
         }
         return self.get_date_from_time(result, SolarEvent::Sunset);
     }
     fn get_sunrise(&self) -> Option<i64> {
-        let result = self.get_utc_sunrise(GEOMETRIC_ZENITH);
+        let result = self.get_utc_sunrise(GEOMETRIC_ZENITH)?;
         if result.is_nan() {
             return None;
         }
         return self.get_date_from_time(result, SolarEvent::Sunrise);
     }
     fn get_sea_level_sunrise(&self) -> Option<i64> {
-        let result = self.get_utc_sea_level_sunrise(GEOMETRIC_ZENITH);
+        let result = self.get_utc_sea_level_sunrise(GEOMETRIC_ZENITH)?;
         if result.is_nan() {
             return None;
         }
         return self.get_date_from_time(result, SolarEvent::Sunrise);
     }
     fn get_sunrise_offset_by_degrees(&self, degrees: f64) -> Option<i64> {
-        let result = self.get_utc_sunrise(degrees);
+        let result = self.get_utc_sunrise(degrees)?;
         if result.is_nan() {
             return None;
         }
         return self.get_date_from_time(result, SolarEvent::Sunrise);
     }
     fn get_sunset_offset_by_degrees(&self, degrees: f64) -> Option<i64> {
-        let result = self.get_utc_sunset(degrees);
+        let result = self.get_utc_sunset(degrees)?;
         if result.is_nan() {
             return None;
         }
@@ -216,7 +212,7 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
     fn get_sun_transit(&self) -> Option<i64> {
         let noon = self
             .noaa_calculator
-            .get_utc_noon(self.timestamp, self.geo_location);
+            .get_utc_noon(self.timestamp, self.geo_location)?;
         if noon.is_nan() {
             return None;
         }
@@ -235,7 +231,7 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
     fn get_solar_midnight(&self) -> Option<i64> {
         let midnight = self
             .noaa_calculator
-            .get_utc_midnight(self.timestamp, self.geo_location);
+            .get_utc_midnight(self.timestamp, self.geo_location)?;
         if midnight.is_nan() {
             return None;
         }

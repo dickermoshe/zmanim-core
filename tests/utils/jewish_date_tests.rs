@@ -150,8 +150,26 @@ mod tests {
             );
 
             // Get molad from both implementations
-            let (rust_molad, rust_molad_data) = rust_date.get_molad();
-            let (java_molad, java_molad_data) = JewishDateTrait::get_molad(&java_date);
+            let rust_molad_result = rust_date.get_molad();
+            let java_molad_result = JewishDateTrait::get_molad(&java_date);
+
+            // Both should return Some values for valid dates
+            assert!(
+                rust_molad_result.is_some(),
+                "Rust get_molad returned None for timestamp: {}, tz_offset: {}",
+                timestamp,
+                tz_offset
+            );
+            assert!(
+                java_molad_result.is_some(),
+                "Java get_molad returned None for timestamp: {}, tz_offset: {}",
+                timestamp,
+                tz_offset
+            );
+
+            let message = format!("timestamp: {}, tz_offset: {}", timestamp, tz_offset);
+            let (rust_molad, rust_molad_data) = rust_molad_result.expect(&message);
+            let (java_molad, java_molad_data) = java_molad_result.expect(&message);
 
             // Compare molad dates
             assert_eq!(

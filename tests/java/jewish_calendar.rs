@@ -548,10 +548,10 @@ impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewi
 
     fn get_molad(
         &self,
-    ) -> (
+    ) -> Option<(
         impl zmanim_core::hebrew_calendar::JewishDateTrait,
         zmanim_core::hebrew_calendar::MoladData,
-    ) {
+    )> {
         let molad_date = self
             .jvm
             .invoke(&self.instance, "getMolad", InvocationArg::empty())
@@ -588,14 +588,14 @@ impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewi
             )
             .unwrap();
         let molad_chalakim: i64 = self.jvm.to_rust(molad_chalakim_result).unwrap();
-        (
+        Some((
             molad_date,
             zmanim_core::hebrew_calendar::MoladData {
                 hours: molad_hours,
                 minutes: molad_minutes,
                 chalakim: molad_chalakim,
             },
-        )
+        ))
     }
 }
 

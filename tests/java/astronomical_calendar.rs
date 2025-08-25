@@ -1,5 +1,5 @@
 use j4rs::{Instance, InvocationArg, Jvm, Null};
-use zmanim_core::{GeoLocationTrait, astronomical_calendar::AstronomicalCalendarTrait};
+use zmanim_core::{astronomical_calendar::AstronomicalCalendarTrait, GeoLocationTrait};
 
 use crate::java::{calendar::create_calendar, date::create_date, geolocation::JavaGeoLocation};
 
@@ -29,7 +29,7 @@ impl<'a> AstronomicalCalendar<'a> {
 }
 
 impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
-    fn get_utc_sunset(&self, zenith: f64) -> f64 {
+    fn get_utc_sunset(&self, zenith: f64) -> Option<f64> {
         let sunrise = self
             .jvm
             .invoke(
@@ -41,10 +41,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
                     .unwrap()],
             )
             .unwrap();
-        self.jvm.to_rust::<f64>(sunrise).unwrap()
+        Some(self.jvm.to_rust::<f64>(sunrise).unwrap())
     }
 
-    fn get_utc_sea_level_sunrise(&self, zenith: f64) -> f64 {
+    fn get_utc_sea_level_sunrise(&self, zenith: f64) -> Option<f64> {
         let result = self
             .jvm
             .invoke(
@@ -56,10 +56,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
                     .unwrap()],
             )
             .unwrap();
-        self.jvm.to_rust::<f64>(result).unwrap()
+        Some(self.jvm.to_rust::<f64>(result).unwrap())
     }
 
-    fn get_utc_sea_level_sunset(&self, zenith: f64) -> f64 {
+    fn get_utc_sea_level_sunset(&self, zenith: f64) -> Option<f64> {
         let result = self
             .jvm
             .invoke(
@@ -71,10 +71,10 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
                     .unwrap()],
             )
             .unwrap();
-        self.jvm.to_rust::<f64>(result).unwrap()
+        Some(self.jvm.to_rust::<f64>(result).unwrap())
     }
 
-    fn get_utc_sunrise(&self, zenith: f64) -> f64 {
+    fn get_utc_sunrise(&self, zenith: f64) -> Option<f64> {
         let result = self
             .jvm
             .invoke(
@@ -86,7 +86,7 @@ impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
                     .unwrap()],
             )
             .unwrap();
-        self.jvm.to_rust::<f64>(result).unwrap()
+        Some(self.jvm.to_rust::<f64>(result).unwrap())
     }
 
     fn get_sea_level_sunset(&self) -> Option<i64> {

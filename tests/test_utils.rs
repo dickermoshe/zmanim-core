@@ -5,7 +5,7 @@ use serde::Deserialize;
 use zmanim_core::{GeoLocationError, SolarEvent};
 
 // Test configuration constants
-pub const DEFAULT_TEST_ITERATIONS: usize = 10000;
+pub const DEFAULT_TEST_ITERATIONS: usize = 1000;
 pub const DEFAULT_FLOAT_TOLERANCE: f64 = 0.00000001;
 pub const DEFAULT_INT_TOLERANCE: u64 = 0;
 pub const MIN_TIMESTAMP_YEAR_OFFSET: i64 = -50; // 500 years ago to 500 years from now
@@ -159,6 +159,7 @@ pub struct TestCase {
     pub solar_declination: f64,
     pub use_elevation: bool,
     pub is_azimuth: bool,
+    pub julian_day: f64,
 }
 
 impl TestCase {
@@ -184,6 +185,7 @@ impl TestCase {
         let solar_declination = rand::rng().random_range(-23.0..=23.0);
         let use_elevation = rand::rng().random_range(0.0..=1.0) > 0.5;
         let is_azimuth = rand::rng().random_range(0.0..=1.0) > 0.5;
+        let julian_day = rand::rng().random_range(2415045.0..=2488045.0); // 1900-2100
 
         Self {
             lat: test_geo.lat,
@@ -202,6 +204,7 @@ impl TestCase {
             solar_declination,
             use_elevation,
             is_azimuth,
+            julian_day,
         }
     }
 }

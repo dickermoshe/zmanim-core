@@ -823,10 +823,8 @@ impl JewishCalendarTrait for JewishCalendar {
             .gregorian_date
             .year()
             .era_year_or_related_iso();
-        let timestamp = NaiveDate::from_ymd_opt(year, month as u32, day as u32)
-            .unwrap()
-            .and_hms_opt(0, 0, 0)
-            .unwrap()
+        let timestamp = NaiveDate::from_ymd_opt(year, month as u32, day as u32)?
+            .and_hms_opt(0, 0, 0)?
             .and_utc()
             .timestamp_millis();
         YomiCalculator::get_daf_yomi_bavli(timestamp)

@@ -267,14 +267,6 @@ mod tests {
             "{} - daf_yomi_bavli masechta",
             base_message
         );
-        // println!("rust_daf: {:?}", base_message);
-        // let rust_daf = rust_cal.get_daf_yomi_yerushalmi();
-        // let java_daf = java_cal.get_daf_yomi_yerushalmi();
-        // assert_eq!(
-        //     rust_daf, java_daf,
-        //     "{} - daf_yomi_yerushalmi masechta",
-        //     base_message
-        // );
     }
 
     #[test]
