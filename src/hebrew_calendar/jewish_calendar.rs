@@ -84,42 +84,76 @@ pub struct JewishCalendar {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Holiday {
+    #[allow(non_camel_case_types)]
     EREV_PESACH = 0,
     PESACH = 1,
+    #[allow(non_camel_case_types)]
     CHOL_HAMOED_PESACH = 2,
+    #[allow(non_camel_case_types)]
     PESACH_SHENI = 3,
+    #[allow(non_camel_case_types)]
     EREV_SHAVUOS = 4,
     SHAVUOS = 5,
+    #[allow(non_camel_case_types)]
     SEVENTEEN_OF_TAMMUZ = 6,
+    #[allow(non_camel_case_types)]
     TISHA_BEAV = 7,
+    #[allow(non_camel_case_types)]
     TU_BEAV = 8,
+    #[allow(non_camel_case_types)]
     EREV_ROSH_HASHANA = 9,
+    #[allow(non_camel_case_types)]
     ROSH_HASHANA = 10,
+    #[allow(non_camel_case_types)]
     FAST_OF_GEDALYAH = 11,
+    #[allow(non_camel_case_types)]
     EREV_YOM_KIPPUR = 12,
+    #[allow(non_camel_case_types)]
     YOM_KIPPUR = 13,
+    #[allow(non_camel_case_types)]
     EREV_SUCCOS = 14,
     SUCCOS = 15,
+    #[allow(non_camel_case_types)]
     CHOL_HAMOED_SUCCOS = 16,
+    #[allow(non_camel_case_types)]
     HOSHANA_RABBA = 17,
+    #[allow(non_camel_case_types)]
     SHEMINI_ATZERES = 18,
+    #[allow(non_camel_case_types)]
     SIMCHAS_TORAH = 19,
+    #[allow(non_camel_case_types)]
     CHANUKAH = 21,
+    #[allow(non_camel_case_types)]
     TENTH_OF_TEVES = 22,
+    #[allow(non_camel_case_types)]
     TU_BESHVAT = 23,
+    #[allow(non_camel_case_types)]
     FAST_OF_ESTHER = 24,
+    #[allow(non_camel_case_types)]
     PURIM = 25,
+    #[allow(non_camel_case_types)]
     SHUSHAN_PURIM = 26,
+    #[allow(non_camel_case_types)]
     PURIM_KATAN = 27,
+    #[allow(non_camel_case_types)]
     ROSH_CHODESH = 28,
+    #[allow(non_camel_case_types)]
     YOM_HASHOAH = 29,
+    #[allow(non_camel_case_types)]
     YOM_HAZIKARON = 30,
+    #[allow(non_camel_case_types)]
     YOM_HAATZMAUT = 31,
+    #[allow(non_camel_case_types)]
     YOM_YERUSHALAYIM = 32,
+    #[allow(non_camel_case_types)]
     LAG_BAOMER = 33,
+    #[allow(non_camel_case_types)]
     SHUSHAN_PURIM_KATAN = 34,
+    #[allow(non_camel_case_types)]
     ISRU_CHAG = 35,
+    #[allow(non_camel_case_types)]
     YOM_KIPPUR_KATAN = 36,
+    #[allow(non_camel_case_types)]
     BEHAB = 37,
 }
 
@@ -812,23 +846,23 @@ impl JewishCalendarTrait for JewishCalendar {
             JewishDate::get_jewish_calendar_elapsed_days(self.jewish_date.get_jewish_year()) % 7;
         let day = rosh_hashana_day_of_week + self.jewish_date.get_days_since_start_of_jewish_year();
         match year_type {
-            Some(0) => parsha_list_0[(day / 7) as usize],
-            Some(1) => parsha_list_1[(day / 7) as usize],
-            Some(2) => parsha_list_2[(day / 7) as usize],
-            Some(3) => parsha_list_3[(day / 7) as usize],
-            Some(4) => parsha_list_4[(day / 7) as usize],
-            Some(5) => parsha_list_5[(day / 7) as usize],
-            Some(6) => parsha_list_6[(day / 7) as usize],
-            Some(7) => parsha_list_7[(day / 7) as usize],
-            Some(8) => parsha_list_8[(day / 7) as usize],
-            Some(9) => parsha_list_9[(day / 7) as usize],
-            Some(10) => parsha_list_10[(day / 7) as usize],
-            Some(11) => parsha_list_11[(day / 7) as usize],
-            Some(12) => parsha_list_12[(day / 7) as usize],
-            Some(13) => parsha_list_13[(day / 7) as usize],
-            Some(14) => parsha_list_14[(day / 7) as usize],
-            Some(15) => parsha_list_15[(day / 7) as usize],
-            Some(16) => parsha_list_16[(day / 7) as usize],
+            Some(0) => PARSHA_LIST_0[(day / 7) as usize],
+            Some(1) => PARSHA_LIST_1[(day / 7) as usize],
+            Some(2) => PARSHA_LIST_2[(day / 7) as usize],
+            Some(3) => PARSHA_LIST_3[(day / 7) as usize],
+            Some(4) => PARSHA_LIST_4[(day / 7) as usize],
+            Some(5) => PARSHA_LIST_5[(day / 7) as usize],
+            Some(6) => PARSHA_LIST_6[(day / 7) as usize],
+            Some(7) => PARSHA_LIST_7[(day / 7) as usize],
+            Some(8) => PARSHA_LIST_8[(day / 7) as usize],
+            Some(9) => PARSHA_LIST_9[(day / 7) as usize],
+            Some(10) => PARSHA_LIST_10[(day / 7) as usize],
+            Some(11) => PARSHA_LIST_11[(day / 7) as usize],
+            Some(12) => PARSHA_LIST_12[(day / 7) as usize],
+            Some(13) => PARSHA_LIST_13[(day / 7) as usize],
+            Some(14) => PARSHA_LIST_14[(day / 7) as usize],
+            Some(15) => PARSHA_LIST_15[(day / 7) as usize],
+            Some(16) => PARSHA_LIST_16[(day / 7) as usize],
             _ => Parsha::NONE,
         }
     }

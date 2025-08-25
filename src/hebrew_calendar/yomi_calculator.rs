@@ -3,7 +3,7 @@ extern crate alloc;
 use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use libm::floor;
 
-use crate::hebrew_calendar::daf::{BavliTractate, Daf, Mesachta, YerushalmiTractate};
+use crate::hebrew_calendar::daf::{BavliTractate, Daf, Mesachta};
 
 pub struct YomiCalculator;
 
@@ -19,20 +19,6 @@ impl YomiCalculator {
         .and_hms_opt(0, 0, 0)
         .unwrap()
         .and_utc();
-
-    const YERUSHALMI_DAF_YOMI_START_DAY: &'static DateTime<Utc> =
-        &NaiveDate::from_ymd_opt(1980, 2, 2)
-            .unwrap()
-            .and_hms_opt(0, 0, 0)
-            .unwrap()
-            .and_utc();
-
-    const YERUSHALMI_WHOLE_SHAS_DAFS: i32 = 1554;
-
-    const YERUSHALMI_BLATT_PER_MASECHTA: [i32; 39] = [
-        68, 37, 34, 44, 31, 59, 26, 33, 28, 20, 13, 92, 65, 71, 22, 22, 42, 26, 26, 33, 34, 22, 19,
-        85, 72, 47, 40, 47, 54, 48, 44, 37, 34, 44, 9, 57, 37, 19, 13,
-    ];
 
     pub fn get_daf_yomi_bavli(timestamp: i64) -> Option<Daf> {
         let date = DateTime::from_timestamp_millis(timestamp).unwrap();
@@ -130,102 +116,6 @@ impl YomiCalculator {
         };
 
         Some(Daf::new(Mesachta::Bavli(tractate), blatt))
-    }
-
-    pub fn get_daf_yomi_yerushalmi(timestamp: i64) -> Option<Daf> {
-        let date = DateTime::from_timestamp_millis(timestamp).unwrap();
-
-        if date < *Self::YERUSHALMI_DAF_YOMI_START_DAY {
-            return None;
-        }
-
-        let mut next_cycle = *Self::YERUSHALMI_DAF_YOMI_START_DAY;
-        let mut prev_cycle = *Self::YERUSHALMI_DAF_YOMI_START_DAY;
-
-        while date > next_cycle {
-            prev_cycle = next_cycle;
-
-            next_cycle =
-                next_cycle + chrono::Duration::days(Self::YERUSHALMI_WHOLE_SHAS_DAFS as i64);
-            next_cycle = next_cycle
-                + chrono::Duration::days(
-                    Self::get_num_of_special_days(&prev_cycle, &next_cycle) as i64
-                );
-        }
-
-        let daf_no = Self::get_diff_between_days(&prev_cycle, &date);
-
-        let special_days = Self::get_num_of_special_days(&prev_cycle, &date);
-        let mut total = daf_no - special_days;
-
-        let mut masechta = 0;
-        for (i, &blatt_count) in Self::YERUSHALMI_BLATT_PER_MASECHTA.iter().enumerate() {
-            if total < blatt_count {
-                let tractate = Self::get_yerushalmi_tractate_by_index(i as i32);
-                return Some(Daf::new(Mesachta::Yerushalmi(tractate), total + 1));
-            }
-            total -= blatt_count;
-            masechta = i + 1;
-        }
-
-        None
-    }
-
-    fn get_num_of_special_days(start: &DateTime<Utc>, end: &DateTime<Utc>) -> i32 {
-        let days_diff = Self::get_diff_between_days(start, end);
-
-        let years_diff = days_diff / 365;
-        years_diff * 2
-    }
-
-    fn get_diff_between_days(start: &DateTime<Utc>, end: &DateTime<Utc>) -> i32 {
-        let duration = end.signed_duration_since(*start);
-        duration.num_days() as i32
-    }
-
-    fn get_yerushalmi_tractate_by_index(index: i32) -> YerushalmiTractate {
-        match index {
-            0 => YerushalmiTractate::Berachos,
-            1 => YerushalmiTractate::Peah,
-            2 => YerushalmiTractate::Demai,
-            3 => YerushalmiTractate::Kilayim,
-            4 => YerushalmiTractate::Sheviis,
-            5 => YerushalmiTractate::Terumos,
-            6 => YerushalmiTractate::Maasros,
-            7 => YerushalmiTractate::MaaserSheni,
-            8 => YerushalmiTractate::Chalah,
-            9 => YerushalmiTractate::Orlah,
-            10 => YerushalmiTractate::Bikurim,
-            11 => YerushalmiTractate::Shabbos,
-            12 => YerushalmiTractate::Eruvin,
-            13 => YerushalmiTractate::Pesachim,
-            14 => YerushalmiTractate::Beitzah,
-            15 => YerushalmiTractate::RoshHashanah,
-            16 => YerushalmiTractate::Yoma,
-            17 => YerushalmiTractate::Sukah,
-            18 => YerushalmiTractate::Taanis,
-            19 => YerushalmiTractate::Shekalim,
-            20 => YerushalmiTractate::Megilah,
-            21 => YerushalmiTractate::Chagigah,
-            22 => YerushalmiTractate::MoedKatan,
-            23 => YerushalmiTractate::Yevamos,
-            24 => YerushalmiTractate::Kesuvos,
-            25 => YerushalmiTractate::Sotah,
-            26 => YerushalmiTractate::Nedarim,
-            27 => YerushalmiTractate::Nazir,
-            28 => YerushalmiTractate::Gitin,
-            29 => YerushalmiTractate::Kidushin,
-            30 => YerushalmiTractate::BavaKama,
-            31 => YerushalmiTractate::BavaMetzia,
-            32 => YerushalmiTractate::BavaBasra,
-            33 => YerushalmiTractate::Shevuos,
-            34 => YerushalmiTractate::Makos,
-            35 => YerushalmiTractate::Sanhedrin,
-            36 => YerushalmiTractate::AvodahZarah,
-            37 => YerushalmiTractate::Horayos,
-            38 => YerushalmiTractate::Nidah,
-            _ => panic!("Invalid Yerushalmi masechta index: {}", index),
-        }
     }
 }
 

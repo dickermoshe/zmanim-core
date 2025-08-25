@@ -1,80 +1,95 @@
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Parsha {
-    NONE,
-    BERESHIS,
-    NOACH,
-    LECH_LECHA,
-    VAYERA,
-    CHAYEI_SARA,
-    TOLDOS,
-    VAYETZEI,
-    VAYISHLACH,
-    VAYESHEV,
-    MIKETZ,
-    VAYIGASH,
-    VAYECHI,
-    SHEMOS,
-    VAERA,
-    BO,
-    BESHALACH,
-    YISRO,
-    MISHPATIM,
-    TERUMAH,
-    TETZAVEH,
-    KI_SISA,
-    VAYAKHEL,
-    PEKUDEI,
-    VAYIKRA,
-    TZAV,
-    SHMINI,
-    TAZRIA,
-    METZORA,
-    ACHREI_MOS,
-    KEDOSHIM,
-    EMOR,
-    BEHAR,
-    BECHUKOSAI,
-    BAMIDBAR,
-    NASSO,
-    BEHAALOSCHA,
-    SHLACH,
-    KORACH,
-    CHUKAS,
-    BALAK,
-    PINCHAS,
-    MATOS,
-    MASEI,
-    DEVARIM,
-    VAESCHANAN,
-    EIKEV,
-    REEH,
-    SHOFTIM,
-    KI_SEITZEI,
-    KI_SAVO,
-    NITZAVIM,
-    VAYEILECH,
-    HAAZINU,
-    VZOS_HABERACHA,
-    VAYAKHEL_PEKUDEI,
-    TAZRIA_METZORA,
-    ACHREI_MOS_KEDOSHIM,
-    BEHAR_BECHUKOSAI,
-    CHUKAS_BALAK,
-    MATOS_MASEI,
-    NITZAVIM_VAYEILECH,
-    SHKALIM,
-    ZACHOR,
-    PARA,
-    HACHODESH,
-    SHUVA,
-    SHIRA,
-    HAGADOL,
-    CHAZON,
-    NACHAMU,
+    NONE = 0,
+    BERESHIS = 1,
+    NOACH = 2,
+    #[allow(non_camel_case_types)]
+    LECH_LECHA = 3,
+    VAYERA = 4,
+    #[allow(non_camel_case_types)]
+    CHAYEI_SARA = 5,
+    TOLDOS = 6,
+    VAYETZEI = 7,
+    VAYISHLACH = 8,
+    VAYESHEV = 9,
+    MIKETZ = 10,
+    VAYIGASH = 11,
+    VAYECHI = 12,
+    SHEMOS = 13,
+    VAERA = 14,
+    BO = 15,
+    BESHALACH = 16,
+    YISRO = 17,
+    MISHPATIM = 18,
+    TERUMAH = 19,
+    TETZAVEH = 20,
+    #[allow(non_camel_case_types)]
+    KI_SISA = 21,
+    VAYAKHEL = 22,
+    PEKUDEI = 23,
+    VAYIKRA = 24,
+    TZAV = 25,
+    SHMINI = 26,
+    TAZRIA = 27,
+    METZORA = 28,
+    #[allow(non_camel_case_types)]
+    ACHREI_MOS = 29,
+    KEDOSHIM = 30,
+    EMOR = 31,
+    BEHAR = 32,
+    BECHUKOSAI = 33,
+    BAMIDBAR = 34,
+    NASSO = 35,
+    BEHAALOSCHA = 36,
+    SHLACH = 37,
+    KORACH = 38,
+    CHUKAS = 39,
+    BALAK = 40,
+    PINCHAS = 41,
+    MATOS = 42,
+    MASEI = 43,
+    DEVARIM = 44,
+    VAESCHANAN = 45,
+    EIKEV = 46,
+    REEH = 47,
+    SHOFTIM = 48,
+    #[allow(non_camel_case_types)]
+    KI_SEITZEI = 49,
+    #[allow(non_camel_case_types)]
+    KI_SAVO = 50,
+    #[allow(non_camel_case_types)]
+    NITZAVIM = 51,
+    #[allow(non_camel_case_types)]
+    VAYEILECH = 52,
+    HAAZINU = 53,
+    #[allow(non_camel_case_types)]
+    VZOS_HABERACHA = 54,
+    #[allow(non_camel_case_types)]
+    VAYAKHEL_PEKUDEI = 55,
+    #[allow(non_camel_case_types)]
+    TAZRIA_METZORA = 56,
+    #[allow(non_camel_case_types)]
+    ACHREI_MOS_KEDOSHIM = 57,
+    #[allow(non_camel_case_types)]
+    BEHAR_BECHUKOSAI = 58,
+    #[allow(non_camel_case_types)]
+    CHUKAS_BALAK = 59,
+    #[allow(non_camel_case_types)]
+    MATOS_MASEI = 60,
+    #[allow(non_camel_case_types)]
+    NITZAVIM_VAYEILECH = 61,
+    SHKALIM = 62,
+    ZACHOR = 63,
+    PARA = 64,
+    HACHODESH = 65,
+    SHUVA = 66,
+    SHIRA = 67,
+    HAGADOL = 68,
+    CHAZON = 69,
+    NACHAMU = 70,
 }
 
-pub const parsha_list_0: [Parsha; 51] = [
+pub const PARSHA_LIST_0: [Parsha; 51] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -127,7 +142,7 @@ pub const parsha_list_0: [Parsha; 51] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const parsha_list_1: [Parsha; 51] = [
+pub const PARSHA_LIST_1: [Parsha; 51] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -180,7 +195,7 @@ pub const parsha_list_1: [Parsha; 51] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const parsha_list_2: [Parsha; 52] = [
+pub const PARSHA_LIST_2: [Parsha; 52] = [
     Parsha::NONE,
     Parsha::HAAZINU,
     Parsha::NONE,
@@ -234,7 +249,7 @@ pub const parsha_list_2: [Parsha; 52] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const parsha_list_3: [Parsha; 52] = [
+pub const PARSHA_LIST_3: [Parsha; 52] = [
     Parsha::NONE,
     Parsha::HAAZINU,
     Parsha::NONE,
@@ -288,7 +303,7 @@ pub const parsha_list_3: [Parsha; 52] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const parsha_list_4: [Parsha; 52] = [
+pub const PARSHA_LIST_4: [Parsha; 52] = [
     Parsha::NONE,
     Parsha::NONE,
     Parsha::HAAZINU,
@@ -342,7 +357,7 @@ pub const parsha_list_4: [Parsha; 52] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const parsha_list_5: [Parsha; 52] = [
+pub const PARSHA_LIST_5: [Parsha; 52] = [
     Parsha::NONE,
     Parsha::NONE,
     Parsha::HAAZINU,
@@ -396,7 +411,7 @@ pub const parsha_list_5: [Parsha; 52] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const parsha_list_6: [Parsha; 55] = [
+pub const PARSHA_LIST_6: [Parsha; 55] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -453,7 +468,7 @@ pub const parsha_list_6: [Parsha; 55] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const parsha_list_7: [Parsha; 56] = [
+pub const PARSHA_LIST_7: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -511,7 +526,7 @@ pub const parsha_list_7: [Parsha; 56] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const parsha_list_8: [Parsha; 56] = [
+pub const PARSHA_LIST_8: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::HAAZINU,
     Parsha::NONE,
@@ -569,7 +584,7 @@ pub const parsha_list_8: [Parsha; 56] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const parsha_list_9: [Parsha; 56] = [
+pub const PARSHA_LIST_9: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::HAAZINU,
     Parsha::NONE,
@@ -627,7 +642,7 @@ pub const parsha_list_9: [Parsha; 56] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const parsha_list_10: [Parsha; 56] = [
+pub const PARSHA_LIST_10: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::NONE,
     Parsha::HAAZINU,
@@ -685,7 +700,7 @@ pub const parsha_list_10: [Parsha; 56] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const parsha_list_11: [Parsha; 56] = [
+pub const PARSHA_LIST_11: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::NONE,
     Parsha::HAAZINU,
@@ -743,7 +758,7 @@ pub const parsha_list_11: [Parsha; 56] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const parsha_list_12: [Parsha; 51] = [
+pub const PARSHA_LIST_12: [Parsha; 51] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -796,7 +811,7 @@ pub const parsha_list_12: [Parsha; 51] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const parsha_list_13: [Parsha; 52] = [
+pub const PARSHA_LIST_13: [Parsha; 52] = [
     Parsha::NONE,
     Parsha::HAAZINU,
     Parsha::NONE,
@@ -850,7 +865,7 @@ pub const parsha_list_13: [Parsha; 52] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const parsha_list_14: [Parsha; 55] = [
+pub const PARSHA_LIST_14: [Parsha; 55] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -907,7 +922,7 @@ pub const parsha_list_14: [Parsha; 55] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const parsha_list_15: [Parsha; 56] = [
+pub const PARSHA_LIST_15: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -965,7 +980,7 @@ pub const parsha_list_15: [Parsha; 56] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const parsha_list_16: [Parsha; 56] = [
+pub const PARSHA_LIST_16: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::NONE,
     Parsha::HAAZINU,

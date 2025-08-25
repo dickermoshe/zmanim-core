@@ -5,8 +5,7 @@ use crate::{
         DEFAULT_TEST_ITERATIONS,
     },
 };
-use rand::Rng;
-use zmanim_core::{GeoLocation, NOAACalculator, NOAACalculatorTrait, SolarEvent};
+use zmanim_core::{GeoLocation, NOAACalculator, NOAACalculatorTrait};
 
 #[test]
 fn test_noaa_calculator() {
