@@ -174,7 +174,6 @@ impl JewishDateTrait for JewishDate {
 impl GetMoladTrait for JewishDate {
     fn get_molad(&self) -> Option<(impl JewishDateTrait, MoladData)> {
         self._get_molad()
-            .map(|(molad_date, molad_data)| (molad_date, molad_data))
     }
 }
 
