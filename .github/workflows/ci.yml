@@ -75,10 +75,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-      - name: Install Bindgen
-        run: uv tool install uniffi-bindgen
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -86,6 +82,8 @@ jobs:
           args: --release --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: musllinux_1_2
+          before-script-linux: |
+            pip install uniffi-bindgen
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
