@@ -209,8 +209,8 @@ impl JewishCalendar {
     ) -> Option<Self> {
         Some(Self {
             jewish_date: JewishDate::new(timestamp, tz_offset)?,
-            in_israel: in_israel,
-            use_modern_holidays: use_modern_holidays,
+            in_israel,
+            use_modern_holidays,
         })
     }
 
@@ -279,7 +279,7 @@ impl JewishCalendar {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     fn get_parsha_year_type(&self) -> Option<i32> {
@@ -406,22 +406,21 @@ impl JewishCalendarTrait for JewishCalendar {
                 if day == 15 || day == 21 || (!self.in_israel && (day == 16 || day == 22)) {
                     return Some(JewishHoliday::PESACH);
                 }
-                if day >= 17 && day <= 20 || day == 16 {
+                if (17..=20).contains(&day) || day == 16 {
                     return Some(JewishHoliday::CHOL_HAMOED_PESACH);
                 }
                 if day == 22 || day == 23 && !self.in_israel {
                     return Some(JewishHoliday::ISRU_CHAG);
                 }
-                if self.use_modern_holidays {
-                    if (day == 26 && day_of_week == DayOfWeek::Thursday)
+                if self.use_modern_holidays
+                    && ((day == 26 && day_of_week == DayOfWeek::Thursday)
                         || (day == 28 && day_of_week == DayOfWeek::Monday)
                         || (day == 27
                             && day_of_week != DayOfWeek::Sunday
-                            && day_of_week != DayOfWeek::Friday)
+                            && day_of_week != DayOfWeek::Friday))
                     {
                         return Some(JewishHoliday::YOM_HASHOAH);
                     }
-                }
             }
 
             JewishMonth::IYAR => {
@@ -508,7 +507,7 @@ impl JewishCalendarTrait for JewishCalendar {
                 if day == 15 || (day == 16 && !self.in_israel) {
                     return Some(JewishHoliday::SUCCOS);
                 }
-                if day >= 16 && day <= 20 {
+                if (16..=20).contains(&day) {
                     return Some(JewishHoliday::CHOL_HAMOED_SUCCOS);
                 }
                 if day == 21 {
@@ -608,7 +607,7 @@ impl JewishCalendarTrait for JewishCalendar {
         if holiday_index == Some(JewishHoliday::ISRU_CHAG) {
             return false;
         }
-        holiday_index != None
+        holiday_index.is_some()
     }
 
     fn is_yom_tov_assur_bemelacha(&self) -> bool {
@@ -773,12 +772,10 @@ impl JewishCalendarTrait for JewishCalendar {
 
         if month == date_constants::KISLEV as i32 {
             day - 24
+        } else if self.jewish_date.is_kislev_short() {
+            day + 5
         } else {
-            if self.jewish_date.is_kislev_short() {
-                day + 5
-            } else {
-                day + 6
-            }
+            day + 6
         }
     }
 

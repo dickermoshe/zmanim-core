@@ -46,10 +46,10 @@ pub trait GeoLocationTrait {
 
 impl GeoLocation {
     pub fn new(latitude: f64, longitude: f64, elevation: f64) -> Result<Self, GeoLocationError> {
-        if latitude > 90.0 || latitude < -90.0 {
+        if !(-90.0..=90.0).contains(&latitude) {
             return Err(GeoLocationError::InvalidLatitude);
         }
-        if longitude > 180.0 || longitude < -180.0 {
+        if !(-180.0..=180.0).contains(&longitude) {
             return Err(GeoLocationError::InvalidLongitude);
         }
         if elevation < 0.0 {

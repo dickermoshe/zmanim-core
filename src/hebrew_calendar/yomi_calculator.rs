@@ -23,8 +23,8 @@ impl YomiCalculator {
     pub(crate) fn get_daf_yomi_bavli(timestamp: i64) -> Option<BavliDaf> {
         let date = DateTime::from_timestamp_millis(timestamp)?;
 
-        let daf_yomi_julian_start = get_julian_day(&Self::DAF_YOMI_START_DAY);
-        let shekalim_julian_change = get_julian_day(&Self::SHEKALIM_CHANGE_DAY);
+        let daf_yomi_julian_start = get_julian_day(Self::DAF_YOMI_START_DAY);
+        let shekalim_julian_change = get_julian_day(Self::SHEKALIM_CHANGE_DAY);
 
         if date < *Self::DAF_YOMI_START_DAY {
             return None;
@@ -87,9 +87,9 @@ fn get_julian_day(date: &DateTime<Utc>) -> i32 {
     }
     let a = year / 100;
     let b = 2 - a + a / 4;
-    return (floor(365.25 * (year + 4716) as f64)
+    (floor(365.25 * (year + 4716) as f64)
         + floor(30.6001 * (month + 1) as f64)
         + day as f64
         + b as f64
-        - 1524.5) as i32;
+        - 1524.5) as i32
 }

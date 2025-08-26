@@ -100,11 +100,11 @@ impl AstronomicalCalendar {
         let local_time_hours = (self.geo_location.get_longitude() / 15.0) as i32;
 
         if solar_event == SolarEvent::Sunrise && local_time_hours + hours > 18 {
-            cal = cal - chrono::Duration::days(1);
+            cal -= chrono::Duration::days(1);
         } else if solar_event == SolarEvent::Sunset && local_time_hours + hours < 6 {
-            cal = cal + chrono::Duration::days(1);
+            cal += chrono::Duration::days(1);
         } else if solar_event == SolarEvent::Midnight && local_time_hours + hours < 12 {
-            cal = cal + chrono::Duration::days(1);
+            cal += chrono::Duration::days(1);
         }
 
         cal = cal
@@ -143,73 +143,72 @@ impl AstronomicalCalendarTrait for AstronomicalCalendar {
         if result.is_nan() {
             return None;
         }
-        return self.get_date_from_time(result, SolarEvent::Sunset);
+        self.get_date_from_time(result, SolarEvent::Sunset)
     }
     fn get_sunset(&self) -> Option<i64> {
         let result = self.get_utc_sunset(GEOMETRIC_ZENITH)?;
         if result.is_nan() {
             return None;
         }
-        return self.get_date_from_time(result, SolarEvent::Sunset);
+        self.get_date_from_time(result, SolarEvent::Sunset)
     }
     fn get_sunrise(&self) -> Option<i64> {
         let result = self.get_utc_sunrise(GEOMETRIC_ZENITH)?;
         if result.is_nan() {
             return None;
         }
-        return self.get_date_from_time(result, SolarEvent::Sunrise);
+        self.get_date_from_time(result, SolarEvent::Sunrise)
     }
     fn get_sea_level_sunrise(&self) -> Option<i64> {
         let result = self.get_utc_sea_level_sunrise(GEOMETRIC_ZENITH)?;
         if result.is_nan() {
             return None;
         }
-        return self.get_date_from_time(result, SolarEvent::Sunrise);
+        self.get_date_from_time(result, SolarEvent::Sunrise)
     }
     fn get_sunrise_offset_by_degrees(&self, degrees: f64) -> Option<i64> {
         let result = self.get_utc_sunrise(degrees)?;
         if result.is_nan() {
             return None;
         }
-        return self.get_date_from_time(result, SolarEvent::Sunrise);
+        self.get_date_from_time(result, SolarEvent::Sunrise)
     }
     fn get_sunset_offset_by_degrees(&self, degrees: f64) -> Option<i64> {
         let result = self.get_utc_sunset(degrees)?;
         if result.is_nan() {
             return None;
         }
-        return self.get_date_from_time(result, SolarEvent::Sunset);
+        self.get_date_from_time(result, SolarEvent::Sunset)
     }
     fn get_begin_civil_twilight(&self) -> Option<i64> {
-        return self.get_sunrise_offset_by_degrees(CIVIL_ZENITH);
+        self.get_sunrise_offset_by_degrees(CIVIL_ZENITH)
     }
     fn get_begin_nautical_twilight(&self) -> Option<i64> {
-        return self.get_sunrise_offset_by_degrees(NAUTICAL_ZENITH);
+        self.get_sunrise_offset_by_degrees(NAUTICAL_ZENITH)
     }
     fn get_begin_astronomical_twilight(&self) -> Option<i64> {
-        return self.get_sunrise_offset_by_degrees(ASTRONOMICAL_ZENITH);
+        self.get_sunrise_offset_by_degrees(ASTRONOMICAL_ZENITH)
     }
     fn get_end_civil_twilight(&self) -> Option<i64> {
-        return self.get_sunset_offset_by_degrees(CIVIL_ZENITH);
+        self.get_sunset_offset_by_degrees(CIVIL_ZENITH)
     }
     fn get_end_nautical_twilight(&self) -> Option<i64> {
-        return self.get_sunset_offset_by_degrees(NAUTICAL_ZENITH);
+        self.get_sunset_offset_by_degrees(NAUTICAL_ZENITH)
     }
     fn get_end_astronomical_twilight(&self) -> Option<i64> {
-        return self.get_sunset_offset_by_degrees(ASTRONOMICAL_ZENITH);
+        self.get_sunset_offset_by_degrees(ASTRONOMICAL_ZENITH)
     }
     fn get_temporal_hour(&self) -> Option<i64> {
         let sea_level_sunrise = self.get_sea_level_sunrise()?;
         let sea_level_sunset = self.get_sea_level_sunset()?;
-        return self
-            .get_temporal_hour_with_start_and_end_times(sea_level_sunrise, sea_level_sunset);
+        self.get_temporal_hour_with_start_and_end_times(sea_level_sunrise, sea_level_sunset)
     }
     fn get_temporal_hour_with_start_and_end_times(
         &self,
         start_time: i64,
         end_time: i64,
     ) -> Option<i64> {
-        return Some((end_time - start_time) as i64 / 12);
+        Some((end_time - start_time) / 12)
     }
 
     fn get_sun_transit(&self) -> Option<i64> {
@@ -219,7 +218,7 @@ impl AstronomicalCalendarTrait for AstronomicalCalendar {
         if noon.is_nan() {
             return None;
         }
-        return self.get_date_from_time(noon, SolarEvent::Noon);
+        self.get_date_from_time(noon, SolarEvent::Noon)
     }
     fn get_sun_transit_with_start_and_end_times(
         &self,
@@ -238,6 +237,6 @@ impl AstronomicalCalendarTrait for AstronomicalCalendar {
         if midnight.is_nan() {
             return None;
         }
-        return self.get_date_from_time(midnight, SolarEvent::Midnight);
+        self.get_date_from_time(midnight, SolarEvent::Midnight)
     }
 }

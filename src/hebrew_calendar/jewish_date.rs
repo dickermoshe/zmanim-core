@@ -167,7 +167,7 @@ impl JewishDate {
         let month = chrono_date.month();
         let day = chrono_date.day();
 
-        let gregorian_date = Date::try_new_gregorian(year as i32, month as u8, day as u8).ok()?;
+        let gregorian_date = Date::try_new_gregorian(year, month as u8, day as u8).ok()?;
         let hebrew_date = gregorian_date.to_calendar(Hebrew);
 
         Some(Self {
@@ -315,7 +315,7 @@ impl JewishDate {
             + ((7 * ((year - 1) % 19) + 1) / 19)
             + (month_of_year - 1);
 
-        date_constants::CHALAKIM_MOLAD_TOHU as i64
+        date_constants::CHALAKIM_MOLAD_TOHU
             + (date_constants::CHALAKIM_PER_MONTH * months_elapsed as i64)
     }
 
@@ -391,9 +391,9 @@ impl JewishDate {
     pub fn get_jewish_calendar_elapsed_days(year: i32) -> i32 {
         let chalakim_since =
             Self::get_chalakim_since_molad_tohu_static(year, date_constants::TISHREI.into());
-        let molad_day = (chalakim_since / date_constants::CHALAKIM_PER_DAY as i64) as i32;
+        let molad_day = (chalakim_since / date_constants::CHALAKIM_PER_DAY) as i32;
         let molad_parts =
-            (chalakim_since - molad_day as i64 * date_constants::CHALAKIM_PER_DAY as i64) as i32;
+            (chalakim_since - molad_day as i64 * date_constants::CHALAKIM_PER_DAY) as i32;
 
         Self::add_dechiyos(year, molad_day, molad_parts)
     }
@@ -433,7 +433,7 @@ impl JewishDate {
         }
     }
     fn molad_to_abs_date(chalakim: i64) -> i64 {
-        return date_constants::JEWISH_EPOCH + (chalakim / date_constants::CHALAKIM_PER_DAY as i64);
+        date_constants::JEWISH_EPOCH + (chalakim / date_constants::CHALAKIM_PER_DAY)
     }
     fn gregorian_date_to_abs_date(year: i64, month: i64, day_of_month: i64) -> i64 {
         let mut abs_date = day_of_month;

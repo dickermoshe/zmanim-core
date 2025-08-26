@@ -161,7 +161,8 @@ impl ZmanimCalendarTrait for ZmanimCalendar {
                 .get_sunrise_offset_by_degrees(GEOMETRIC_ZENITH + degrees)
         };
 
-        let result = match (sea_level_sunrise, sea_level_sunset, twilight) {
+        
+        match (sea_level_sunrise, sea_level_sunset, twilight) {
             (Some(sunrise), Some(sunset_time), Some(twilight_time)) => {
                 let shaah_zmanis = (sunset_time - sunrise) as f64 / 12.0;
                 let rise_set_to_twilight = if sunset {
@@ -172,8 +173,7 @@ impl ZmanimCalendarTrait for ZmanimCalendar {
                 Some(rise_set_to_twilight as f64 / shaah_zmanis)
             }
             _ => None,
-        };
-        result
+        }
     }
 
     fn get_half_day_based_zman(

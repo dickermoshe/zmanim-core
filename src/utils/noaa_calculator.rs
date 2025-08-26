@@ -31,15 +31,19 @@ pub enum SolarEvent {
     Midnight,
 }
 
+impl Default for NOAACalculator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NOAACalculator {
     pub fn new() -> Self {
         Self { __: 0 }
     }
 
     fn get_elevation_adjustment(&self, elevation: f64) -> f64 {
-        let elevation_adjustment =
-            acos(EARTH_RADIUS / (EARTH_RADIUS + (elevation / 1000.0))).to_degrees();
-        elevation_adjustment
+        acos(EARTH_RADIUS / (EARTH_RADIUS + (elevation / 1000.0))).to_degrees()
     }
     fn get_sun_rise_set_utc(
         &self,
@@ -104,7 +108,7 @@ impl NOAACalculator {
         let cos_zenith = sin(latitude.to_radians()) * sin(theta.to_radians())
             + cos(latitude.to_radians()) * cos(theta.to_radians()) * cos(hour_angle_rad);
 
-        let cos_zenith_clamped = cos_zenith.max(-1.0).min(1.0);
+        let cos_zenith_clamped = cos_zenith.clamp(-1.0, 1.0);
         let zenith = acos(cos_zenith_clamped).to_degrees();
 
         let az_denom = cos(latitude.to_radians()) * sin(zenith.to_radians());
@@ -116,16 +120,14 @@ impl NOAACalculator {
                     - sin(theta.to_radians()))
                     / az_denom;
 
-                let az_rad_clamped = az_rad.max(-1.0).min(1.0);
+                let az_rad_clamped = az_rad.clamp(-1.0, 1.0);
                 180.0
                     - acos(az_rad_clamped).to_degrees()
                         * if hour_angle_rad > 0.0 { -1.0 } else { 1.0 }
+            } else if latitude > 0.0 {
+                180.0
             } else {
-                if latitude > 0.0 {
-                    180.0
-                } else {
-                    0.0
-                }
+                0.0
             };
             Some(azimuth % 360.0)
         } else {
