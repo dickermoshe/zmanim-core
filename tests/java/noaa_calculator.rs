@@ -1,5 +1,5 @@
 use j4rs::{Instance, InvocationArg, Jvm};
-use zmanim_core::{GeoLocationTrait, NOAACalculatorTrait};
+use zmanim_core::prelude::*;
 
 use crate::java::{calendar::create_calendar, geolocation::JavaGeoLocation};
 

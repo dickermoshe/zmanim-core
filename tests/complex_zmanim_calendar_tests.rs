@@ -1,18 +1,11 @@
-use zmanim_core::{
-    astronomical_calendar::AstronomicalCalendarTrait,
-    complex_zmanim_calendar::{ComplexZmanimCalendar, ComplexZmanimCalendarTrait},
-    zmanim_calendar::ZmanimCalendarTrait,
-    GeoLocation,
-};
+mod test_utils;
+use test_utils::*;
 
-use crate::{
-    java::{
-        complex_zmanim_calendar::JavaComplexZmanimCalendar, noaa_calculator::JavaNOAACalculator,
-    },
-    test_utils::{
-        assert_almost_equal_i64, assert_almost_equal_i64_option, create_jvm, TestCase,
-        DEFAULT_TEST_ITERATIONS,
-    },
+mod java;
+use zmanim_core::prelude::*;
+
+use crate::java::{
+    complex_zmanim_calendar::JavaComplexZmanimCalendar, noaa_calculator::JavaNOAACalculator,
 };
 
 #[test]
@@ -45,7 +38,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
 
         let message = format!("Passed {passed_tests} - test_case: {:?}", test_case);
 
-        // Test Shaah Zmanis methods
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.get_shaah_zmanis_19_point_8_degrees(),
             &java_complex_zmanim_calendar.get_shaah_zmanis_19_point_8_degrees(),
@@ -102,7 +94,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Test Alos methods
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.get_alos_60(),
             &java_complex_zmanim_calendar.get_alos_60(),
@@ -180,7 +171,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Test Misheyakir methods
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.get_misheyakir_11_point_5_degrees(),
             &java_complex_zmanim_calendar.get_misheyakir_11_point_5_degrees(),
@@ -216,7 +206,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Test Sof Zman Shma methods
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.get_sof_zman_shma_mga_19_point_8_degrees(),
             &java_complex_zmanim_calendar.get_sof_zman_shma_mga_19_point_8_degrees(),
@@ -273,7 +262,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Test Sof Zman Tfila methods
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.get_sof_zman_tfila_mga_19_point_8_degrees(),
             &java_complex_zmanim_calendar.get_sof_zman_tfila_mga_19_point_8_degrees(),
@@ -316,7 +304,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Test Tzais methods
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.get_tzais_geonim_3_point_7_degrees(),
             &java_complex_zmanim_calendar.get_tzais_geonim_3_point_7_degrees(),
@@ -415,7 +402,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Test inherited ZmanimCalendarTrait methods through composition
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.zmanim_calendar.get_tzais(),
             &java_complex_zmanim_calendar.get_tzais(),
@@ -455,7 +441,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Test inherited AstronomicalCalendarTrait methods through composition
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar
                 .zmanim_calendar
@@ -496,7 +481,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Test Ateret Torah offset
         assert_almost_equal_i64(
             complex_zmanim_calendar.get_ateret_torah_sunset_offset(),
             java_complex_zmanim_calendar.get_ateret_torah_sunset_offset(),
@@ -504,7 +488,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Test Mincha Gedola methods
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.get_mincha_gedola_30_minutes(),
             &java_complex_zmanim_calendar.get_mincha_gedola_30_minutes(),
@@ -547,7 +530,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Test Bain Hashmashos methods
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.get_bain_hashmashos_rt_13_point_24_degrees(),
             &java_complex_zmanim_calendar.get_bain_hashmashos_rt_13_point_24_degrees(),
@@ -583,7 +565,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Additional tzais methods from the second comprehensive test
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.get_tzais_geonim_4_point_37_degrees(),
             &java_complex_zmanim_calendar.get_tzais_geonim_4_point_37_degrees(),
@@ -654,7 +635,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Test time-based tzais
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.get_tzais_50(),
             &java_complex_zmanim_calendar.get_tzais_50(),
@@ -662,7 +642,6 @@ fn test_complex_zmanim_calendar_comprehensive() {
             &message,
         );
 
-        // Test deprecated methods
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar.get_tzais_geonim_3_point_65_degrees(),
             &java_complex_zmanim_calendar.get_tzais_geonim_3_point_65_degrees(),

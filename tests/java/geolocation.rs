@@ -1,5 +1,8 @@
 use j4rs::{Instance, InvocationArg, Jvm};
-use zmanim_core::{GeoLocation, GeoLocationTrait};
+use zmanim_core::{
+    prelude::*,
+    utils::geolocation::{Formula, GeoLocationError},
+};
 
 use crate::java::timezone::create_timezone;
 
@@ -54,38 +57,29 @@ impl<'a> JavaGeoLocation<'a> {
 }
 
 impl<'a> GeoLocationTrait for JavaGeoLocation<'a> {
-    fn geodesic_initial_bearing(
-        &self,
-        location: &GeoLocation,
-    ) -> Result<f64, zmanim_core::GeoLocationError> {
+    fn geodesic_initial_bearing(&self, location: &GeoLocation) -> Result<f64, GeoLocationError> {
         let result = self.invoke_with_geolocation("getGeodesicInitialBearing", location);
         if result.is_nan() {
-            Err(zmanim_core::GeoLocationError::FormulaError)
+            Err(GeoLocationError::FormulaError)
         } else {
             Ok(result)
         }
     }
 
-    fn geodesic_final_bearing(
-        &self,
-        location: &GeoLocation,
-    ) -> Result<f64, zmanim_core::GeoLocationError> {
+    fn geodesic_final_bearing(&self, location: &GeoLocation) -> Result<f64, GeoLocationError> {
         let result = self.invoke_with_geolocation("getGeodesicFinalBearing", location);
         if result.is_nan() {
-            Err(zmanim_core::GeoLocationError::FormulaError)
+            Err(GeoLocationError::FormulaError)
         } else {
             Ok(result)
         }
     }
 
-    fn geodesic_distance(
-        &self,
-        location: &GeoLocation,
-    ) -> Result<f64, zmanim_core::GeoLocationError> {
+    fn geodesic_distance(&self, location: &GeoLocation) -> Result<f64, GeoLocationError> {
         let result = self.invoke_with_geolocation("getGeodesicDistance", location);
 
         if result.is_nan() {
-            Err(zmanim_core::GeoLocationError::FormulaError)
+            Err(GeoLocationError::FormulaError)
         } else {
             Ok(result)
         }
@@ -102,13 +96,13 @@ impl<'a> GeoLocationTrait for JavaGeoLocation<'a> {
     fn vincenty_inverse_formula(
         &self,
         location: &GeoLocation,
-        formula: zmanim_core::Formula,
-    ) -> Result<f64, zmanim_core::GeoLocationError> {
+        formula: Formula,
+    ) -> Result<f64, GeoLocationError> {
         let java_other = JavaGeoLocation::new(&self.jvm, location);
         let formula_arg = match formula {
-            zmanim_core::Formula::Distance => 0,
-            zmanim_core::Formula::InitialBearing => 1,
-            zmanim_core::Formula::FinalBearing => 2,
+            Formula::Distance => 0,
+            Formula::InitialBearing => 1,
+            Formula::FinalBearing => 2,
         };
         let instance = self
             .jvm
@@ -126,7 +120,7 @@ impl<'a> GeoLocationTrait for JavaGeoLocation<'a> {
             .unwrap();
         let result = self.jvm.to_rust::<f64>(instance).unwrap();
         if result.is_nan() {
-            Err(zmanim_core::GeoLocationError::FormulaError)
+            Err(GeoLocationError::FormulaError)
         } else {
             Ok(result)
         }

@@ -6,11 +6,7 @@ pub struct JavaJewishCalendar<'a> {
 }
 
 use j4rs::{Instance, InvocationArg, Jvm};
-use zmanim_core::hebrew_calendar::daf::BavliDaf;
-use zmanim_core::hebrew_calendar::parsha::Parsha;
-use zmanim_core::hebrew_calendar::{
-    BavliTractate, DayOfWeek, Holiday, JewishCalendarTrait, JewishMonth,
-};
+use zmanim_core::prelude::*;
 
 use crate::java::calendar::create_calendar;
 
@@ -23,7 +19,7 @@ impl Clone for JavaJewishCalendar<'_> {
 }
 
 impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
-    fn get_yom_tov_index(&self) -> Option<Holiday> {
+    fn get_yom_tov_index(&self) -> Option<JewishHoliday> {
         let result = self
             .jvm
             .invoke(&self.instance, "getYomTovIndex", InvocationArg::empty())
@@ -32,7 +28,7 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
         if index == -1 {
             None
         } else {
-            Some(Holiday::from_index(index))
+            Some(JewishHoliday::from_index(index))
         }
     }
 

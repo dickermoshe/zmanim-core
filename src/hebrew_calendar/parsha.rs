@@ -1,7 +1,4 @@
-use safer_ffi::derive_ReprC;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive_ReprC]
 #[repr(u8)]
 pub enum Parsha {
     NONE = 0,
@@ -93,7 +90,7 @@ pub enum Parsha {
     NACHAMU = 70,
 }
 
-pub const PARSHA_LIST_0: [Parsha; 51] = [
+pub(crate) const PARSHA_LIST_0: [Parsha; 51] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -146,7 +143,7 @@ pub const PARSHA_LIST_0: [Parsha; 51] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const PARSHA_LIST_1: [Parsha; 51] = [
+pub(crate) const PARSHA_LIST_1: [Parsha; 51] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -199,7 +196,7 @@ pub const PARSHA_LIST_1: [Parsha; 51] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const PARSHA_LIST_2: [Parsha; 52] = [
+pub(crate) const PARSHA_LIST_2: [Parsha; 52] = [
     Parsha::NONE,
     Parsha::HAAZINU,
     Parsha::NONE,
@@ -253,7 +250,7 @@ pub const PARSHA_LIST_2: [Parsha; 52] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const PARSHA_LIST_3: [Parsha; 52] = [
+pub(crate) const PARSHA_LIST_3: [Parsha; 52] = [
     Parsha::NONE,
     Parsha::HAAZINU,
     Parsha::NONE,
@@ -307,7 +304,7 @@ pub const PARSHA_LIST_3: [Parsha; 52] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const PARSHA_LIST_4: [Parsha; 52] = [
+pub(crate) const PARSHA_LIST_4: [Parsha; 52] = [
     Parsha::NONE,
     Parsha::NONE,
     Parsha::HAAZINU,
@@ -361,7 +358,7 @@ pub const PARSHA_LIST_4: [Parsha; 52] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const PARSHA_LIST_5: [Parsha; 52] = [
+pub(crate) const PARSHA_LIST_5: [Parsha; 52] = [
     Parsha::NONE,
     Parsha::NONE,
     Parsha::HAAZINU,
@@ -415,7 +412,7 @@ pub const PARSHA_LIST_5: [Parsha; 52] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const PARSHA_LIST_6: [Parsha; 55] = [
+pub(crate) const PARSHA_LIST_6: [Parsha; 55] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -530,7 +527,7 @@ pub const PARSHA_LIST_7: [Parsha; 56] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const PARSHA_LIST_8: [Parsha; 56] = [
+pub(crate) const PARSHA_LIST_8: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::HAAZINU,
     Parsha::NONE,
@@ -588,7 +585,7 @@ pub const PARSHA_LIST_8: [Parsha; 56] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const PARSHA_LIST_9: [Parsha; 56] = [
+pub(crate) const PARSHA_LIST_9: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::HAAZINU,
     Parsha::NONE,
@@ -646,7 +643,7 @@ pub const PARSHA_LIST_9: [Parsha; 56] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const PARSHA_LIST_10: [Parsha; 56] = [
+pub(crate) const PARSHA_LIST_10: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::NONE,
     Parsha::HAAZINU,
@@ -704,7 +701,7 @@ pub const PARSHA_LIST_10: [Parsha; 56] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const PARSHA_LIST_11: [Parsha; 56] = [
+pub(crate) const PARSHA_LIST_11: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::NONE,
     Parsha::HAAZINU,
@@ -762,7 +759,7 @@ pub const PARSHA_LIST_11: [Parsha; 56] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const PARSHA_LIST_12: [Parsha; 51] = [
+pub(crate) const PARSHA_LIST_12: [Parsha; 51] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -815,7 +812,7 @@ pub const PARSHA_LIST_12: [Parsha; 51] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const PARSHA_LIST_13: [Parsha; 52] = [
+pub(crate) const PARSHA_LIST_13: [Parsha; 52] = [
     Parsha::NONE,
     Parsha::HAAZINU,
     Parsha::NONE,
@@ -869,7 +866,7 @@ pub const PARSHA_LIST_13: [Parsha; 52] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const PARSHA_LIST_14: [Parsha; 55] = [
+pub(crate) const PARSHA_LIST_14: [Parsha; 55] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -926,7 +923,7 @@ pub const PARSHA_LIST_14: [Parsha; 55] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM_VAYEILECH,
 ];
-pub const PARSHA_LIST_15: [Parsha; 56] = [
+pub(crate) const PARSHA_LIST_15: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::VAYEILECH,
     Parsha::HAAZINU,
@@ -984,7 +981,7 @@ pub const PARSHA_LIST_15: [Parsha; 56] = [
     Parsha::KI_SAVO,
     Parsha::NITZAVIM,
 ];
-pub const PARSHA_LIST_16: [Parsha; 56] = [
+pub(crate) const PARSHA_LIST_16: [Parsha; 56] = [
     Parsha::NONE,
     Parsha::NONE,
     Parsha::HAAZINU,

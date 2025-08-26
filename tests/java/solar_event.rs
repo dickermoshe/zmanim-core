@@ -1,5 +1,5 @@
 use j4rs::{Instance, Jvm};
-use zmanim_core::SolarEvent;
+use zmanim_core::prelude::*;
 
 pub fn create_solar_event(jvm: &Jvm, solar_event: SolarEvent) -> Instance {
     let string = match solar_event {

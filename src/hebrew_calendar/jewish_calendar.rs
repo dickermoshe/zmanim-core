@@ -1,13 +1,15 @@
 use chrono::NaiveDate;
-use safer_ffi::derive_ReprC;
 
-use crate::hebrew_calendar::{parsha::*, YomiCalculator};
+use serde::{Deserialize, Serialize};
+
+use crate::hebrew_calendar::parsha::*;
+use crate::hebrew_calendar::yomi_calculator::YomiCalculator;
 
 use super::daf::BavliDaf;
 use super::jewish_date::{date_constants, DayOfWeek, JewishDate, JewishDateTrait, JewishMonth};
 
 pub trait JewishCalendarTrait {
-    fn get_yom_tov_index(&self) -> Option<Holiday>;
+    fn get_yom_tov_index(&self) -> Option<JewishHoliday>;
 
     fn is_yom_tov(&self) -> bool;
 
@@ -70,12 +72,6 @@ pub trait JewishCalendarTrait {
     fn get_parshah(&self) -> Parsha;
 }
 
-pub trait JewishCalendarConfig {
-    fn get_in_israel(&self) -> bool;
-
-    fn get_use_modern_holidays(&self) -> bool;
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JewishCalendar {
     pub jewish_date: JewishDate,
@@ -83,10 +79,9 @@ pub struct JewishCalendar {
     pub use_modern_holidays: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive_ReprC]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-pub enum Holiday {
+pub enum JewishHoliday {
     #[allow(non_camel_case_types)]
     EREV_PESACH = 0,
     PESACH = 1,
@@ -160,46 +155,46 @@ pub enum Holiday {
     BEHAB = 37,
 }
 
-impl Holiday {
+impl JewishHoliday {
     pub fn from_index(value: i32) -> Self {
         match value {
-            0 => Holiday::EREV_PESACH,
-            1 => Holiday::PESACH,
-            2 => Holiday::CHOL_HAMOED_PESACH,
-            3 => Holiday::PESACH_SHENI,
-            4 => Holiday::EREV_SHAVUOS,
-            5 => Holiday::SHAVUOS,
-            6 => Holiday::SEVENTEEN_OF_TAMMUZ,
-            7 => Holiday::TISHA_BEAV,
-            8 => Holiday::TU_BEAV,
-            9 => Holiday::EREV_ROSH_HASHANA,
-            10 => Holiday::ROSH_HASHANA,
-            11 => Holiday::FAST_OF_GEDALYAH,
-            12 => Holiday::EREV_YOM_KIPPUR,
-            13 => Holiday::YOM_KIPPUR,
-            14 => Holiday::EREV_SUCCOS,
-            15 => Holiday::SUCCOS,
-            16 => Holiday::CHOL_HAMOED_SUCCOS,
-            17 => Holiday::HOSHANA_RABBA,
-            18 => Holiday::SHEMINI_ATZERES,
-            19 => Holiday::SIMCHAS_TORAH,
-            21 => Holiday::CHANUKAH,
-            22 => Holiday::TENTH_OF_TEVES,
-            23 => Holiday::TU_BESHVAT,
-            24 => Holiday::FAST_OF_ESTHER,
-            25 => Holiday::PURIM,
-            26 => Holiday::SHUSHAN_PURIM,
-            27 => Holiday::PURIM_KATAN,
-            28 => Holiday::ROSH_CHODESH,
-            29 => Holiday::YOM_HASHOAH,
-            30 => Holiday::YOM_HAZIKARON,
-            31 => Holiday::YOM_HAATZMAUT,
-            32 => Holiday::YOM_YERUSHALAYIM,
-            33 => Holiday::LAG_BAOMER,
-            34 => Holiday::SHUSHAN_PURIM_KATAN,
-            35 => Holiday::ISRU_CHAG,
-            36 => Holiday::YOM_KIPPUR_KATAN,
-            37 => Holiday::BEHAB,
+            0 => JewishHoliday::EREV_PESACH,
+            1 => JewishHoliday::PESACH,
+            2 => JewishHoliday::CHOL_HAMOED_PESACH,
+            3 => JewishHoliday::PESACH_SHENI,
+            4 => JewishHoliday::EREV_SHAVUOS,
+            5 => JewishHoliday::SHAVUOS,
+            6 => JewishHoliday::SEVENTEEN_OF_TAMMUZ,
+            7 => JewishHoliday::TISHA_BEAV,
+            8 => JewishHoliday::TU_BEAV,
+            9 => JewishHoliday::EREV_ROSH_HASHANA,
+            10 => JewishHoliday::ROSH_HASHANA,
+            11 => JewishHoliday::FAST_OF_GEDALYAH,
+            12 => JewishHoliday::EREV_YOM_KIPPUR,
+            13 => JewishHoliday::YOM_KIPPUR,
+            14 => JewishHoliday::EREV_SUCCOS,
+            15 => JewishHoliday::SUCCOS,
+            16 => JewishHoliday::CHOL_HAMOED_SUCCOS,
+            17 => JewishHoliday::HOSHANA_RABBA,
+            18 => JewishHoliday::SHEMINI_ATZERES,
+            19 => JewishHoliday::SIMCHAS_TORAH,
+            21 => JewishHoliday::CHANUKAH,
+            22 => JewishHoliday::TENTH_OF_TEVES,
+            23 => JewishHoliday::TU_BESHVAT,
+            24 => JewishHoliday::FAST_OF_ESTHER,
+            25 => JewishHoliday::PURIM,
+            26 => JewishHoliday::SHUSHAN_PURIM,
+            27 => JewishHoliday::PURIM_KATAN,
+            28 => JewishHoliday::ROSH_CHODESH,
+            29 => JewishHoliday::YOM_HASHOAH,
+            30 => JewishHoliday::YOM_HAZIKARON,
+            31 => JewishHoliday::YOM_HAATZMAUT,
+            32 => JewishHoliday::YOM_YERUSHALAYIM,
+            33 => JewishHoliday::LAG_BAOMER,
+            34 => JewishHoliday::SHUSHAN_PURIM_KATAN,
+            35 => JewishHoliday::ISRU_CHAG,
+            36 => JewishHoliday::YOM_KIPPUR_KATAN,
+            37 => JewishHoliday::BEHAB,
             _ => panic!("Invalid holiday index: {}", value),
         }
     }
@@ -228,10 +223,10 @@ impl JewishCalendar {
     pub fn is_yom_tov(&self) -> bool {
         let holiday_index = self.get_yom_tov_index();
         if (self.is_erev_yom_tov()
-            && !(holiday_index == Some(Holiday::HOSHANA_RABBA)
-                || holiday_index == Some(Holiday::CHOL_HAMOED_PESACH)))
-            || (self.is_taanis() && holiday_index != Some(Holiday::YOM_KIPPUR))
-            || holiday_index == Some(Holiday::ISRU_CHAG)
+            && !(holiday_index == Some(JewishHoliday::HOSHANA_RABBA)
+                || holiday_index == Some(JewishHoliday::CHOL_HAMOED_PESACH)))
+            || (self.is_taanis() && holiday_index != Some(JewishHoliday::YOM_KIPPUR))
+            || holiday_index == Some(JewishHoliday::ISRU_CHAG)
         {
             return false;
         }
@@ -242,13 +237,13 @@ impl JewishCalendar {
         let holiday_index = self.get_yom_tov_index();
         matches!(
             holiday_index,
-            Some(Holiday::PESACH)
-                | Some(Holiday::SHAVUOS)
-                | Some(Holiday::SUCCOS)
-                | Some(Holiday::SHEMINI_ATZERES)
-                | Some(Holiday::SIMCHAS_TORAH)
-                | Some(Holiday::ROSH_HASHANA)
-                | Some(Holiday::YOM_KIPPUR)
+            Some(JewishHoliday::PESACH)
+                | Some(JewishHoliday::SHAVUOS)
+                | Some(JewishHoliday::SUCCOS)
+                | Some(JewishHoliday::SHEMINI_ATZERES)
+                | Some(JewishHoliday::SIMCHAS_TORAH)
+                | Some(JewishHoliday::ROSH_HASHANA)
+                | Some(JewishHoliday::YOM_KIPPUR)
         )
     }
 
@@ -398,7 +393,7 @@ impl JewishCalendar {
 }
 
 impl JewishCalendarTrait for JewishCalendar {
-    fn get_yom_tov_index(&self) -> Option<Holiday> {
+    fn get_yom_tov_index(&self) -> Option<JewishHoliday> {
         let day = self.jewish_date.get_jewish_day_of_month();
         let day_of_week = self.jewish_date.get_day_of_week();
         let month = self.jewish_date.get_jewish_month();
@@ -406,16 +401,16 @@ impl JewishCalendarTrait for JewishCalendar {
         match month {
             JewishMonth::NISSAN => {
                 if day == 14 {
-                    return Some(Holiday::EREV_PESACH);
+                    return Some(JewishHoliday::EREV_PESACH);
                 }
                 if day == 15 || day == 21 || (!self.in_israel && (day == 16 || day == 22)) {
-                    return Some(Holiday::PESACH);
+                    return Some(JewishHoliday::PESACH);
                 }
                 if day >= 17 && day <= 20 || day == 16 {
-                    return Some(Holiday::CHOL_HAMOED_PESACH);
+                    return Some(JewishHoliday::CHOL_HAMOED_PESACH);
                 }
                 if day == 22 || day == 23 && !self.in_israel {
-                    return Some(Holiday::ISRU_CHAG);
+                    return Some(JewishHoliday::ISRU_CHAG);
                 }
                 if self.use_modern_holidays {
                     if (day == 26 && day_of_week == DayOfWeek::Thursday)
@@ -424,7 +419,7 @@ impl JewishCalendarTrait for JewishCalendar {
                             && day_of_week != DayOfWeek::Sunday
                             && day_of_week != DayOfWeek::Friday)
                     {
-                        return Some(Holiday::YOM_HASHOAH);
+                        return Some(JewishHoliday::YOM_HASHOAH);
                     }
                 }
             }
@@ -435,35 +430,35 @@ impl JewishCalendarTrait for JewishCalendar {
                         || ((day == 3 || day == 2) && day_of_week == DayOfWeek::Wednesday)
                         || (day == 5 && day_of_week == DayOfWeek::Monday)
                     {
-                        return Some(Holiday::YOM_HAZIKARON);
+                        return Some(JewishHoliday::YOM_HAZIKARON);
                     }
                     if (day == 5 && day_of_week == DayOfWeek::Wednesday)
                         || ((day == 4 || day == 3) && day_of_week == DayOfWeek::Thursday)
                         || (day == 6 && day_of_week == DayOfWeek::Tuesday)
                     {
-                        return Some(Holiday::YOM_HAATZMAUT);
+                        return Some(JewishHoliday::YOM_HAATZMAUT);
                     }
                 }
                 if day == 14 {
-                    return Some(Holiday::PESACH_SHENI);
+                    return Some(JewishHoliday::PESACH_SHENI);
                 }
                 if day == 18 {
-                    return Some(Holiday::LAG_BAOMER);
+                    return Some(JewishHoliday::LAG_BAOMER);
                 }
                 if self.use_modern_holidays && day == 28 {
-                    return Some(Holiday::YOM_YERUSHALAYIM);
+                    return Some(JewishHoliday::YOM_YERUSHALAYIM);
                 }
             }
 
             JewishMonth::SIVAN => {
                 if day == 5 {
-                    return Some(Holiday::EREV_SHAVUOS);
+                    return Some(JewishHoliday::EREV_SHAVUOS);
                 }
                 if day == 6 || (day == 7 && !self.in_israel) {
-                    return Some(Holiday::SHAVUOS);
+                    return Some(JewishHoliday::SHAVUOS);
                 }
                 if day == 7 || day == 8 && !self.in_israel {
-                    return Some(Holiday::ISRU_CHAG);
+                    return Some(JewishHoliday::ISRU_CHAG);
                 }
             }
 
@@ -471,7 +466,7 @@ impl JewishCalendarTrait for JewishCalendar {
                 if (day == 17 && day_of_week != DayOfWeek::Saturday)
                     || (day == 18 && day_of_week == DayOfWeek::Sunday)
                 {
-                    return Some(Holiday::SEVENTEEN_OF_TAMMUZ);
+                    return Some(JewishHoliday::SEVENTEEN_OF_TAMMUZ);
                 }
             }
 
@@ -479,75 +474,75 @@ impl JewishCalendarTrait for JewishCalendar {
                 if (day_of_week == DayOfWeek::Sunday && day == 10)
                     || (day_of_week != DayOfWeek::Saturday && day == 9)
                 {
-                    return Some(Holiday::TISHA_BEAV);
+                    return Some(JewishHoliday::TISHA_BEAV);
                 }
                 if day == 15 {
-                    return Some(Holiday::TU_BEAV);
+                    return Some(JewishHoliday::TU_BEAV);
                 }
             }
 
             JewishMonth::ELUL => {
                 if day == 29 {
-                    return Some(Holiday::EREV_ROSH_HASHANA);
+                    return Some(JewishHoliday::EREV_ROSH_HASHANA);
                 }
             }
 
             JewishMonth::TISHREI => {
                 if day == 1 || day == 2 {
-                    return Some(Holiday::ROSH_HASHANA);
+                    return Some(JewishHoliday::ROSH_HASHANA);
                 }
                 if (day == 3 && day_of_week != DayOfWeek::Saturday)
                     || (day == 4 && day_of_week == DayOfWeek::Sunday)
                 {
-                    return Some(Holiday::FAST_OF_GEDALYAH);
+                    return Some(JewishHoliday::FAST_OF_GEDALYAH);
                 }
                 if day == 9 {
-                    return Some(Holiday::EREV_YOM_KIPPUR);
+                    return Some(JewishHoliday::EREV_YOM_KIPPUR);
                 }
                 if day == 10 {
-                    return Some(Holiday::YOM_KIPPUR);
+                    return Some(JewishHoliday::YOM_KIPPUR);
                 }
                 if day == 14 {
-                    return Some(Holiday::EREV_SUCCOS);
+                    return Some(JewishHoliday::EREV_SUCCOS);
                 }
                 if day == 15 || (day == 16 && !self.in_israel) {
-                    return Some(Holiday::SUCCOS);
+                    return Some(JewishHoliday::SUCCOS);
                 }
                 if day >= 16 && day <= 20 {
-                    return Some(Holiday::CHOL_HAMOED_SUCCOS);
+                    return Some(JewishHoliday::CHOL_HAMOED_SUCCOS);
                 }
                 if day == 21 {
-                    return Some(Holiday::HOSHANA_RABBA);
+                    return Some(JewishHoliday::HOSHANA_RABBA);
                 }
                 if day == 22 {
-                    return Some(Holiday::SHEMINI_ATZERES);
+                    return Some(JewishHoliday::SHEMINI_ATZERES);
                 }
                 if day == 23 && !self.in_israel {
-                    return Some(Holiday::SIMCHAS_TORAH);
+                    return Some(JewishHoliday::SIMCHAS_TORAH);
                 }
                 if day == 23 || day == 24 && !self.in_israel {
-                    return Some(Holiday::ISRU_CHAG);
+                    return Some(JewishHoliday::ISRU_CHAG);
                 }
             }
 
             JewishMonth::KISLEV => {
                 if day >= 25 {
-                    return Some(Holiday::CHANUKAH);
+                    return Some(JewishHoliday::CHANUKAH);
                 }
             }
 
             JewishMonth::TEVES => {
                 if day == 1 || day == 2 || (day == 3 && self.jewish_date.is_kislev_short()) {
-                    return Some(Holiday::CHANUKAH);
+                    return Some(JewishHoliday::CHANUKAH);
                 }
                 if day == 10 {
-                    return Some(Holiday::TENTH_OF_TEVES);
+                    return Some(JewishHoliday::TENTH_OF_TEVES);
                 }
             }
 
             JewishMonth::SHEVAT => {
                 if day == 15 {
-                    return Some(Holiday::TU_BESHVAT);
+                    return Some(JewishHoliday::TU_BESHVAT);
                 }
             }
 
@@ -558,20 +553,20 @@ impl JewishCalendarTrait for JewishCalendar {
                             && !(day_of_week == DayOfWeek::Friday
                                 || day_of_week == DayOfWeek::Saturday))
                     {
-                        return Some(Holiday::FAST_OF_ESTHER);
+                        return Some(JewishHoliday::FAST_OF_ESTHER);
                     }
                     if day == 14 {
-                        return Some(Holiday::PURIM);
+                        return Some(JewishHoliday::PURIM);
                     }
                     if day == 15 {
-                        return Some(Holiday::SHUSHAN_PURIM);
+                        return Some(JewishHoliday::SHUSHAN_PURIM);
                     }
                 } else {
                     if day == 14 {
-                        return Some(Holiday::PURIM_KATAN);
+                        return Some(JewishHoliday::PURIM_KATAN);
                     }
                     if day == 15 {
-                        return Some(Holiday::SHUSHAN_PURIM_KATAN);
+                        return Some(JewishHoliday::SHUSHAN_PURIM_KATAN);
                     }
                 }
             }
@@ -582,13 +577,13 @@ impl JewishCalendarTrait for JewishCalendar {
                         && !(day_of_week == DayOfWeek::Friday
                             || day_of_week == DayOfWeek::Saturday))
                 {
-                    return Some(Holiday::FAST_OF_ESTHER);
+                    return Some(JewishHoliday::FAST_OF_ESTHER);
                 }
                 if day == 14 {
-                    return Some(Holiday::PURIM);
+                    return Some(JewishHoliday::PURIM);
                 }
                 if day == 15 {
-                    return Some(Holiday::SHUSHAN_PURIM);
+                    return Some(JewishHoliday::SHUSHAN_PURIM);
                 }
             }
             _ => {}
@@ -602,15 +597,15 @@ impl JewishCalendarTrait for JewishCalendar {
         if self.is_erev_yom_tov()
             && !matches!(
                 holiday_index,
-                Some(Holiday::HOSHANA_RABBA) | Some(Holiday::CHOL_HAMOED_PESACH)
+                Some(JewishHoliday::HOSHANA_RABBA) | Some(JewishHoliday::CHOL_HAMOED_PESACH)
             )
         {
             return false;
         }
-        if self.is_taanis() && holiday_index != Some(Holiday::YOM_KIPPUR) {
+        if self.is_taanis() && holiday_index != Some(JewishHoliday::YOM_KIPPUR) {
             return false;
         }
-        if holiday_index == Some(Holiday::ISRU_CHAG) {
+        if holiday_index == Some(JewishHoliday::ISRU_CHAG) {
             return false;
         }
         holiday_index != None
@@ -620,13 +615,13 @@ impl JewishCalendarTrait for JewishCalendar {
         let holiday_index = self.get_yom_tov_index();
         matches!(
             holiday_index,
-            Some(Holiday::PESACH)
-                | Some(Holiday::SHAVUOS)
-                | Some(Holiday::SUCCOS)
-                | Some(Holiday::SHEMINI_ATZERES)
-                | Some(Holiday::SIMCHAS_TORAH)
-                | Some(Holiday::ROSH_HASHANA)
-                | Some(Holiday::YOM_KIPPUR)
+            Some(JewishHoliday::PESACH)
+                | Some(JewishHoliday::SHAVUOS)
+                | Some(JewishHoliday::SUCCOS)
+                | Some(JewishHoliday::SHEMINI_ATZERES)
+                | Some(JewishHoliday::SIMCHAS_TORAH)
+                | Some(JewishHoliday::ROSH_HASHANA)
+                | Some(JewishHoliday::YOM_KIPPUR)
         )
     }
 
@@ -653,70 +648,70 @@ impl JewishCalendarTrait for JewishCalendar {
         let month = self.jewish_date.get_jewish_month() as i32;
         let day = self.jewish_date.get_jewish_day_of_month();
 
-        (month == date_constants::TISHREI.into() && (day == 1))
+        (month == date_constants::TISHREI as i32 && (day == 1))
             || (!self.in_israel
-                && ((month == date_constants::NISSAN.into() && (day == 15 || day == 21))
-                    || (month == date_constants::TISHREI.into() && (day == 15 || day == 22))
-                    || (month == date_constants::SIVAN.into() && day == 6)))
+                && ((month == date_constants::NISSAN as i32 && (day == 15 || day == 21))
+                    || (month == date_constants::TISHREI as i32 && (day == 15 || day == 22))
+                    || (month == date_constants::SIVAN as i32 && day == 6)))
     }
 
     fn is_aseres_yemei_teshuva(&self) -> bool {
         let month = self.jewish_date.get_jewish_month() as i32;
         let day = self.jewish_date.get_jewish_day_of_month();
-        month == date_constants::TISHREI.into() && day <= 10
+        month == date_constants::TISHREI as i32 && day <= 10
     }
 
     fn is_pesach(&self) -> bool {
         let holiday_index = self.get_yom_tov_index();
         matches!(
             holiday_index,
-            Some(Holiday::PESACH) | Some(Holiday::CHOL_HAMOED_PESACH)
+            Some(JewishHoliday::PESACH) | Some(JewishHoliday::CHOL_HAMOED_PESACH)
         )
     }
 
     fn is_chol_hamoed_pesach(&self) -> bool {
-        self.get_yom_tov_index() == Some(Holiday::CHOL_HAMOED_PESACH)
+        self.get_yom_tov_index() == Some(JewishHoliday::CHOL_HAMOED_PESACH)
     }
 
     fn is_shavuos(&self) -> bool {
-        self.get_yom_tov_index() == Some(Holiday::SHAVUOS)
+        self.get_yom_tov_index() == Some(JewishHoliday::SHAVUOS)
     }
 
     fn is_rosh_hashana(&self) -> bool {
-        self.get_yom_tov_index() == Some(Holiday::ROSH_HASHANA)
+        self.get_yom_tov_index() == Some(JewishHoliday::ROSH_HASHANA)
     }
 
     fn is_yom_kippur(&self) -> bool {
-        self.get_yom_tov_index() == Some(Holiday::YOM_KIPPUR)
+        self.get_yom_tov_index() == Some(JewishHoliday::YOM_KIPPUR)
     }
 
     fn is_succos(&self) -> bool {
         let holiday_index = self.get_yom_tov_index();
         matches!(
             holiday_index,
-            Some(Holiday::SUCCOS)
-                | Some(Holiday::CHOL_HAMOED_SUCCOS)
-                | Some(Holiday::HOSHANA_RABBA)
+            Some(JewishHoliday::SUCCOS)
+                | Some(JewishHoliday::CHOL_HAMOED_SUCCOS)
+                | Some(JewishHoliday::HOSHANA_RABBA)
         )
     }
 
     fn is_hoshana_rabba(&self) -> bool {
-        self.get_yom_tov_index() == Some(Holiday::HOSHANA_RABBA)
+        self.get_yom_tov_index() == Some(JewishHoliday::HOSHANA_RABBA)
     }
 
     fn is_shemini_atzeres(&self) -> bool {
-        self.get_yom_tov_index() == Some(Holiday::SHEMINI_ATZERES)
+        self.get_yom_tov_index() == Some(JewishHoliday::SHEMINI_ATZERES)
     }
 
     fn is_simchas_torah(&self) -> bool {
-        self.get_yom_tov_index() == Some(Holiday::SIMCHAS_TORAH)
+        self.get_yom_tov_index() == Some(JewishHoliday::SIMCHAS_TORAH)
     }
 
     fn is_chol_hamoed_succos(&self) -> bool {
         let holiday_index = self.get_yom_tov_index();
         matches!(
             holiday_index,
-            Some(Holiday::CHOL_HAMOED_SUCCOS) | Some(Holiday::HOSHANA_RABBA)
+            Some(JewishHoliday::CHOL_HAMOED_SUCCOS) | Some(JewishHoliday::HOSHANA_RABBA)
         )
     }
 
@@ -726,36 +721,36 @@ impl JewishCalendarTrait for JewishCalendar {
 
     fn is_erev_yom_tov(&self) -> bool {
         let holiday_index = self.get_yom_tov_index();
-        holiday_index == Some(Holiday::EREV_PESACH)
-            || holiday_index == Some(Holiday::EREV_SHAVUOS)
-            || holiday_index == Some(Holiday::EREV_ROSH_HASHANA)
-            || holiday_index == Some(Holiday::EREV_YOM_KIPPUR)
-            || holiday_index == Some(Holiday::EREV_SUCCOS)
-            || holiday_index == Some(Holiday::HOSHANA_RABBA)
-            || (holiday_index == Some(Holiday::CHOL_HAMOED_PESACH)
+        holiday_index == Some(JewishHoliday::EREV_PESACH)
+            || holiday_index == Some(JewishHoliday::EREV_SHAVUOS)
+            || holiday_index == Some(JewishHoliday::EREV_ROSH_HASHANA)
+            || holiday_index == Some(JewishHoliday::EREV_YOM_KIPPUR)
+            || holiday_index == Some(JewishHoliday::EREV_SUCCOS)
+            || holiday_index == Some(JewishHoliday::HOSHANA_RABBA)
+            || (holiday_index == Some(JewishHoliday::CHOL_HAMOED_PESACH)
                 && self.jewish_date.get_jewish_day_of_month() == 20)
     }
 
     fn is_rosh_chodesh(&self) -> bool {
         let day = self.jewish_date.get_jewish_day_of_month();
         let month = self.jewish_date.get_jewish_month() as i32;
-        (day == 1 && month != date_constants::TISHREI.into()) || day == 30
+        (day == 1 && month != date_constants::TISHREI as i32) || day == 30
     }
 
     fn is_isru_chag(&self) -> bool {
-        self.get_yom_tov_index() == Some(Holiday::ISRU_CHAG)
+        self.get_yom_tov_index() == Some(JewishHoliday::ISRU_CHAG)
     }
 
     fn is_taanis(&self) -> bool {
         let holiday_index = self.get_yom_tov_index();
         matches!(
             holiday_index,
-            Some(Holiday::SEVENTEEN_OF_TAMMUZ)
-                | Some(Holiday::TISHA_BEAV)
-                | Some(Holiday::YOM_KIPPUR)
-                | Some(Holiday::FAST_OF_GEDALYAH)
-                | Some(Holiday::TENTH_OF_TEVES)
-                | Some(Holiday::FAST_OF_ESTHER)
+            Some(JewishHoliday::SEVENTEEN_OF_TAMMUZ)
+                | Some(JewishHoliday::TISHA_BEAV)
+                | Some(JewishHoliday::YOM_KIPPUR)
+                | Some(JewishHoliday::FAST_OF_GEDALYAH)
+                | Some(JewishHoliday::TENTH_OF_TEVES)
+                | Some(JewishHoliday::FAST_OF_ESTHER)
         )
     }
 
@@ -764,7 +759,7 @@ impl JewishCalendarTrait for JewishCalendar {
         let day_of_week = self.jewish_date.get_day_of_week() as i32;
         let month = self.jewish_date.get_jewish_month() as i32;
 
-        month == date_constants::NISSAN.into()
+        month == date_constants::NISSAN as i32
             && ((day == 14 && day_of_week != 7) || (day == 12 && day_of_week == 5))
     }
 
@@ -776,7 +771,7 @@ impl JewishCalendarTrait for JewishCalendar {
         let month = self.jewish_date.get_jewish_month() as i32;
         let day = self.jewish_date.get_jewish_day_of_month();
 
-        if month == date_constants::KISLEV.into() {
+        if month == date_constants::KISLEV as i32 {
             day - 24
         } else {
             if self.jewish_date.is_kislev_short() {
@@ -788,14 +783,14 @@ impl JewishCalendarTrait for JewishCalendar {
     }
 
     fn is_chanukah(&self) -> bool {
-        self.get_yom_tov_index() == Some(Holiday::CHANUKAH)
+        self.get_yom_tov_index() == Some(JewishHoliday::CHANUKAH)
     }
 
     fn is_purim(&self) -> bool {
         let holiday_index = self.get_yom_tov_index();
         matches!(
             holiday_index,
-            Some(Holiday::PURIM) | Some(Holiday::SHUSHAN_PURIM)
+            Some(JewishHoliday::PURIM) | Some(JewishHoliday::SHUSHAN_PURIM)
         )
     }
 
@@ -803,11 +798,11 @@ impl JewishCalendarTrait for JewishCalendar {
         let month = self.jewish_date.get_jewish_month() as i32;
         let day = self.jewish_date.get_jewish_day_of_month();
 
-        if month == date_constants::NISSAN.into() && day >= 16 {
+        if month == date_constants::NISSAN as i32 && day >= 16 {
             day - 15
-        } else if month == date_constants::IYAR.into() {
+        } else if month == date_constants::IYAR as i32 {
             day + 15
-        } else if month == date_constants::SIVAN.into() && day < 6 {
+        } else if month == date_constants::SIVAN as i32 && day < 6 {
             day + 44
         } else {
             -1
@@ -815,7 +810,7 @@ impl JewishCalendarTrait for JewishCalendar {
     }
 
     fn is_tisha_beav(&self) -> bool {
-        self.get_yom_tov_index() == Some(Holiday::TISHA_BEAV)
+        self.get_yom_tov_index() == Some(JewishHoliday::TISHA_BEAV)
     }
 
     fn get_daf_yomi_bavli(&self) -> Option<BavliDaf> {
@@ -866,154 +861,5 @@ impl JewishCalendarTrait for JewishCalendar {
             Some(16) => PARSHA_LIST_16[(day / 7) as usize],
             _ => Parsha::NONE,
         }
-    }
-}
-
-// FFI module - only compiled when FFI is needed
-#[cfg(feature = "ffi")]
-pub mod jewish_calendar_ffi {
-    use super::*;
-    use safer_ffi::{ffi_export, option::TaggedOption};
-
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    #[derive_ReprC]
-    #[repr(C)]
-    pub struct JewishCalendarData {
-        // Jewish date information
-        pub jewish_year: i32,
-        pub jewish_month: JewishMonth,
-        pub jewish_day_of_month: i32,
-        pub gregorian_year: i32,
-        pub gregorian_month: i32,
-        pub gregorian_day_of_month: i32,
-        pub day_of_week: DayOfWeek,
-        pub is_jewish_leap_year: bool,
-        pub days_in_jewish_year: i32,
-        pub days_in_jewish_month: i32,
-        pub is_cheshvan_long: bool,
-        pub is_kislev_short: bool,
-        pub cheshvan_kislev_kviah: i32, // Using i32 instead of YearLengthType for FFI compatibility
-        pub days_since_start_of_jewish_year: i32,
-        pub chalakim_since_molad_tohu: i64,
-
-        // Calendar configuration
-        pub in_israel: bool,
-        pub use_modern_holidays: bool,
-
-        // Holiday and special day information
-        pub yom_tov_index: TaggedOption<i32>, // Holiday index or None
-        pub is_yom_tov: bool,
-        pub is_yom_tov_assur_bemelacha: bool,
-        pub is_assur_bemelacha: bool,
-        pub has_candle_lighting: bool,
-        pub is_tomorrow_shabbos_or_yom_tov: bool,
-        pub is_erev_yom_tov_sheni: bool,
-        pub is_aseres_yemei_teshuva: bool,
-        pub is_pesach: bool,
-        pub is_chol_hamoed_pesach: bool,
-        pub is_shavuos: bool,
-        pub is_rosh_hashana: bool,
-        pub is_yom_kippur: bool,
-        pub is_succos: bool,
-        pub is_hoshana_rabba: bool,
-        pub is_shemini_atzeres: bool,
-        pub is_simchas_torah: bool,
-        pub is_chol_hamoed_succos: bool,
-        pub is_chol_hamoed: bool,
-        pub is_erev_yom_tov: bool,
-        pub is_rosh_chodesh: bool,
-        pub is_isru_chag: bool,
-        pub is_taanis: bool,
-        pub is_taanis_bechoros: bool,
-        pub day_of_chanukah: i32,
-        pub is_chanukah: bool,
-        pub is_purim: bool,
-        pub day_of_omer: i32,
-        pub is_tisha_beav: bool,
-
-        // Additional information
-        pub daf_yomi_bavli: TaggedOption<i32>, // Daf index or None
-        pub parshah: i32,                      // Parsha index
-    }
-
-    impl JewishCalendarData {
-        pub fn from_jewish_calendar(calendar: JewishCalendar) -> Self {
-            let jewish_date = calendar.get_jewish_date();
-
-            Self {
-                // Jewish date information
-                jewish_year: jewish_date.get_jewish_year(),
-                jewish_month: jewish_date.get_jewish_month(),
-                jewish_day_of_month: jewish_date.get_jewish_day_of_month(),
-                gregorian_year: jewish_date.get_gregorian_year(),
-                gregorian_month: jewish_date.get_gregorian_month(),
-                gregorian_day_of_month: jewish_date.get_gregorian_day_of_month(),
-                day_of_week: jewish_date.get_day_of_week(),
-                is_jewish_leap_year: jewish_date.is_jewish_leap_year(),
-                days_in_jewish_year: jewish_date.get_days_in_jewish_year(),
-                days_in_jewish_month: jewish_date.get_days_in_jewish_month(),
-                is_cheshvan_long: jewish_date.is_cheshvan_long(),
-                is_kislev_short: jewish_date.is_kislev_short(),
-                cheshvan_kislev_kviah: jewish_date.get_cheshvan_kislev_kviah() as i32,
-                days_since_start_of_jewish_year: jewish_date.get_days_since_start_of_jewish_year(),
-                chalakim_since_molad_tohu: jewish_date.get_chalakim_since_molad_tohu(),
-
-                // Calendar configuration
-                in_israel: calendar.in_israel,
-                use_modern_holidays: calendar.use_modern_holidays,
-
-                // Holiday and special day information
-                yom_tov_index: calendar.get_yom_tov_index().map(|h| h as i32).into(),
-                is_yom_tov: calendar.is_yom_tov(),
-                is_yom_tov_assur_bemelacha: calendar.is_yom_tov_assur_bemelacha(),
-                is_assur_bemelacha: calendar.is_assur_bemelacha(),
-                has_candle_lighting: calendar.has_candle_lighting(),
-                is_tomorrow_shabbos_or_yom_tov: calendar.is_tomorrow_shabbos_or_yom_tov(),
-                is_erev_yom_tov_sheni: calendar.is_erev_yom_tov_sheni(),
-                is_aseres_yemei_teshuva: calendar.is_aseres_yemei_teshuva(),
-                is_pesach: calendar.is_pesach(),
-                is_chol_hamoed_pesach: calendar.is_chol_hamoed_pesach(),
-                is_shavuos: calendar.is_shavuos(),
-                is_rosh_hashana: calendar.is_rosh_hashana(),
-                is_yom_kippur: calendar.is_yom_kippur(),
-                is_succos: calendar.is_succos(),
-                is_hoshana_rabba: calendar.is_hoshana_rabba(),
-                is_shemini_atzeres: calendar.is_shemini_atzeres(),
-                is_simchas_torah: calendar.is_simchas_torah(),
-                is_chol_hamoed_succos: calendar.is_chol_hamoed_succos(),
-                is_chol_hamoed: calendar.is_chol_hamoed(),
-                is_erev_yom_tov: calendar.is_erev_yom_tov(),
-                is_rosh_chodesh: calendar.is_rosh_chodesh(),
-                is_isru_chag: calendar.is_isru_chag(),
-                is_taanis: calendar.is_taanis(),
-                is_taanis_bechoros: calendar.is_taanis_bechoros(),
-                day_of_chanukah: calendar.get_day_of_chanukah(),
-                is_chanukah: calendar.is_chanukah(),
-                is_purim: calendar.is_purim(),
-                day_of_omer: calendar.get_day_of_omer(),
-                is_tisha_beav: calendar.is_tisha_beav(),
-
-                // Additional information
-                daf_yomi_bavli: calendar
-                    .get_daf_yomi_bavli()
-                    .map(|d| (d.masechta as i32) * 1000 + d.daf)
-                    .into(),
-                parshah: calendar.get_parshah() as i32,
-            }
-        }
-    }
-
-    #[no_mangle]
-    #[ffi_export]
-    pub fn jewish_calendar_data_from_timestamp(
-        timestamp: i64,
-        tz_offset: i64,
-        in_israel: bool,
-        use_modern_holidays: bool,
-    ) -> TaggedOption<JewishCalendarData> {
-        let calendar = JewishCalendar::new(timestamp, tz_offset, in_israel, use_modern_holidays);
-        calendar
-            .map(|c| JewishCalendarData::from_jewish_calendar(c))
-            .into()
     }
 }

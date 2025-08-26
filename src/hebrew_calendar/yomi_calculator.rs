@@ -5,7 +5,7 @@ use libm::floor;
 
 use crate::hebrew_calendar::daf::{BavliDaf, BavliTractate};
 
-pub struct YomiCalculator;
+pub(crate) struct YomiCalculator;
 
 impl YomiCalculator {
     const DAF_YOMI_START_DAY: &'static DateTime<Utc> = &NaiveDate::from_ymd_opt(1923, 9, 11)
@@ -20,7 +20,7 @@ impl YomiCalculator {
         .expect("Invalid time for SHEKALIM_CHANGE_DAY")
         .and_utc();
 
-    pub fn get_daf_yomi_bavli(timestamp: i64) -> Option<BavliDaf> {
+    pub(crate) fn get_daf_yomi_bavli(timestamp: i64) -> Option<BavliDaf> {
         let date = DateTime::from_timestamp_millis(timestamp)?;
 
         let daf_yomi_julian_start = get_julian_day(&Self::DAF_YOMI_START_DAY);

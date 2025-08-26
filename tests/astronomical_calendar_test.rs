@@ -1,14 +1,11 @@
-use zmanim_core::{
-    astronomical_calendar::{
-        AstronomicalCalendar as RustAstronomicalCalendar, AstronomicalCalendarTrait,
-    },
-    GeoLocation,
-};
+use zmanim_core::prelude::*;
 
-use crate::{
-    java::astronomical_calendar::AstronomicalCalendar as JavaAstronomicalCalendar,
-    test_utils::{assert_almost_equal_f64, assert_almost_equal_i64_option, create_jvm, TestCase},
-};
+mod java;
+mod test_utils;
+use test_utils::*;
+
+use java::astronomical_calendar::AstronomicalCalendar as JavaAstronomicalCalendar;
+use zmanim_core::astronomical_calendar::AstronomicalCalendar as RustAstronomicalCalendar;
 
 #[test]
 fn test_astronomical_calendar() {

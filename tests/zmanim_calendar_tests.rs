@@ -1,48 +1,10 @@
-use rand::Rng;
-use zmanim_core::{
-    zmanim_calendar::{ZmanimCalendar, ZmanimCalendarTrait},
-    GeoLocation,
-};
+mod test_utils;
+use test_utils::*;
 
-use crate::{
-    java::{noaa_calculator::JavaNOAACalculator, zmanim_calendar::JavaZmanimCalendar},
-    test_utils::{
-        assert_almost_equal_f64_option, assert_almost_equal_i64_option, create_jvm,
-        random_test_geolocation, random_test_timestamp, DEFAULT_INT_TOLERANCE,
-        DEFAULT_TEST_ITERATIONS,
-    },
-};
-#[derive(Debug)]
-struct TestCase {
-    lat: f64,
-    lon: f64,
-    elevation: f64,
-    timestamp: i64,
-    use_astronomical_chatzos: bool,
-    use_astronomical_chatzos_for_other_zmanim: bool,
-    candle_lighting_offset: i64,
-}
-
-impl TestCase {
-    fn new() -> Self {
-        let test_geo = random_test_geolocation();
-        let test_timestamp = random_test_timestamp();
-        let mut rng = rand::rng();
-        let test_use_astronomical_chatzos = rng.random_bool(0.5);
-        let test_use_astronomical_chatzos_for_other_zmanim = rng.random_bool(0.5);
-        let test_candle_lighting_offset = rng.random_range(0..=60 * 1000);
-        Self {
-            lat: test_geo.lat,
-            lon: test_geo.lon,
-            elevation: test_geo.elevation,
-            timestamp: test_timestamp,
-            use_astronomical_chatzos: test_use_astronomical_chatzos,
-            use_astronomical_chatzos_for_other_zmanim:
-                test_use_astronomical_chatzos_for_other_zmanim,
-            candle_lighting_offset: test_candle_lighting_offset,
-        }
-    }
-}
+mod java;
+use java::noaa_calculator::JavaNOAACalculator;
+use java::zmanim_calendar::JavaZmanimCalendar;
+use zmanim_core::prelude::*;
 
 #[test]
 fn test_zmanim_calendar() {
@@ -90,7 +52,6 @@ fn test_zmanim_calendar() {
             &message,
         );
 
-        // Test new methods
         assert_almost_equal_i64_option(
             &zmanim_calendar.get_tzais72(),
             &java_zmanim_calendar.get_tzais72(),
@@ -101,7 +62,7 @@ fn test_zmanim_calendar() {
         assert_almost_equal_i64_option(
             &zmanim_calendar.get_candle_lighting(),
             &java_zmanim_calendar.get_candle_lighting(),
-            1, // Keep 1 for candle lighting as it seems intentional
+            1,
             &message,
         );
 
@@ -154,7 +115,6 @@ fn test_zmanim_calendar() {
             &message,
         );
 
-        // Test shaah zmanis methods (handle None case for KosherJava bug)
         let rust_shaah_zmanis_gra = zmanim_calendar.get_shaah_zmanis_gra();
         let java_shaah_zmanis_gra = java_zmanim_calendar.get_shaah_zmanis_gra();
 
@@ -165,7 +125,6 @@ fn test_zmanim_calendar() {
 
         assert_eq!(rust_shaah_zmanis_mga, java_shaah_zmanis_mga, "{}", message);
 
-        // Test percent of shaah zmanis from degrees
         let rust_percent_sunrise =
             zmanim_calendar.get_percent_of_shaah_zmanis_from_degrees(16.1, false);
         let java_percent_sunrise =
@@ -178,18 +137,15 @@ fn test_zmanim_calendar() {
             java_zmanim_calendar.get_percent_of_shaah_zmanis_from_degrees(8.5, true);
         assert_almost_equal_f64_option(&rust_percent_sunset, &java_percent_sunset, 1.0, &message);
 
-        // Test half day based methods (when we have valid sunrise/sunset)
         if let (Some(sunrise), Some(sunset)) = (
             zmanim_calendar.get_alos_hashachar(),
             zmanim_calendar.get_tzais(),
         ) {
-            // Test half day based zman
             let rust_half_day_zman = zmanim_calendar.get_half_day_based_zman(sunrise, sunset, 3.0);
             let java_half_day_zman =
                 java_zmanim_calendar.get_half_day_based_zman(sunrise, sunset, 3.0);
             assert_almost_equal_i64_option(&rust_half_day_zman, &java_half_day_zman, 0, &message);
 
-            // Test half day based shaah zmanis
             let rust_half_day_shaah =
                 zmanim_calendar.get_half_day_based_shaah_zmanis(sunrise, sunset);
             let java_half_day_shaah =
@@ -197,13 +153,11 @@ fn test_zmanim_calendar() {
 
             assert_eq!(rust_half_day_shaah, java_half_day_shaah, "{}", message);
 
-            // Test shaah zmanis based zman
             let rust_shaah_zman = zmanim_calendar.get_shaah_zmanis_based_zman(sunrise, sunset, 4.0);
             let java_shaah_zman =
                 java_zmanim_calendar.get_shaah_zmanis_based_zman(sunrise, sunset, 4.0);
             assert_almost_equal_i64_option(&rust_shaah_zman, &java_shaah_zman, 0, &message);
 
-            // Test sof zman shma variants
             let rust_sof_zman_shma =
                 zmanim_calendar._get_sof_zman_shma(sunrise, Some(sunset), true);
             let java_sof_zman_shma =
@@ -221,7 +175,6 @@ fn test_zmanim_calendar() {
                 &message,
             );
 
-            // Test sof zman tfila variants
             let rust_sof_zman_tfila =
                 zmanim_calendar._get_sof_zman_tfila(sunrise, Some(sunset), true);
             let java_sof_zman_tfila =
@@ -239,7 +192,6 @@ fn test_zmanim_calendar() {
                 &message,
             );
 
-            // Test mincha gedola variants
             let rust_mincha_gedola =
                 zmanim_calendar._get_mincha_gedola(Some(sunrise), sunset, true);
             let java_mincha_gedola =
@@ -257,7 +209,6 @@ fn test_zmanim_calendar() {
                 &message,
             );
 
-            // Test samuch le mincha ketana variants
             let rust_samuch_mincha =
                 zmanim_calendar._get_samuch_le_mincha_ketana(Some(sunrise), sunset, true);
             let java_samuch_mincha =
@@ -275,7 +226,6 @@ fn test_zmanim_calendar() {
                 &message,
             );
 
-            // Test mincha ketana variants
             let rust_mincha_ketana =
                 zmanim_calendar._get_mincha_ketana(Some(sunrise), sunset, true);
             let java_mincha_ketana =
@@ -293,7 +243,6 @@ fn test_zmanim_calendar() {
                 &message,
             );
 
-            // Test plag hamincha variants
             let rust_plag_hamincha =
                 zmanim_calendar._get_plag_hamincha(Some(sunrise), sunset, true);
             let java_plag_hamincha =

@@ -4,10 +4,11 @@ use chrono::Duration as ChronoDuration;
 use icu_calendar::cal::Hebrew;
 use icu_calendar::Gregorian;
 use icu_calendar::{types::Weekday, Date, DateDuration};
-use safer_ffi::derive_ReprC;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[derive_ReprC]
+use serde::Deserialize;
+use serde::Serialize;
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum JewishMonth {
     NISSAN = date_constants::NISSAN,
@@ -50,8 +51,7 @@ impl From<i32> for JewishMonth {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[derive_ReprC]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum YearLengthType {
     CHASERIM = 0,
@@ -73,8 +73,7 @@ impl From<YearLengthType> for i32 {
         year_length as i32
     }
 }
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[derive_ReprC]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum DayOfWeek {
     Sunday = 1,
@@ -113,7 +112,6 @@ impl From<Weekday> for DayOfWeek {
     }
 }
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[derive_ReprC]
 #[repr(C)]
 pub struct MoladData {
     pub hours: i64,
@@ -478,7 +476,7 @@ impl JewishDate {
     }
 }
 
-pub mod date_constants {
+pub(crate) mod date_constants {
     pub const NISSAN: u8 = 1;
     pub const IYAR: u8 = 2;
     pub const SIVAN: u8 = 3;
@@ -499,119 +497,4 @@ pub mod date_constants {
     pub const CHALAKIM_PER_MONTH: i64 = 765433;
     pub const CHALAKIM_MOLAD_TOHU: i64 = 31524;
     pub const JEWISH_EPOCH: i64 = -1373429;
-}
-
-#[cfg(feature = "ffi")]
-pub mod jewish_date_ffi {
-    use super::*;
-    use safer_ffi::{ffi_export, option::TaggedOption};
-
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    #[derive_ReprC]
-    #[repr(C)]
-    pub struct JewishDateData {
-        pub jewish_year: i32,
-        pub jewish_month: JewishMonth,
-        pub jewish_day_of_month: i32,
-        pub gregorian_year: i32,
-        pub gregorian_month: i32,
-        pub gregorian_day_of_month: i32,
-        pub day_of_week: DayOfWeek,
-        pub is_jewish_leap_year: bool,
-        pub days_in_jewish_year: i32,
-        pub days_in_jewish_month: i32,
-        pub is_cheshvan_long: bool,
-        pub is_kislev_short: bool,
-        pub cheshvan_kislev_kviah: YearLengthType,
-        pub days_since_start_of_jewish_year: i32,
-        pub chalakim_since_molad_tohu: i64,
-        pub molad: TaggedOption<MoladDateData>,
-    }
-    impl JewishDateData {
-        pub fn from_jewish_date(jewish_date: JewishDate) -> Self {
-            let molad_option = jewish_date.get_molad();
-            let molad: TaggedOption<MoladDateData> = molad_option
-                .map(|molad| MoladDateData::from_molad(molad.0, molad.1))
-                .into();
-
-            Self {
-                jewish_year: jewish_date.get_jewish_year(),
-                jewish_month: jewish_date.get_jewish_month(),
-                jewish_day_of_month: jewish_date.get_jewish_day_of_month(),
-                gregorian_year: jewish_date.get_gregorian_year(),
-                gregorian_month: jewish_date.get_gregorian_month(),
-                gregorian_day_of_month: jewish_date.get_gregorian_day_of_month(),
-                day_of_week: jewish_date.get_day_of_week(),
-                is_jewish_leap_year: jewish_date.is_jewish_leap_year(),
-                days_in_jewish_year: jewish_date.get_days_in_jewish_year(),
-                days_in_jewish_month: jewish_date.get_days_in_jewish_month(),
-                is_cheshvan_long: jewish_date.is_cheshvan_long(),
-                is_kislev_short: jewish_date.is_kislev_short(),
-                cheshvan_kislev_kviah: jewish_date.get_cheshvan_kislev_kviah(),
-                days_since_start_of_jewish_year: jewish_date.get_days_since_start_of_jewish_year(),
-                chalakim_since_molad_tohu: jewish_date.get_chalakim_since_molad_tohu(),
-
-                molad: molad,
-            }
-        }
-    }
-
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    #[derive_ReprC]
-    #[repr(C)]
-    pub struct MoladDateData {
-        pub jewish_year: i32,
-        pub jewish_month: JewishMonth,
-        pub jewish_day_of_month: i32,
-        pub gregorian_year: i32,
-        pub gregorian_month: i32,
-        pub gregorian_day_of_month: i32,
-        pub day_of_week: DayOfWeek,
-        pub is_jewish_leap_year: bool,
-        pub days_in_jewish_year: i32,
-        pub days_in_jewish_month: i32,
-        pub is_cheshvan_long: bool,
-        pub is_kislev_short: bool,
-        pub cheshvan_kislev_kviah: YearLengthType,
-        pub days_since_start_of_jewish_year: i32,
-        pub chalakim_since_molad_tohu: i64,
-        pub hours: i64,
-        pub minutes: i64,
-        pub chalakim: i64,
-    }
-
-    impl MoladDateData {
-        pub fn from_molad(jewish_date: impl JewishDateTrait, molad: MoladData) -> Self {
-            Self {
-                jewish_year: jewish_date.get_jewish_year(),
-                jewish_month: jewish_date.get_jewish_month(),
-                jewish_day_of_month: jewish_date.get_jewish_day_of_month(),
-                gregorian_year: jewish_date.get_gregorian_year(),
-                gregorian_month: jewish_date.get_gregorian_month(),
-                gregorian_day_of_month: jewish_date.get_gregorian_day_of_month(),
-                day_of_week: jewish_date.get_day_of_week(),
-                is_jewish_leap_year: jewish_date.is_jewish_leap_year(),
-                days_in_jewish_year: jewish_date.get_days_in_jewish_year(),
-                days_in_jewish_month: jewish_date.get_days_in_jewish_month(),
-                is_cheshvan_long: jewish_date.is_cheshvan_long(),
-                is_kislev_short: jewish_date.is_kislev_short(),
-                cheshvan_kislev_kviah: jewish_date.get_cheshvan_kislev_kviah(),
-                days_since_start_of_jewish_year: jewish_date.get_days_since_start_of_jewish_year(),
-                chalakim_since_molad_tohu: jewish_date.get_chalakim_since_molad_tohu(),
-                hours: molad.hours,
-                minutes: molad.minutes,
-                chalakim: molad.chalakim,
-            }
-        }
-    }
-
-    #[no_mangle]
-    #[ffi_export]
-    pub fn jewish_date_data_from_timestamp(
-        timestamp: i64,
-        tz_offset: i64,
-    ) -> TaggedOption<JewishDateData> {
-        let jewish_date = JewishDate::new(timestamp, tz_offset).unwrap();
-        TaggedOption::Some(JewishDateData::from_jewish_date(jewish_date))
-    }
 }

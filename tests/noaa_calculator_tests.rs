@@ -1,11 +1,9 @@
-use crate::{
-    java::noaa_calculator::JavaNOAACalculator,
-    test_utils::{
-        assert_almost_equal_f64, create_jvm, TestCase, DEFAULT_FLOAT_TOLERANCE,
-        DEFAULT_TEST_ITERATIONS,
-    },
-};
-use zmanim_core::{GeoLocation, NOAACalculator, NOAACalculatorTrait};
+use zmanim_core::prelude::*;
+
+mod test_utils;
+use test_utils::*;
+mod java;
+use java::noaa_calculator::JavaNOAACalculator;
 
 #[test]
 fn test_noaa_calculator() {

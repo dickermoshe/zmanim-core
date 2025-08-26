@@ -1,7 +1,4 @@
-use safer_ffi::derive_ReprC;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[derive_ReprC]
 #[repr(u8)]
 pub enum BavliTractate {
     Berachos = 0,
@@ -94,7 +91,6 @@ impl From<i32> for BavliTractate {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[derive_ReprC]
 #[repr(C)]
 pub struct BavliDaf {
     pub masechta: BavliTractate,

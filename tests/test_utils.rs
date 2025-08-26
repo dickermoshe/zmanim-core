@@ -2,7 +2,7 @@ use j4rs::{ClasspathEntry, Jvm, JvmBuilder};
 
 use rand::Rng;
 use serde::Deserialize;
-use zmanim_core::{GeoLocationError, SolarEvent};
+use zmanim_core::{prelude::*, utils::geolocation::GeoLocationError};
 
 // Test configuration constants
 pub const DEFAULT_TEST_ITERATIONS: usize = 1000;

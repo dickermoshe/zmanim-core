@@ -9,37 +9,17 @@ libm = "0.2.15"
 heapless = "0.8.0"
 icu_calendar = { version = "2.0.3", default-features = false }
 chrono = { version = "0.4.41", default-features = false }
-safer-ffi = { version = "0.1.13", default-features = false }
-
+serde = { version = "1.0", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 j4rs = "0.22.0"
 rand = "0.9.2"
 serde_json = "1.0"
-serde = { version = "1.0", features = ["derive"] }
+
 
 [lib]
-crate-type = [
-    # "staticlib", 
-    "cdylib",
-    "lib",
-]
+crate-type = ["cdylib", "lib"]
 
-[[bin]]
-name = "generate-headers"
-required-features = ["headers"] # Do not build unless generating headers.
-
-[features]
-std = [] # To enable the standard library
-ffi = [] # To include all the exported ffi functions
-headers = [
-    "safer-ffi/headers",
-    "std",
-    "ffi",
-] # For generating headers for the shared library
-
-[workspace]
-members = ["example/rust"]
 
 [profile.release]
 strip = true

@@ -1,10 +1,8 @@
-use ::safer_ffi::prelude::*;
 use core::f64;
 use core::f64::consts::PI;
 use libm::{atan, atan2, cos, log, sin, sqrt, tan};
 
 #[derive(Debug, Clone, PartialEq)]
-#[derive_ReprC]
 #[repr(C)]
 pub struct GeoLocation {
     pub latitude: f64,
@@ -13,7 +11,7 @@ pub struct GeoLocation {
 
     pub elevation: f64,
 }
-#[derive_ReprC]
+
 #[repr(u8)]
 pub enum Formula {
     Distance,
@@ -22,7 +20,6 @@ pub enum Formula {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-#[derive_ReprC]
 #[repr(u8)]
 pub enum GeoLocationError {
     InvalidLatitude,
@@ -231,84 +228,5 @@ impl GeoLocationTrait for GeoLocation {
 
     fn get_elevation(&self) -> f64 {
         self.elevation
-    }
-}
-
-#[cfg(feature = "ffi")]
-pub mod geolocation_ffi {
-    use super::*;
-    use safer_ffi::option::TaggedOption;
-
-    #[no_mangle]
-    #[ffi_export]
-    fn get_latitude(geo_location: &GeoLocation) -> f64 {
-        geo_location.get_latitude()
-    }
-
-    #[no_mangle]
-    #[ffi_export]
-    fn get_longitude(geo_location: &GeoLocation) -> f64 {
-        geo_location.get_longitude()
-    }
-
-    #[no_mangle]
-    #[ffi_export]
-    fn get_elevation(geo_location: &GeoLocation) -> f64 {
-        geo_location.get_elevation()
-    }
-
-    #[no_mangle]
-    #[ffi_export]
-    fn geodesic_initial_bearing(
-        geo_location: &GeoLocation,
-        location: &GeoLocation,
-    ) -> TaggedOption<f64> {
-        match geo_location.geodesic_initial_bearing(location) {
-            Ok(value) => TaggedOption::Some(value),
-            Err(_) => TaggedOption::None,
-        }
-    }
-
-    #[no_mangle]
-    #[ffi_export]
-    fn geodesic_final_bearing(
-        geo_location: &GeoLocation,
-        location: &GeoLocation,
-    ) -> TaggedOption<f64> {
-        match geo_location.geodesic_final_bearing(location) {
-            Ok(value) => TaggedOption::Some(value),
-            Err(_) => TaggedOption::None,
-        }
-    }
-
-    #[no_mangle]
-    #[ffi_export]
-    fn geodesic_distance(geo_location: &GeoLocation, location: &GeoLocation) -> TaggedOption<f64> {
-        match geo_location.geodesic_distance(location) {
-            Ok(value) => TaggedOption::Some(value),
-            Err(_) => TaggedOption::None,
-        }
-    }
-
-    #[no_mangle]
-    #[ffi_export]
-
-    fn rhumb_line_bearing(geo_location: &GeoLocation, location: &GeoLocation) -> f64 {
-        geo_location.rhumb_line_bearing(location)
-    }
-
-    #[no_mangle]
-    #[ffi_export]
-    fn rhumb_line_distance(geo_location: &GeoLocation, location: &GeoLocation) -> f64 {
-        geo_location.rhumb_line_distance(location)
-    }
-    #[no_mangle]
-    #[ffi_export]
-    fn geolocation_new(latitude: f64, longitude: f64, elevation: f64) -> TaggedOption<GeoLocation> {
-        let result = GeoLocation::new(latitude, longitude, elevation);
-        match result {
-            Ok(location) => TaggedOption::Some(location),
-            Err(_) => TaggedOption::None,
-        }
     }
 }

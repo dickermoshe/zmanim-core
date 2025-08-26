@@ -1,12 +1,9 @@
-use zmanim_core::{GeoLocation, GeoLocationTrait};
+mod test_utils;
+use test_utils::*;
 
-use crate::{
-    java::geolocation::JavaGeoLocation,
-    test_utils::{
-        assert_almost_equal_f64, assert_almost_equal_f64_result, create_jvm,
-        random_test_geolocation, DEFAULT_FLOAT_TOLERANCE, DEFAULT_TEST_ITERATIONS,
-    },
-};
+mod java;
+use java::geolocation::JavaGeoLocation;
+use zmanim_core::prelude::*;
 
 #[test]
 fn test_geolocation() {
