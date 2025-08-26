@@ -177,7 +177,7 @@ This library is a Rust port of the [KosherJava](https://github.com/KosherJava/Ko
 
 ## Bindings
 
-Build and Use bindings for Python (e.g. the default bindings), with the following command:
+Build and use bindings for Python with the following command:
 
 ```bash
 uv tool install maturin  
