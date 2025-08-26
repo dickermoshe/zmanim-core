@@ -34,10 +34,10 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Run tests
-        run: cargo test
+        run: RUSTFLAGS="-A warnings" cargo test
 
       - name: Run tests with uniffi feature
-        run: cargo test --features="uniffi"
+        run: RUSTFLAGS="-A warnings" cargo test --features="uniffi"
   bindgen:
     runs-on: ubuntu-latest
 
@@ -59,9 +59,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Build
+      - name: Build Crate
         run: cargo build --release --features="uniffi"
 
-      - name: Run bindgen
+      # Runs to ensure that our uniffi-bindgen is working.
+      # This package does not provide bindings for all languages, so we need to run it to ensure that it is working.
+      - name: Run python bindgen
         working-directory: uniffi-bindgen
-        run: cargo run --bin uniffi-bindgen generate --library ../target/release/libzmanim_core.so --language python --out-dir out
+        run: cargo run --bin uniffi-bindgen generate --library ../target/release/libzmanim_core.so --language python --out-dir pythonout
