@@ -3,7 +3,8 @@ requires = ["maturin>=1.9,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "python"
+name = "zmanim-core-bindings"
+description = "Bindings to the zmanim-core rust library"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
@@ -11,6 +12,11 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["version"]
+readme = "PYTHON.README.md"
+authors = [{ name = "Moshe Dicker", email = "dickermoshe@gmail.com" }]
+license = { file = "LICENSE" }
+keywords = ["zmanim", "jewish", "calendar", "astronomy", "time", "zmanim-core"]
+
 
 [tool.maturin]
 module-name = "zmanim_py"
