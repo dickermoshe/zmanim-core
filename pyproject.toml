@@ -13,9 +13,12 @@ classifiers = [
 dynamic = ["version"]
 
 [tool.maturin]
-python-source = "bindings/python"
+python-source = "bindings"
 module-name = "zmanim_py"
 profile = "release"
 bindings = "uniffi"
 strip = true
 features = ["uniffi"]
+
+[tool.uv.workspace]
+members = ["bindings/zmanim_py"]
