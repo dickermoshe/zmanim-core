@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "zmanim-core"
-version = "0.1.0"
+version = "0.2.0"
 description = "A high-performance, `no_std` Rust library for calculating Jewish religious times (zmanim) and astronomical events."
 license-file = "./LICENCE"
 repository = "https://github.com/dickermoshe/zmanim-core"
