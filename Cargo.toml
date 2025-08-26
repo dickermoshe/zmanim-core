@@ -31,9 +31,6 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 [build-dependencies]
 uniffi = { workspace = true, features = ["build"], optional = true }
 
-[workspace]
-members = ["uniffi-bindgen"]
-resolver = "2"
 
 [workspace.dependencies]
 uniffi = { version = "0.28.0" }
