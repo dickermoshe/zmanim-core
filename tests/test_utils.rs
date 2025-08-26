@@ -5,19 +5,26 @@ use serde::Deserialize;
 use zmanim_core::prelude::*;
 
 // Test configuration constants
+#[allow(dead_code)]
 pub const DEFAULT_TEST_ITERATIONS: usize = 1000;
+#[allow(dead_code)]
 pub const DEFAULT_FLOAT_TOLERANCE: f64 = 0.00000001;
+#[allow(dead_code)]
 pub const DEFAULT_INT_TOLERANCE: u64 = 0;
+#[allow(dead_code)]
 pub const MIN_TIMESTAMP_YEAR_OFFSET: i64 = -50; // 500 years ago to 500 years from now
 
+#[allow(dead_code)]
 pub const MAX_TIMESTAMP_YEAR_OFFSET: i64 = 500; // 500 years ago to 500 years from now
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 pub struct TestGeoLocation {
     pub lat: f64,
     pub lon: f64,
     pub elevation: f64,
 }
+#[allow(dead_code)]
 pub fn create_jvm() -> Jvm {
     JvmBuilder::new()
         .classpath_entry(ClasspathEntry::new("./zmanim-2.6.0-SNAPSHOT.jar"))
@@ -25,6 +32,7 @@ pub fn create_jvm() -> Jvm {
         .unwrap()
 }
 
+#[allow(dead_code)]
 pub fn random_test_geolocation() -> TestGeoLocation {
     let mut rng = rand::rng();
     let lat = rng.random_range(-90.0..=90.0);
@@ -37,6 +45,7 @@ pub fn random_test_geolocation() -> TestGeoLocation {
     }
 }
 
+#[allow(dead_code)]
 pub fn random_test_timestamp() -> i64 {
     let mut rng = rand::rng();
 
@@ -49,6 +58,7 @@ pub fn random_test_timestamp() -> i64 {
 /// Compare two f64 values using ULP (Unit in the Last Place) difference
 /// This is more reliable than epsilon-based comparison for floating-point values
 /// If that fails, we use a more lenient approach.
+#[allow(dead_code)]
 fn almost_equal_f64(a: f64, b: f64, diff: f64) -> bool {
     if a == b {
         return true;
@@ -80,6 +90,7 @@ fn almost_equal_f64(a: f64, b: f64, diff: f64) -> bool {
     ulp_diff <= 1_000_000 || (a - b).abs() < diff
 }
 
+#[allow(dead_code)]
 fn almost_equal_i64(a: i64, b: i64, diff: u64) -> bool {
     // Prevent overflow by checking if diff fits in i64 range
     if diff > i64::MAX as u64 {
@@ -87,6 +98,7 @@ fn almost_equal_i64(a: i64, b: i64, diff: u64) -> bool {
     }
     (a - b).abs() <= diff as i64
 }
+#[allow(dead_code)]
 pub fn assert_almost_equal_f64(a: f64, b: f64, diff: f64, message: &str) {
     let result = almost_equal_f64(a, b, diff);
     let distance = (a - b).abs();
@@ -97,6 +109,7 @@ pub fn assert_almost_equal_f64(a: f64, b: f64, diff: f64, message: &str) {
     );
 }
 
+#[allow(dead_code)]
 pub fn assert_almost_equal_f64_option(a: &Option<f64>, b: &Option<f64>, diff: f64, message: &str) {
     match (a, b) {
         (Some(a), Some(b)) => assert_almost_equal_f64(*a, *b, diff, message),
@@ -107,6 +120,7 @@ pub fn assert_almost_equal_f64_option(a: &Option<f64>, b: &Option<f64>, diff: f6
     }
 }
 
+#[allow(dead_code)]
 pub fn assert_almost_equal_f64_result(a: &Option<f64>, b: &Option<f64>, diff: f64, message: &str) {
     match (a, b) {
         (Some(a), Some(b)) => assert_almost_equal_f64(*a, *b, diff, message),
@@ -116,6 +130,7 @@ pub fn assert_almost_equal_f64_result(a: &Option<f64>, b: &Option<f64>, diff: f6
         }
     }
 }
+#[allow(dead_code)]
 pub fn assert_almost_equal_i64(a: i64, b: i64, diff: u64, message: &str) {
     let result = almost_equal_i64(a, b, diff);
     let distance = (a - b).abs();
@@ -127,6 +142,7 @@ pub fn assert_almost_equal_i64(a: i64, b: i64, diff: u64, message: &str) {
     }
     assert!(result);
 }
+#[allow(dead_code)]
 pub fn assert_almost_equal_i64_option(a: &Option<i64>, b: &Option<i64>, diff: u64, message: &str) {
     match (a, b) {
         (Some(a), Some(b)) => assert_almost_equal_i64(*a, *b, diff, message),
@@ -138,6 +154,7 @@ pub fn assert_almost_equal_i64_option(a: &Option<i64>, b: &Option<i64>, diff: u6
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct TestCase {
     pub lat: f64,
     pub lon: f64,
@@ -158,6 +175,7 @@ pub struct TestCase {
 }
 
 impl TestCase {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         let test_geo = random_test_geolocation();
         let test_timestamp = random_test_timestamp();

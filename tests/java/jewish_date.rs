@@ -1,14 +1,20 @@
+#![allow(dead_code, unused)]
+
+#[allow(dead_code, unused)]
 pub struct JavaJewishDate<'a> {
     pub jvm: &'a Jvm,
     pub instance: Instance,
 }
 
 use j4rs::{Instance, InvocationArg, Jvm};
+#[allow(unused_imports)]
 use zmanim_core::{hebrew_calendar::MoladData, prelude::jewish_date::GetMoladTrait};
 
 use crate::java::calendar::create_calendar;
 
+#[allow(dead_code, unused)]
 impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewishDate<'a> {
+    #[allow(dead_code)]
     fn get_jewish_year(&self) -> i32 {
         let result = self
             .jvm

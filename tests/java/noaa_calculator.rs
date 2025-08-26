@@ -3,11 +3,14 @@ use zmanim_core::prelude::*;
 
 use crate::java::{calendar::create_calendar, geolocation::JavaGeoLocation};
 
+#[allow(dead_code)]
 pub struct JavaNOAACalculator<'a> {
     jvm: &'a Jvm,
     pub instance: Instance,
 }
+#[allow(dead_code)]
 impl<'a> JavaNOAACalculator<'a> {
+    #[allow(dead_code)]
     pub fn new(jvm: &'a Jvm) -> Self {
         Self {
             jvm,

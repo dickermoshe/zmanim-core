@@ -3,12 +3,15 @@ use zmanim_core::{prelude::*, utils::geolocation::Formula};
 
 use crate::java::timezone::create_timezone;
 
+#[allow(dead_code)]
 pub struct JavaGeoLocation<'a> {
     jvm: &'a Jvm,
     pub instance: Instance,
 }
 
+#[allow(dead_code)]
 impl<'a> JavaGeoLocation<'a> {
+    #[allow(dead_code)]
     pub fn new(jvm: &'a Jvm, geolocation: &dyn GeoLocationTrait) -> Self {
         let utc = create_timezone(jvm, "UTC");
         let instance = jvm
@@ -35,6 +38,7 @@ impl<'a> JavaGeoLocation<'a> {
         Self { jvm, instance }
     }
 
+    #[allow(dead_code)]
     pub fn invoke_with_geolocation(
         &self,
         method_name: &str,

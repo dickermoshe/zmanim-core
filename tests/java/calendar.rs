@@ -1,5 +1,6 @@
 use j4rs::{Instance, InvocationArg, Jvm};
 
+#[allow(dead_code)]
 pub fn create_calendar(jvm: &Jvm, timestamp: i64) -> Instance {
     let calendar_instance = jvm
         .invoke_static("java.util.Calendar", "getInstance", InvocationArg::empty())

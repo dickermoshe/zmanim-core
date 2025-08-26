@@ -7,6 +7,7 @@ mod java;
 mod test_utils;
 use java::jewish_calendar::JavaJewishCalendar;
 
+#[allow(dead_code)]
 fn compare_calendar_methods(
     rust_cal: &JewishCalendar,
     java_cal: &JavaJewishCalendar,

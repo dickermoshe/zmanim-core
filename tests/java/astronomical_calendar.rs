@@ -3,12 +3,14 @@ use zmanim_core::prelude::*;
 
 use crate::java::{calendar::create_calendar, date::create_date, geolocation::JavaGeoLocation};
 
+#[allow(dead_code)]
 pub struct AstronomicalCalendar<'a> {
     jvm: &'a Jvm,
     pub instance: Instance,
 }
 
 impl<'a> AstronomicalCalendar<'a> {
+    #[allow(dead_code)]
     pub fn new(jvm: &'a Jvm, timestamp: i64, geo_location: &dyn GeoLocationTrait) -> Self {
         let geolocation = JavaGeoLocation::new(jvm, geo_location);
         let calendar = create_calendar(jvm, timestamp);
@@ -28,6 +30,7 @@ impl<'a> AstronomicalCalendar<'a> {
     }
 }
 
+#[allow(dead_code)]
 impl<'a> AstronomicalCalendarTrait for AstronomicalCalendar<'a> {
     fn get_utc_sunset(&self, zenith: f64) -> Option<f64> {
         let sunrise = self

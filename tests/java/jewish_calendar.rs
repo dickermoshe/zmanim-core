@@ -1,3 +1,6 @@
+#![allow(dead_code, unused)]
+
+#[allow(dead_code, unused)]
 pub struct JavaJewishCalendar<'a> {
     pub jvm: &'a Jvm,
     pub instance: Instance,
@@ -16,6 +19,7 @@ impl Clone for JavaJewishCalendar<'_> {
     }
 }
 
+#[allow(dead_code, unused)]
 impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
     fn get_yom_tov_index(&self) -> Option<JewishHoliday> {
         let result = self

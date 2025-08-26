@@ -1,11 +1,14 @@
 use j4rs::{Instance, InvocationArg, Jvm};
 
+#[allow(dead_code)]
 pub struct JavaDaf<'a> {
     jvm: &'a Jvm,
     pub instance: Instance,
 }
 
+#[allow(dead_code)]
 impl<'a> JavaDaf<'a> {
+    #[allow(dead_code)]
     pub fn new(jvm: &'a Jvm, masechta_number: i32, daf: i32) -> Self {
         let instance = jvm
             .create_instance(

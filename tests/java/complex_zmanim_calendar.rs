@@ -9,12 +9,14 @@ use crate::java::{
     noaa_calculator::JavaNOAACalculator,
 };
 
+#[allow(dead_code)]
 pub struct JavaComplexZmanimCalendar<'a> {
     jvm: &'a Jvm,
     pub instance: Instance,
 }
 
 impl<'a> JavaComplexZmanimCalendar<'a> {
+    #[allow(dead_code)]
     pub fn new(
         jvm: &'a Jvm,
         timestamp: i64,
@@ -103,6 +105,7 @@ impl<'a> JavaComplexZmanimCalendar<'a> {
     }
 }
 
+#[allow(dead_code)]
 impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
     fn get_shaah_zmanis_19_point_8_degrees(&self) -> Option<i64> {
         java_long_to_i64(
@@ -3235,6 +3238,7 @@ impl<'a> AstronomicalCalendarTrait for JavaComplexZmanimCalendar<'a> {
     }
 }
 
+#[allow(dead_code)]
 fn java_date_to_i64(jvm: &Jvm, value: &Instance) -> Option<i64> {
     if jvm
         .check_equals(
@@ -3252,6 +3256,7 @@ fn java_date_to_i64(jvm: &Jvm, value: &Instance) -> Option<i64> {
     Some(jvm.to_rust::<i64>(result).unwrap())
 }
 
+#[allow(dead_code)]
 fn java_long_to_i64(jvm: &Jvm, value: Instance) -> Option<i64> {
     let long_value: i64 = jvm.to_rust(value).unwrap();
     if long_value == i64::MIN {

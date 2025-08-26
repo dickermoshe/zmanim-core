@@ -6,12 +6,14 @@ use crate::java::{
     noaa_calculator::JavaNOAACalculator,
 };
 
+#[allow(dead_code)]
 pub struct JavaZmanimCalendar<'a> {
     jvm: &'a Jvm,
     pub instance: Instance,
 }
 
 impl<'a> JavaZmanimCalendar<'a> {
+    #[allow(dead_code)]
     pub fn new(
         jvm: &'a Jvm,
         timestamp: i64,
@@ -87,6 +89,7 @@ impl<'a> JavaZmanimCalendar<'a> {
     }
 }
 
+#[allow(dead_code)]
 impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
     fn get_tzais(&self) -> Option<i64> {
         java_date_to_i64(
@@ -673,6 +676,7 @@ impl<'a> ZmanimCalendarTrait for JavaZmanimCalendar<'a> {
         }
     }
 }
+#[allow(dead_code)]
 fn java_date_to_i64(jvm: &Jvm, value: &Instance) -> Option<i64> {
     if jvm
         .check_equals(
