@@ -2,7 +2,7 @@ use j4rs::{ClasspathEntry, Jvm, JvmBuilder};
 
 use rand::Rng;
 use serde::Deserialize;
-use zmanim_core::{prelude::*, utils::geolocation::GeoLocationError};
+use zmanim_core::prelude::*;
 
 // Test configuration constants
 pub const DEFAULT_TEST_ITERATIONS: usize = 1000;
@@ -107,15 +107,10 @@ pub fn assert_almost_equal_f64_option(a: &Option<f64>, b: &Option<f64>, diff: f6
     }
 }
 
-pub fn assert_almost_equal_f64_result(
-    a: &Result<f64, GeoLocationError>,
-    b: &Result<f64, GeoLocationError>,
-    diff: f64,
-    message: &str,
-) {
+pub fn assert_almost_equal_f64_result(a: &Option<f64>, b: &Option<f64>, diff: f64, message: &str) {
     match (a, b) {
-        (Ok(a), Ok(b)) => assert_almost_equal_f64(*a, *b, diff, message),
-        (Err(_), Err(_)) => (), // Both errors are considered equal
+        (Some(a), Some(b)) => assert_almost_equal_f64(*a, *b, diff, message),
+        (None, None) => (),
         _ => {
             assert!(false, "Error: {:?} vs {:?}, {}", a, b, message);
         }

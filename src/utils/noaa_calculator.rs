@@ -3,17 +3,13 @@ use core::f64;
 use core::f64::consts::PI;
 use libm::{acos, asin, cos, floor, fmod, sin, tan};
 
-use crate::utils::GeoLocationTrait;
+use crate::utils::{GeoLocation, GeoLocationTrait};
 
-#[repr(C)]
-pub struct AstronomicalCalculator {
-    __: i32,
-}
-
-#[repr(C)]
-pub struct NOAACalculator {
-    __: i32,
-}
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+pub struct AstronomicalCalculator {}
+#[derive(Copy, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+pub struct NOAACalculator {}
 
 const JULIAN_DAY_JAN_1_2000: f64 = 2451545.0;
 const JULIAN_DAYS_PER_CENTURY: f64 = 36525.0;
@@ -23,15 +19,17 @@ const SOLAR_RADIUS: f64 = 16.0 / 60.0;
 const REFRACTION: f64 = 34.0 / 60.0;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[repr(u8)]
 pub enum SolarEvent {
-    Sunrise,
-    Sunset,
-    Noon,
-    Midnight,
+    Sunrise = 1,
+    Sunset = 2,
+    Noon = 3,
+    Midnight = 4,
 }
 
 impl Default for NOAACalculator {
+    #[cfg_attr(feature = "uniffi", uniffi::constructor)]
     fn default() -> Self {
         Self::new()
     }
@@ -39,7 +37,7 @@ impl Default for NOAACalculator {
 
 impl NOAACalculator {
     pub fn new() -> Self {
-        Self { __: 0 }
+        Self {}
     }
 
     fn get_elevation_adjustment(&self, elevation: f64) -> f64 {
@@ -298,37 +296,30 @@ impl NOAACalculator {
         base_minutes + (longitude * 4.0) - equation_of_time
     }
 }
+
 pub trait NOAACalculatorTrait {
     fn get_utc_sunrise(
         &self,
         timestamp: i64,
-        geo_location: &dyn GeoLocationTrait,
+        geo_location: &GeoLocation,
         zenith: f64,
         adjust_for_elevation: bool,
     ) -> Option<f64>;
     fn get_utc_sunset(
         &self,
         timestamp: i64,
-        geo_location: &dyn GeoLocationTrait,
+        geo_location: &GeoLocation,
         zenith: f64,
         adjust_for_elevation: bool,
     ) -> Option<f64>;
-    fn get_solar_elevation(
-        &self,
-        timestamp: i64,
-        geo_location: &crate::utils::geolocation::GeoLocation,
-    ) -> Option<f64>;
-    fn get_solar_azimuth(
-        &self,
-        timestamp: i64,
-        geo_location: &crate::utils::geolocation::GeoLocation,
-    ) -> Option<f64>;
-    fn get_utc_noon(&self, timestamp: i64, geo_location: &dyn GeoLocationTrait) -> Option<f64>;
-    fn get_utc_midnight(&self, timestamp: i64, geo_location: &dyn GeoLocationTrait) -> Option<f64>;
+    fn get_solar_elevation(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64>;
+    fn get_solar_azimuth(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64>;
+    fn get_utc_noon(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64>;
+    fn get_utc_midnight(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64>;
 }
-
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl NOAACalculatorTrait for NOAACalculator {
-    fn get_utc_noon(&self, timestamp: i64, geo_location: &dyn GeoLocationTrait) -> Option<f64> {
+    fn get_utc_noon(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64> {
         let julian_day = self.get_julian_day(timestamp)?;
         let noon = self.get_solar_noon_midnight_utc(
             julian_day,
@@ -343,7 +334,7 @@ impl NOAACalculatorTrait for NOAACalculator {
         })
     }
 
-    fn get_utc_midnight(&self, timestamp: i64, geo_location: &dyn GeoLocationTrait) -> Option<f64> {
+    fn get_utc_midnight(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64> {
         let julian_day = self.get_julian_day(timestamp)?;
         let midnight = self.get_solar_noon_midnight_utc(
             julian_day,
@@ -361,7 +352,7 @@ impl NOAACalculatorTrait for NOAACalculator {
     fn get_utc_sunrise(
         &self,
         timestamp: i64,
-        geo_location: &dyn GeoLocationTrait,
+        geo_location: &GeoLocation,
         zenith: f64,
         adjust_for_elevation: bool,
     ) -> Option<f64> {
@@ -389,7 +380,7 @@ impl NOAACalculatorTrait for NOAACalculator {
     fn get_utc_sunset(
         &self,
         timestamp: i64,
-        geo_location: &dyn GeoLocationTrait,
+        geo_location: &GeoLocation,
         zenith: f64,
         adjust_for_elevation: bool,
     ) -> Option<f64> {
@@ -414,19 +405,17 @@ impl NOAACalculatorTrait for NOAACalculator {
         })
     }
 
-    fn get_solar_elevation(
-        &self,
-        timestamp: i64,
-        geo_location: &crate::utils::geolocation::GeoLocation,
-    ) -> Option<f64> {
+    fn get_solar_elevation(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64> {
         self.get_solar_elevation_azimuth(timestamp, geo_location, false)
     }
 
-    fn get_solar_azimuth(
-        &self,
-        timestamp: i64,
-        geo_location: &crate::utils::geolocation::GeoLocation,
-    ) -> Option<f64> {
+    fn get_solar_azimuth(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64> {
         self.get_solar_elevation_azimuth(timestamp, geo_location, true)
     }
+}
+
+#[cfg(feature = "uniffi")]
+#[uniffi::export]
+pub fn new_noaa_calculator() -> NOAACalculator {
+    NOAACalculator::new()
 }

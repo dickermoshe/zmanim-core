@@ -3,7 +3,7 @@ use test_utils::*;
 
 mod java;
 use java::jewish_date::JavaJewishDate;
-use zmanim_core::prelude::*;
+use zmanim_core::prelude::{jewish_date::GetMoladTrait, *};
 
 #[test]
 fn test_rust_java_jewish_date_comparison() {
@@ -144,7 +144,7 @@ fn test_rust_java_jewish_date_comparison() {
         );
 
         let rust_molad_result = rust_date.get_molad();
-        let java_molad_result = JewishDateTrait::get_molad(&java_date);
+        let java_molad_result = GetMoladTrait::get_molad(&java_date);
 
         assert!(
             rust_molad_result.is_some(),

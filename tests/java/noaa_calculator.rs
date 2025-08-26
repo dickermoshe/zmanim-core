@@ -19,10 +19,7 @@ impl<'a> JavaNOAACalculator<'a> {
                 .unwrap(),
         }
     }
-}
-
-impl<'a> NOAACalculatorTrait for JavaNOAACalculator<'a> {
-    fn get_utc_noon(&self, timestamp: i64, geo_location: &dyn GeoLocationTrait) -> Option<f64> {
+    pub fn get_utc_noon(&self, timestamp: i64, geo_location: &dyn GeoLocationTrait) -> Option<f64> {
         let calendar = create_calendar(&self.jvm, timestamp);
         let geolocation = JavaGeoLocation::new(&self.jvm, geo_location);
         let result = self
@@ -39,7 +36,11 @@ impl<'a> NOAACalculatorTrait for JavaNOAACalculator<'a> {
         Some(self.jvm.to_rust::<f64>(result).unwrap())
     }
 
-    fn get_utc_midnight(&self, timestamp: i64, geo_location: &dyn GeoLocationTrait) -> Option<f64> {
+    pub fn get_utc_midnight(
+        &self,
+        timestamp: i64,
+        geo_location: &dyn GeoLocationTrait,
+    ) -> Option<f64> {
         let calendar = create_calendar(&self.jvm, timestamp);
         let geolocation = JavaGeoLocation::new(&self.jvm, geo_location);
         let result = self
@@ -56,7 +57,7 @@ impl<'a> NOAACalculatorTrait for JavaNOAACalculator<'a> {
         Some(self.jvm.to_rust::<f64>(result).unwrap())
     }
 
-    fn get_utc_sunrise(
+    pub fn get_utc_sunrise(
         &self,
         timestamp: i64,
         geo_location: &dyn GeoLocationTrait,
@@ -87,7 +88,7 @@ impl<'a> NOAACalculatorTrait for JavaNOAACalculator<'a> {
         Some(self.jvm.to_rust::<f64>(result).unwrap())
     }
 
-    fn get_utc_sunset(
+    pub fn get_utc_sunset(
         &self,
         timestamp: i64,
         geo_location: &dyn GeoLocationTrait,
@@ -118,7 +119,7 @@ impl<'a> NOAACalculatorTrait for JavaNOAACalculator<'a> {
         Some(self.jvm.to_rust::<f64>(result).unwrap())
     }
 
-    fn get_solar_elevation(
+    pub fn get_solar_elevation(
         &self,
         timestamp: i64,
         geo_location: &zmanim_core::utils::geolocation::GeoLocation,
@@ -139,7 +140,7 @@ impl<'a> NOAACalculatorTrait for JavaNOAACalculator<'a> {
         Some(self.jvm.to_rust::<f64>(result).unwrap())
     }
 
-    fn get_solar_azimuth(
+    pub fn get_solar_azimuth(
         &self,
         timestamp: i64,
         geo_location: &zmanim_core::utils::geolocation::GeoLocation,

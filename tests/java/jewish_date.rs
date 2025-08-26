@@ -4,7 +4,7 @@ pub struct JavaJewishDate<'a> {
 }
 
 use j4rs::{Instance, InvocationArg, Jvm};
-use zmanim_core::hebrew_calendar::MoladData;
+use zmanim_core::{hebrew_calendar::MoladData, prelude::jewish_date::GetMoladTrait};
 
 use crate::java::calendar::create_calendar;
 
@@ -161,58 +161,6 @@ impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewi
             )
             .unwrap();
         self.jvm.to_rust(result).unwrap()
-    }
-
-    fn get_molad(
-        &self,
-    ) -> Option<(
-        impl zmanim_core::hebrew_calendar::JewishDateTrait,
-        zmanim_core::hebrew_calendar::MoladData,
-    )> {
-        let molad_date = self
-            .jvm
-            .invoke(&self.instance, "getMolad", InvocationArg::empty())
-            .unwrap();
-
-        let molad_date = JavaJewishDate {
-            jvm: self.jvm,
-            instance: molad_date,
-        };
-        let molad_hours_result = self
-            .jvm
-            .invoke(
-                &molad_date.instance,
-                "getMoladHours",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        let molad_hours: i64 = self.jvm.to_rust(molad_hours_result).unwrap();
-        let molad_minutes_result = self
-            .jvm
-            .invoke(
-                &molad_date.instance,
-                "getMoladMinutes",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        let molad_minutes: i64 = self.jvm.to_rust(molad_minutes_result).unwrap();
-        let molad_chalakim_result = self
-            .jvm
-            .invoke(
-                &molad_date.instance,
-                "getMoladChalakim",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        let molad_chalakim: i64 = self.jvm.to_rust(molad_chalakim_result).unwrap();
-        Some((
-            molad_date,
-            MoladData {
-                hours: molad_hours,
-                minutes: molad_minutes,
-                chalakim: molad_chalakim,
-            },
-        ))
     }
 }
 
@@ -463,5 +411,59 @@ impl<'a> JavaJewishDate<'a> {
             )
             .unwrap();
         jvm.to_rust(result).unwrap()
+    }
+}
+
+impl GetMoladTrait for JavaJewishDate<'_> {
+    fn get_molad(
+        &self,
+    ) -> Option<(
+        impl zmanim_core::hebrew_calendar::JewishDateTrait,
+        zmanim_core::hebrew_calendar::MoladData,
+    )> {
+        let molad_date = self
+            .jvm
+            .invoke(&self.instance, "getMolad", InvocationArg::empty())
+            .unwrap();
+
+        let molad_date = JavaJewishDate {
+            jvm: self.jvm,
+            instance: molad_date,
+        };
+        let molad_hours_result = self
+            .jvm
+            .invoke(
+                &molad_date.instance,
+                "getMoladHours",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        let molad_hours: i64 = self.jvm.to_rust(molad_hours_result).unwrap();
+        let molad_minutes_result = self
+            .jvm
+            .invoke(
+                &molad_date.instance,
+                "getMoladMinutes",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        let molad_minutes: i64 = self.jvm.to_rust(molad_minutes_result).unwrap();
+        let molad_chalakim_result = self
+            .jvm
+            .invoke(
+                &molad_date.instance,
+                "getMoladChalakim",
+                InvocationArg::empty(),
+            )
+            .unwrap();
+        let molad_chalakim: i64 = self.jvm.to_rust(molad_chalakim_result).unwrap();
+        Some((
+            molad_date,
+            zmanim_core::hebrew_calendar::MoladData {
+                hours: molad_hours,
+                minutes: molad_minutes,
+                chalakim: molad_chalakim,
+            },
+        ))
     }
 }

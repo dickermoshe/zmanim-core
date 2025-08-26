@@ -4,16 +4,17 @@ use crate::{
     },
     utils::GeoLocation,
 };
+#[cfg(feature = "uniffi")]
+use std::sync::Arc;
 
 const ZENITH_16_POINT_1: f64 = GEOMETRIC_ZENITH + 16.1;
 const ZENITH_8_POINT_5: f64 = GEOMETRIC_ZENITH + 8.5;
-
-#[repr(C)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct ZmanimCalendar {
-    astronomical_calendar: AstronomicalCalendar,
-    use_astronomical_chatzos: bool,
-    use_astronomical_chatzos_for_other_zmanim: bool,
-    candle_lighting_offset: i64,
+    pub astronomical_calendar: AstronomicalCalendar,
+    pub use_astronomical_chatzos: bool,
+    pub use_astronomical_chatzos_for_other_zmanim: bool,
+    pub candle_lighting_offset: i64,
 }
 
 pub trait ZmanimCalendarTrait {
@@ -112,11 +113,26 @@ impl ZmanimCalendar {
             candle_lighting_offset,
         }
     }
-    pub fn get_astronomical_calendar(&self) -> &AstronomicalCalendar {
-        &self.astronomical_calendar
-    }
 }
 
+#[cfg(feature = "uniffi")]
+#[uniffi::export]
+pub fn new_zmanim_calendar(
+    timestamp: i64,
+    geo_location: Arc<GeoLocation>,
+    use_astronomical_chatzos: bool,
+    use_astronomical_chatzos_for_other_zmanim: bool,
+    candle_lighting_offset: i64,
+) -> Arc<ZmanimCalendar> {
+    Arc::new(ZmanimCalendar::new(
+        timestamp,
+        (*geo_location).clone(),
+        use_astronomical_chatzos,
+        use_astronomical_chatzos_for_other_zmanim,
+        candle_lighting_offset,
+    ))
+}
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl ZmanimCalendarTrait for ZmanimCalendar {
     fn get_tzais(&self) -> Option<i64> {
         self.astronomical_calendar
@@ -161,7 +177,6 @@ impl ZmanimCalendarTrait for ZmanimCalendar {
                 .get_sunrise_offset_by_degrees(GEOMETRIC_ZENITH + degrees)
         };
 
-        
         match (sea_level_sunrise, sea_level_sunset, twilight) {
             (Some(sunrise), Some(sunset_time), Some(twilight_time)) => {
                 let shaah_zmanis = (sunset_time - sunrise) as f64 / 12.0;
@@ -388,5 +403,22 @@ impl ZmanimCalendarTrait for ZmanimCalendar {
     fn get_shaah_zmanis_mga(&self) -> Option<i64> {
         self.astronomical_calendar
             .get_temporal_hour_with_start_and_end_times(self.get_alos72()?, self.get_tzais72()?)
+    }
+}
+
+#[cfg(feature = "uniffi")]
+#[uniffi::export]
+impl ZmanimCalendar {
+    pub fn get_astronomical_calendar(&self) -> AstronomicalCalendar {
+        self.astronomical_calendar
+    }
+    pub fn get_use_astronomical_chatzos(&self) -> bool {
+        self.use_astronomical_chatzos
+    }
+    pub fn get_use_astronomical_chatzos_for_other_zmanim(&self) -> bool {
+        self.use_astronomical_chatzos_for_other_zmanim
+    }
+    pub fn get_candle_lighting_offset(&self) -> i64 {
+        self.candle_lighting_offset
     }
 }

@@ -1,4 +1,7 @@
-use zmanim_core::hebrew_calendar::{JewishCalendar, JewishCalendarTrait, JewishDateTrait};
+use zmanim_core::{
+    hebrew_calendar::{JewishCalendar, JewishCalendarTrait, JewishDateTrait},
+    prelude::jewish_calendar::GetDafYomiBavliTrait,
+};
 
 mod java;
 mod test_utils;
@@ -13,9 +16,9 @@ fn compare_calendar_methods(
     let formatted_java_date = format!(
         "{:?} {:?} {:?} {:?}",
         java_cal.get_jewish_year(),
-        java_cal.get_jewish_month(),
+        java_cal.get_jewish_month_int(),
         java_cal.get_jewish_day_of_month(),
-        java_cal.get_day_of_week(),
+        java_cal.get_day_of_week_int(),
     );
     let formatted_rust_date = format!(
         "{:?} {:?} {:?} {:?}",
@@ -43,9 +46,9 @@ fn compare_calendar_methods(
     let formatted_java_date = format!(
         "{:?} {:?} {:?} {:?}",
         java_cal.get_jewish_year(),
-        java_cal.get_jewish_month(),
+        java_cal.get_jewish_month_int(),
         java_cal.get_jewish_day_of_month(),
-        java_cal.get_day_of_week(),
+        java_cal.get_day_of_week_int(),
     );
     let formatted_rust_date = format!(
         "{:?} {:?} {:?} {:?}",

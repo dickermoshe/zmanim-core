@@ -1,8 +1,11 @@
 use core::f64;
 use core::f64::consts::PI;
 use libm::{atan, atan2, cos, log, sin, sqrt, tan};
+#[cfg(feature = "uniffi")]
+use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+#[derive(Debug, Clone, PartialEq, Copy)]
 #[repr(C)]
 pub struct GeoLocation {
     pub latitude: f64,
@@ -12,76 +15,66 @@ pub struct GeoLocation {
     pub elevation: f64,
 }
 
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[repr(u8)]
 pub enum Formula {
-    Distance,
-    InitialBearing,
-    FinalBearing,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[repr(u8)]
-pub enum GeoLocationError {
-    InvalidLatitude,
-    InvalidLongitude,
-    InvalidElevation,
-    FormulaError,
+    Distance = 0,
+    InitialBearing = 1,
+    FinalBearing = 2,
 }
 
 pub trait GeoLocationTrait {
-    fn geodesic_initial_bearing(&self, location: &GeoLocation) -> Result<f64, GeoLocationError>;
-    fn geodesic_final_bearing(&self, location: &GeoLocation) -> Result<f64, GeoLocationError>;
-    fn geodesic_distance(&self, location: &GeoLocation) -> Result<f64, GeoLocationError>;
+    fn geodesic_initial_bearing(&self, location: &GeoLocation) -> Option<f64>;
+    fn geodesic_final_bearing(&self, location: &GeoLocation) -> Option<f64>;
+    fn geodesic_distance(&self, location: &GeoLocation) -> Option<f64>;
     fn rhumb_line_bearing(&self, location: &GeoLocation) -> f64;
     fn rhumb_line_distance(&self, location: &GeoLocation) -> f64;
-    fn vincenty_inverse_formula(
-        &self,
-        location: &GeoLocation,
-        formula: Formula,
-    ) -> Result<f64, GeoLocationError>;
+    fn vincenty_inverse_formula(&self, location: &GeoLocation, formula: Formula) -> Option<f64>;
     fn get_latitude(&self) -> f64;
     fn get_longitude(&self) -> f64;
     fn get_elevation(&self) -> f64;
 }
 
 impl GeoLocation {
-    pub fn new(latitude: f64, longitude: f64, elevation: f64) -> Result<Self, GeoLocationError> {
+    pub fn new(latitude: f64, longitude: f64, elevation: f64) -> Option<Self> {
         if !(-90.0..=90.0).contains(&latitude) {
-            return Err(GeoLocationError::InvalidLatitude);
+            return None;
         }
         if !(-180.0..=180.0).contains(&longitude) {
-            return Err(GeoLocationError::InvalidLongitude);
+            return None;
         }
         if elevation < 0.0 {
-            return Err(GeoLocationError::InvalidElevation);
+            return None;
         }
 
-        Ok(GeoLocation {
+        Some(GeoLocation {
             latitude,
             longitude,
             elevation,
         })
     }
 }
+#[cfg(feature = "uniffi")]
+#[uniffi::export]
+pub fn new_geolocation(latitude: f64, longitude: f64, elevation: f64) -> Option<Arc<GeoLocation>> {
+    GeoLocation::new(latitude, longitude, elevation).map(Arc::new)
+}
 
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl GeoLocationTrait for GeoLocation {
-    fn geodesic_initial_bearing(&self, location: &GeoLocation) -> Result<f64, GeoLocationError> {
+    fn geodesic_initial_bearing(&self, location: &GeoLocation) -> Option<f64> {
         self.vincenty_inverse_formula(location, Formula::InitialBearing)
     }
 
-    fn geodesic_final_bearing(&self, location: &GeoLocation) -> Result<f64, GeoLocationError> {
+    fn geodesic_final_bearing(&self, location: &GeoLocation) -> Option<f64> {
         self.vincenty_inverse_formula(location, Formula::FinalBearing)
     }
 
-    fn geodesic_distance(&self, location: &GeoLocation) -> Result<f64, GeoLocationError> {
+    fn geodesic_distance(&self, location: &GeoLocation) -> Option<f64> {
         self.vincenty_inverse_formula(location, Formula::Distance)
     }
 
-    fn vincenty_inverse_formula(
-        &self,
-        location: &GeoLocation,
-        formula: Formula,
-    ) -> Result<f64, GeoLocationError> {
+    fn vincenty_inverse_formula(&self, location: &GeoLocation, formula: Formula) -> Option<f64> {
         let major_semi_axis = 6378137.0;
         let minor_semi_axis = 6356752.3142;
         let f = 1.0 / 298.257223563;
@@ -116,7 +109,7 @@ impl GeoLocationTrait for GeoLocation {
             );
 
             if sin_sigma == 0.0 {
-                return Ok(0.0);
+                return Some(0.0);
             }
 
             cos_sigma = sin_u1 * sin_u2 + cos_u1 * cos_u2 * cos_lambda;
@@ -144,7 +137,7 @@ impl GeoLocationTrait for GeoLocation {
         }
 
         if iter_limit == 0 {
-            return Err(GeoLocationError::FormulaError);
+            return None;
         }
 
         let u_sq = cos_sq_alpha
@@ -176,9 +169,9 @@ impl GeoLocationTrait for GeoLocation {
         .to_degrees();
 
         match formula {
-            Formula::Distance => Ok(distance),
-            Formula::InitialBearing => Ok(fwd_az),
-            Formula::FinalBearing => Ok(rev_az),
+            Formula::Distance => Some(distance),
+            Formula::InitialBearing => Some(fwd_az),
+            Formula::FinalBearing => Some(rev_az),
         }
     }
 

@@ -1,4 +1,7 @@
-#![no_std]
+#![cfg_attr(not(feature = "uniffi"), no_std)]
+
+#[cfg(feature = "uniffi")]
+uniffi::setup_scaffolding!();
 
 pub mod astronomical_calendar;
 pub mod complex_zmanim_calendar;

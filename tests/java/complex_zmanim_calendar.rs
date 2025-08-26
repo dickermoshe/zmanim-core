@@ -2240,18 +2240,6 @@ impl<'a> ComplexZmanimCalendarTrait for JavaComplexZmanimCalendar<'a> {
         )
     }
 
-    fn get_ateret_torah_sunset_offset(&self) -> i64 {
-        let result = self
-            .jvm
-            .invoke(
-                &self.instance,
-                "getAteretTorahSunsetOffset",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        (self.jvm.to_rust::<f64>(result).unwrap() * 1000.0 * 60.0) as i64
-    }
-
     fn get_bain_hasmashosrt_13_point_24_degrees(&self) -> Option<i64> {
         java_date_to_i64(
             &self.jvm,

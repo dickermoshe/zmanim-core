@@ -6,11 +6,9 @@ pub struct JavaJewishCalendar<'a> {
 }
 
 use j4rs::{Instance, InvocationArg, Jvm};
-use zmanim_core::prelude::*;
+use zmanim_core::prelude::{jewish_calendar::GetDafYomiBavliTrait, *};
 
 use crate::java::calendar::create_calendar;
-
-use super::jewish_date::JavaJewishDate;
 
 impl Clone for JavaJewishCalendar<'_> {
     fn clone(&self) -> Self {
@@ -279,31 +277,6 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
         self.jvm.to_rust(result).unwrap()
     }
 
-    fn get_daf_yomi_bavli(&self) -> Option<BavliDaf> {
-        let result = self
-            .jvm
-            .invoke(&self.instance, "getDafYomiBavli", InvocationArg::empty());
-
-        let result = result.ok()?;
-
-        let masechta_result = self
-            .jvm
-            .invoke(&result, "getMasechtaNumber", InvocationArg::empty())
-            .unwrap();
-        let masechta_number: u32 = self.jvm.to_rust(masechta_result).unwrap();
-
-        let daf_result = self
-            .jvm
-            .invoke(&result, "getDaf", InvocationArg::empty())
-            .unwrap();
-        let daf_number: i32 = self.jvm.to_rust(daf_result).unwrap();
-
-        Some(BavliDaf::new(
-            BavliTractate::from(masechta_number as i32),
-            daf_number,
-        ))
-    }
-
     fn get_parshah(&self) -> Parsha {
         let result: Instance = self
             .jvm
@@ -386,213 +359,6 @@ impl<'a> JewishCalendarTrait for JavaJewishCalendar<'a> {
             "NACHAMU" => Parsha::NACHAMU,
             _ => Parsha::NONE,
         }
-    }
-}
-
-impl<'a> zmanim_core::hebrew_calendar::jewish_date::JewishDateTrait for JavaJewishCalendar<'a> {
-    fn get_jewish_year(&self) -> i32 {
-        let result = self
-            .jvm
-            .invoke(&self.instance, "getJewishYear", InvocationArg::empty())
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
-    fn get_jewish_month(&self) -> JewishMonth {
-        let result: Instance = self
-            .jvm
-            .invoke(&self.instance, "getJewishMonth", InvocationArg::empty())
-            .unwrap();
-        let month: i32 = self.jvm.to_rust(result).unwrap();
-        month.into()
-    }
-
-    fn get_jewish_day_of_month(&self) -> i32 {
-        let result = self
-            .jvm
-            .invoke(
-                &self.instance,
-                "getJewishDayOfMonth",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
-    fn get_gregorian_year(&self) -> i32 {
-        let result = self
-            .jvm
-            .invoke(&self.instance, "getGregorianYear", InvocationArg::empty())
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
-    fn get_gregorian_month(&self) -> i32 {
-        let result = self
-            .jvm
-            .invoke(&self.instance, "getGregorianMonth", InvocationArg::empty())
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
-    fn get_gregorian_day_of_month(&self) -> i32 {
-        let result = self
-            .jvm
-            .invoke(
-                &self.instance,
-                "getGregorianDayOfMonth",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
-    fn get_day_of_week(&self) -> DayOfWeek {
-        let result: Instance = self
-            .jvm
-            .invoke(&self.instance, "getDayOfWeek", InvocationArg::empty())
-            .unwrap();
-        let day_of_week: i32 = self.jvm.to_rust(result).unwrap();
-        day_of_week.into()
-    }
-
-    fn is_jewish_leap_year(&self) -> bool {
-        let result = self
-            .jvm
-            .invoke(&self.instance, "isJewishLeapYear", InvocationArg::empty())
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
-    fn get_days_in_jewish_year(&self) -> i32 {
-        let result = self
-            .jvm
-            .invoke(
-                &self.instance,
-                "getDaysInJewishYear",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
-    fn get_days_in_jewish_month(&self) -> i32 {
-        let result = self
-            .jvm
-            .invoke(
-                &self.instance,
-                "getDaysInJewishMonth",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
-    fn is_cheshvan_long(&self) -> bool {
-        let result = self
-            .jvm
-            .invoke(&self.instance, "isCheshvanLong", InvocationArg::empty())
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
-    fn is_kislev_short(&self) -> bool {
-        let result = self
-            .jvm
-            .invoke(&self.instance, "isKislevShort", InvocationArg::empty())
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
-    fn get_cheshvan_kislev_kviah(
-        &self,
-    ) -> zmanim_core::hebrew_calendar::jewish_date::YearLengthType {
-        let result: Instance = self
-            .jvm
-            .invoke(
-                &self.instance,
-                "getCheshvanKislevKviah",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        let kviah: i32 = self.jvm.to_rust(result).unwrap();
-        kviah.into()
-    }
-
-    fn get_days_since_start_of_jewish_year(&self) -> i32 {
-        let result = self
-            .jvm
-            .invoke(
-                &self.instance,
-                "getDaysSinceStartOfJewishYear",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
-    fn get_chalakim_since_molad_tohu(&self) -> i64 {
-        let result = self
-            .jvm
-            .invoke(
-                &self.instance,
-                "getChalakimSinceMoladTohu",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        self.jvm.to_rust(result).unwrap()
-    }
-
-    fn get_molad(
-        &self,
-    ) -> Option<(
-        impl zmanim_core::hebrew_calendar::JewishDateTrait,
-        zmanim_core::hebrew_calendar::MoladData,
-    )> {
-        let molad_date = self
-            .jvm
-            .invoke(&self.instance, "getMolad", InvocationArg::empty())
-            .unwrap();
-
-        let molad_date = JavaJewishDate {
-            jvm: self.jvm,
-            instance: molad_date,
-        };
-        let molad_hours_result = self
-            .jvm
-            .invoke(
-                &molad_date.instance,
-                "getMoladHours",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        let molad_hours: i64 = self.jvm.to_rust(molad_hours_result).unwrap();
-        let molad_minutes_result = self
-            .jvm
-            .invoke(
-                &molad_date.instance,
-                "getMoladMinutes",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        let molad_minutes: i64 = self.jvm.to_rust(molad_minutes_result).unwrap();
-        let molad_chalakim_result = self
-            .jvm
-            .invoke(
-                &molad_date.instance,
-                "getMoladChalakim",
-                InvocationArg::empty(),
-            )
-            .unwrap();
-        let molad_chalakim: i64 = self.jvm.to_rust(molad_chalakim_result).unwrap();
-        Some((
-            molad_date,
-            zmanim_core::hebrew_calendar::MoladData {
-                hours: molad_hours,
-                minutes: molad_minutes,
-                chalakim: molad_chalakim,
-            },
-        ))
     }
 }
 
@@ -691,56 +457,31 @@ impl<'a> JavaJewishCalendar<'a> {
             .unwrap();
         self.jvm.to_rust(result).unwrap()
     }
+}
 
-    pub fn get_daf_yomi_bavli_java(&self) -> Instance {
-        self.jvm
-            .invoke(&self.instance, "getDafYomiBavli", InvocationArg::empty())
-            .unwrap()
-    }
+impl GetDafYomiBavliTrait for JavaJewishCalendar<'_> {
+    fn get_daf_yomi_bavli(&self) -> Option<BavliDaf> {
+        let result = self
+            .jvm
+            .invoke(&self.instance, "getDafYomiBavli", InvocationArg::empty());
 
-    pub fn get_molad_as_date(&self) -> Instance {
-        self.jvm
-            .invoke(&self.instance, "getMoladAsDate", InvocationArg::empty())
-            .unwrap()
-    }
+        let result = result.ok()?;
 
-    pub fn get_tchilas_zman_kidush_levana_3_days(&self) -> Instance {
-        self.jvm
-            .invoke(
-                &self.instance,
-                "getTchilasZmanKidushLevana3Days",
-                InvocationArg::empty(),
-            )
-            .unwrap()
-    }
+        let masechta_result = self
+            .jvm
+            .invoke(&result, "getMasechtaNumber", InvocationArg::empty())
+            .unwrap();
+        let masechta_number: u32 = self.jvm.to_rust(masechta_result).unwrap();
 
-    pub fn get_tchilas_zman_kidush_levana_7_days(&self) -> Instance {
-        self.jvm
-            .invoke(
-                &self.instance,
-                "getTchilasZmanKidushLevana7Days",
-                InvocationArg::empty(),
-            )
-            .unwrap()
-    }
+        let daf_result = self
+            .jvm
+            .invoke(&result, "getDaf", InvocationArg::empty())
+            .unwrap();
+        let daf_number: i32 = self.jvm.to_rust(daf_result).unwrap();
 
-    pub fn get_so_fzman_kidush_levana_between_moldos(&self) -> Instance {
-        self.jvm
-            .invoke(
-                &self.instance,
-                "getSofZmanKidushLevanaBetweenMoldos",
-                InvocationArg::empty(),
-            )
-            .unwrap()
-    }
-
-    pub fn get_so_fzman_kidush_levana_15_days(&self) -> Instance {
-        self.jvm
-            .invoke(
-                &self.instance,
-                "getSofZmanKidushLevana15Days",
-                InvocationArg::empty(),
-            )
-            .unwrap()
+        Some(BavliDaf::new(
+            BavliTractate::from(masechta_number as i32),
+            daf_number,
+        ))
     }
 }

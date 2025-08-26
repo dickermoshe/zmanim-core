@@ -444,7 +444,7 @@ fn test_complex_zmanim_calendar_comprehensive() {
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar
                 .zmanim_calendar
-                .get_astronomical_calendar()
+                .astronomical_calendar
                 .get_sunrise(),
             &java_complex_zmanim_calendar.get_sunrise(),
             1,
@@ -454,7 +454,7 @@ fn test_complex_zmanim_calendar_comprehensive() {
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar
                 .zmanim_calendar
-                .get_astronomical_calendar()
+                .astronomical_calendar
                 .get_sunset(),
             &java_complex_zmanim_calendar.get_sunset(),
             1,
@@ -464,7 +464,7 @@ fn test_complex_zmanim_calendar_comprehensive() {
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar
                 .zmanim_calendar
-                .get_astronomical_calendar()
+                .astronomical_calendar
                 .get_sun_transit(),
             &java_complex_zmanim_calendar.get_sun_transit(),
             1,
@@ -474,16 +474,9 @@ fn test_complex_zmanim_calendar_comprehensive() {
         assert_almost_equal_i64_option(
             &complex_zmanim_calendar
                 .zmanim_calendar
-                .get_astronomical_calendar()
+                .astronomical_calendar
                 .get_temporal_hour(),
             &java_complex_zmanim_calendar.get_temporal_hour(),
-            1,
-            &message,
-        );
-
-        assert_almost_equal_i64(
-            complex_zmanim_calendar.get_ateret_torah_sunset_offset(),
-            java_complex_zmanim_calendar.get_ateret_torah_sunset_offset(),
             1,
             &message,
         );

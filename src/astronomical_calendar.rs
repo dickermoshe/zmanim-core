@@ -1,14 +1,16 @@
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
+#[cfg(feature = "uniffi")]
+use std::sync::Arc;
 
 use crate::utils::{
     GeoLocation, GeoLocationTrait, NOAACalculator, NOAACalculatorTrait, SolarEvent,
 };
-
-#[repr(C)]
+#[derive(Copy, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct AstronomicalCalendar {
-    timestamp: i64,
-    geo_location: GeoLocation,
-    noaa_calculator: NOAACalculator,
+    pub timestamp: i64,
+    pub geo_location: GeoLocation,
+    pub noaa_calculator: NOAACalculator,
 }
 
 pub const GEOMETRIC_ZENITH: f64 = 90.0;
@@ -117,6 +119,19 @@ impl AstronomicalCalendar {
     }
 }
 
+#[cfg(feature = "uniffi")]
+#[uniffi::export]
+pub fn new_astronomical_calendar(
+    timestamp: i64,
+    geo_location: Arc<GeoLocation>,
+) -> Arc<AstronomicalCalendar> {
+    Arc::new(AstronomicalCalendar::new(
+        timestamp,
+        (*geo_location).clone(),
+    ))
+}
+
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl AstronomicalCalendarTrait for AstronomicalCalendar {
     fn get_utc_sunset(&self, zenith: f64) -> Option<f64> {
         self.noaa_calculator
@@ -238,5 +253,19 @@ impl AstronomicalCalendarTrait for AstronomicalCalendar {
             return None;
         }
         self.get_date_from_time(midnight, SolarEvent::Midnight)
+    }
+}
+
+#[cfg(feature = "uniffi")]
+#[uniffi::export]
+impl AstronomicalCalendar {
+    pub fn get_timestamp(&self) -> i64 {
+        self.timestamp
+    }
+    pub fn get_geo_location(&self) -> GeoLocation {
+        self.geo_location
+    }
+    pub fn get_noaa_calculator(&self) -> NOAACalculator {
+        self.noaa_calculator
     }
 }

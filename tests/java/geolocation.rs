@@ -1,8 +1,5 @@
 use j4rs::{Instance, InvocationArg, Jvm};
-use zmanim_core::{
-    prelude::*,
-    utils::geolocation::{Formula, GeoLocationError},
-};
+use zmanim_core::{prelude::*, utils::geolocation::Formula};
 
 use crate::java::timezone::create_timezone;
 
@@ -54,50 +51,47 @@ impl<'a> JavaGeoLocation<'a> {
             .unwrap();
         self.jvm.to_rust::<f64>(result).unwrap()
     }
-}
-
-impl<'a> GeoLocationTrait for JavaGeoLocation<'a> {
-    fn geodesic_initial_bearing(&self, location: &GeoLocation) -> Result<f64, GeoLocationError> {
+    pub fn geodesic_initial_bearing(&self, location: &GeoLocation) -> Option<f64> {
         let result = self.invoke_with_geolocation("getGeodesicInitialBearing", location);
         if result.is_nan() {
-            Err(GeoLocationError::FormulaError)
+            None
         } else {
-            Ok(result)
+            Some(result)
         }
     }
 
-    fn geodesic_final_bearing(&self, location: &GeoLocation) -> Result<f64, GeoLocationError> {
+    pub fn geodesic_final_bearing(&self, location: &GeoLocation) -> Option<f64> {
         let result = self.invoke_with_geolocation("getGeodesicFinalBearing", location);
         if result.is_nan() {
-            Err(GeoLocationError::FormulaError)
+            None
         } else {
-            Ok(result)
+            Some(result)
         }
     }
 
-    fn geodesic_distance(&self, location: &GeoLocation) -> Result<f64, GeoLocationError> {
+    pub fn geodesic_distance(&self, location: &GeoLocation) -> Option<f64> {
         let result = self.invoke_with_geolocation("getGeodesicDistance", location);
 
         if result.is_nan() {
-            Err(GeoLocationError::FormulaError)
+            None
         } else {
-            Ok(result)
+            Some(result)
         }
     }
 
-    fn rhumb_line_bearing(&self, location: &GeoLocation) -> f64 {
+    pub fn rhumb_line_bearing(&self, location: &GeoLocation) -> f64 {
         self.invoke_with_geolocation("getRhumbLineBearing", location)
     }
 
-    fn rhumb_line_distance(&self, location: &GeoLocation) -> f64 {
+    pub fn rhumb_line_distance(&self, location: &GeoLocation) -> f64 {
         self.invoke_with_geolocation("getRhumbLineDistance", location)
     }
 
-    fn vincenty_inverse_formula(
+    pub fn vincenty_inverse_formula(
         &self,
         location: &GeoLocation,
         formula: Formula,
-    ) -> Result<f64, GeoLocationError> {
+    ) -> Option<f64> {
         let java_other = JavaGeoLocation::new(&self.jvm, location);
         let formula_arg = match formula {
             Formula::Distance => 0,
@@ -120,13 +114,13 @@ impl<'a> GeoLocationTrait for JavaGeoLocation<'a> {
             .unwrap();
         let result = self.jvm.to_rust::<f64>(instance).unwrap();
         if result.is_nan() {
-            Err(GeoLocationError::FormulaError)
+            None
         } else {
-            Ok(result)
+            Some(result)
         }
     }
 
-    fn get_latitude(&self) -> f64 {
+    pub fn get_latitude(&self) -> f64 {
         let result = self
             .jvm
             .invoke(&self.instance, "getLatitude", InvocationArg::empty())
@@ -134,7 +128,7 @@ impl<'a> GeoLocationTrait for JavaGeoLocation<'a> {
         self.jvm.to_rust::<f64>(result).unwrap()
     }
 
-    fn get_longitude(&self) -> f64 {
+    pub fn get_longitude(&self) -> f64 {
         let result = self
             .jvm
             .invoke(&self.instance, "getLongitude", InvocationArg::empty())
@@ -142,7 +136,7 @@ impl<'a> GeoLocationTrait for JavaGeoLocation<'a> {
         self.jvm.to_rust::<f64>(result).unwrap()
     }
 
-    fn get_elevation(&self) -> f64 {
+    pub fn get_elevation(&self) -> f64 {
         let result = self
             .jvm
             .invoke(&self.instance, "getElevation", InvocationArg::empty())

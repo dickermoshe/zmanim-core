@@ -1,13 +1,12 @@
 use chrono::NaiveDate;
 
-use serde::{Deserialize, Serialize};
-
 use crate::hebrew_calendar::parsha::*;
 use crate::hebrew_calendar::yomi_calculator::YomiCalculator;
 
 use super::daf::BavliDaf;
 use super::jewish_date::{date_constants, DayOfWeek, JewishDate, JewishDateTrait, JewishMonth};
-
+#[cfg(feature = "uniffi")]
+use std::sync::Arc;
 pub trait JewishCalendarTrait {
     fn get_yom_tov_index(&self) -> Option<JewishHoliday>;
 
@@ -67,19 +66,23 @@ pub trait JewishCalendarTrait {
 
     fn is_tisha_beav(&self) -> bool;
 
-    fn get_daf_yomi_bavli(&self) -> Option<BavliDaf>;
-
     fn get_parshah(&self) -> Parsha;
 }
 
+pub trait GetDafYomiBavliTrait {
+    fn get_daf_yomi_bavli(&self) -> Option<BavliDaf>;
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct JewishCalendar {
     pub jewish_date: JewishDate,
     pub in_israel: bool,
     pub use_modern_holidays: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[repr(u8)]
 pub enum JewishHoliday {
     #[allow(non_camel_case_types)]
@@ -213,12 +216,7 @@ impl JewishCalendar {
             use_modern_holidays,
         })
     }
-
-    pub fn get_jewish_date(&self) -> &JewishDate {
-        &self.jewish_date
-    }
 }
-
 impl JewishCalendar {
     pub fn is_yom_tov(&self) -> bool {
         let holiday_index = self.get_yom_tov_index();
@@ -392,6 +390,7 @@ impl JewishCalendar {
     }
 }
 
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl JewishCalendarTrait for JewishCalendar {
     fn get_yom_tov_index(&self) -> Option<JewishHoliday> {
         let day = self.jewish_date.get_jewish_day_of_month();
@@ -418,9 +417,9 @@ impl JewishCalendarTrait for JewishCalendar {
                         || (day == 27
                             && day_of_week != DayOfWeek::Sunday
                             && day_of_week != DayOfWeek::Friday))
-                    {
-                        return Some(JewishHoliday::YOM_HASHOAH);
-                    }
+                {
+                    return Some(JewishHoliday::YOM_HASHOAH);
+                }
             }
 
             JewishMonth::IYAR => {
@@ -810,21 +809,6 @@ impl JewishCalendarTrait for JewishCalendar {
         self.get_yom_tov_index() == Some(JewishHoliday::TISHA_BEAV)
     }
 
-    fn get_daf_yomi_bavli(&self) -> Option<BavliDaf> {
-        let day = self.jewish_date.gregorian_date.day_of_month().0;
-        let month = self.jewish_date.gregorian_date.month().ordinal;
-        let year = self
-            .jewish_date
-            .gregorian_date
-            .year()
-            .era_year_or_related_iso();
-        let timestamp = NaiveDate::from_ymd_opt(year, month as u32, day as u32)?
-            .and_hms_opt(0, 0, 0)?
-            .and_utc()
-            .timestamp_millis();
-        YomiCalculator::get_daf_yomi_bavli(timestamp)
-    }
-
     fn get_parshah(&self) -> Parsha {
         if self.jewish_date.get_day_of_week() != DayOfWeek::Saturday {
             return Parsha::NONE;
@@ -858,5 +842,38 @@ impl JewishCalendarTrait for JewishCalendar {
             Some(16) => PARSHA_LIST_16[(day / 7) as usize],
             _ => Parsha::NONE,
         }
+    }
+}
+impl GetDafYomiBavliTrait for JewishCalendar {
+    fn get_daf_yomi_bavli(&self) -> Option<BavliDaf> {
+        let day = self.jewish_date.gregorian_date.day_of_month().0;
+        let month = self.jewish_date.gregorian_date.month().ordinal;
+        let year = self
+            .jewish_date
+            .gregorian_date
+            .year()
+            .era_year_or_related_iso();
+        let timestamp = NaiveDate::from_ymd_opt(year, month as u32, day as u32)?
+            .and_hms_opt(0, 0, 0)?
+            .and_utc()
+            .timestamp_millis();
+        YomiCalculator::get_daf_yomi_bavli(timestamp)
+    }
+}
+
+#[cfg(feature = "uniffi")]
+#[uniffi::export]
+impl JewishCalendar {
+    pub fn get_jewish_date(&self) -> JewishDate {
+        self.jewish_date.clone()
+    }
+    pub fn get_in_israel(&self) -> bool {
+        self.in_israel
+    }
+    pub fn get_use_modern_holidays(&self) -> bool {
+        self.use_modern_holidays
+    }
+    pub fn get_bavli_daf_yomi(&self) -> Option<Arc<BavliDaf>> {
+        self.get_daf_yomi_bavli().map(|daf| Arc::new(daf))
     }
 }

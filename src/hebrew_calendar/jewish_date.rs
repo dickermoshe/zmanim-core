@@ -4,120 +4,8 @@ use chrono::Duration as ChronoDuration;
 use icu_calendar::cal::Hebrew;
 use icu_calendar::Gregorian;
 use icu_calendar::{types::Weekday, Date, DateDuration};
-
-use serde::Deserialize;
-use serde::Serialize;
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
-#[repr(u8)]
-pub enum JewishMonth {
-    NISSAN = date_constants::NISSAN,
-    IYAR = date_constants::IYAR,
-    SIVAN = date_constants::SIVAN,
-    TAMMUZ = date_constants::TAMMUZ,
-    AV = date_constants::AV,
-    ELUL = date_constants::ELUL,
-    TISHREI = date_constants::TISHREI,
-    CHESHVAN = date_constants::CHESHVAN,
-    KISLEV = date_constants::KISLEV,
-    TEVES = date_constants::TEVES,
-    SHEVAT = date_constants::SHEVAT,
-    ADAR = date_constants::ADAR,
-    ADARII = date_constants::ADAR_II,
-}
-impl From<JewishMonth> for i32 {
-    fn from(month: JewishMonth) -> Self {
-        month as i32
-    }
-}
-impl From<i32> for JewishMonth {
-    fn from(month: i32) -> Self {
-        match month {
-            1 => JewishMonth::NISSAN,
-            2 => JewishMonth::IYAR,
-            3 => JewishMonth::SIVAN,
-            4 => JewishMonth::TAMMUZ,
-            5 => JewishMonth::AV,
-            6 => JewishMonth::ELUL,
-            7 => JewishMonth::TISHREI,
-            8 => JewishMonth::CHESHVAN,
-            9 => JewishMonth::KISLEV,
-            10 => JewishMonth::TEVES,
-            11 => JewishMonth::SHEVAT,
-            12 => JewishMonth::ADAR,
-            13 => JewishMonth::ADARII,
-            _ => panic!("Invalid Jewish month: {}", month),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
-#[repr(u8)]
-pub enum YearLengthType {
-    CHASERIM = 0,
-    KESIDRAN = 1,
-    SHELAIMIM = 2,
-}
-impl From<i32> for YearLengthType {
-    fn from(year_length: i32) -> Self {
-        match year_length {
-            0 => YearLengthType::CHASERIM,
-            1 => YearLengthType::KESIDRAN,
-            2 => YearLengthType::SHELAIMIM,
-            _ => panic!("Invalid year length: {}", year_length),
-        }
-    }
-}
-impl From<YearLengthType> for i32 {
-    fn from(year_length: YearLengthType) -> Self {
-        year_length as i32
-    }
-}
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
-#[repr(u8)]
-pub enum DayOfWeek {
-    Sunday = 1,
-    Monday = 2,
-    Tuesday = 3,
-    Wednesday = 4,
-    Thursday = 5,
-    Friday = 6,
-    Saturday = 7,
-}
-impl From<i32> for DayOfWeek {
-    fn from(day_of_week: i32) -> Self {
-        match day_of_week {
-            1 => DayOfWeek::Sunday,
-            2 => DayOfWeek::Monday,
-            3 => DayOfWeek::Tuesday,
-            4 => DayOfWeek::Wednesday,
-            5 => DayOfWeek::Thursday,
-            6 => DayOfWeek::Friday,
-            7 => DayOfWeek::Saturday,
-            _ => panic!("Invalid day of week: {}", day_of_week),
-        }
-    }
-}
-impl From<Weekday> for DayOfWeek {
-    fn from(weekday: Weekday) -> Self {
-        match weekday {
-            Weekday::Sunday => DayOfWeek::Sunday,
-            Weekday::Monday => DayOfWeek::Monday,
-            Weekday::Tuesday => DayOfWeek::Tuesday,
-            Weekday::Wednesday => DayOfWeek::Wednesday,
-            Weekday::Thursday => DayOfWeek::Thursday,
-            Weekday::Friday => DayOfWeek::Friday,
-            Weekday::Saturday => DayOfWeek::Saturday,
-        }
-    }
-}
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[repr(C)]
-pub struct MoladData {
-    pub hours: i64,
-    pub minutes: i64,
-    pub chalakim: i64,
-}
+#[cfg(feature = "uniffi")]
+use std::sync::Arc;
 
 pub trait JewishDateTrait {
     fn get_jewish_year(&self) -> i32;
@@ -149,11 +37,14 @@ pub trait JewishDateTrait {
     fn get_days_since_start_of_jewish_year(&self) -> i32;
 
     fn get_chalakim_since_molad_tohu(&self) -> i64;
+}
 
+pub trait GetMoladTrait {
     fn get_molad(&self) -> Option<(impl JewishDateTrait, MoladData)>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct JewishDate {
     pub hebrew_date: Date<Hebrew>,
     pub gregorian_date: Date<Gregorian>,
@@ -177,6 +68,13 @@ impl JewishDate {
     }
 }
 
+#[cfg(feature = "uniffi")]
+#[uniffi::export]
+pub fn new_jewish_date(timestamp: i64, tz_offset: i64) -> Option<Arc<JewishDate>> {
+    JewishDate::new(timestamp, tz_offset).map(Arc::new)
+}
+
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl JewishDateTrait for JewishDate {
     fn get_jewish_year(&self) -> i32 {
         self.hebrew_date.era_year().year
@@ -271,8 +169,24 @@ impl JewishDateTrait for JewishDate {
         let month = self.get_jewish_month() as i32;
         Self::get_chalakim_since_molad_tohu_static(year, month)
     }
+}
 
+impl GetMoladTrait for JewishDate {
     fn get_molad(&self) -> Option<(impl JewishDateTrait, MoladData)> {
+        self._get_molad()
+            .map(|(molad_date, molad_data)| (molad_date, molad_data))
+    }
+}
+
+impl JewishDate {
+    fn from_gregorian_date(gregorian_date: Date<Gregorian>) -> Self {
+        let hebrew_date = gregorian_date.to_calendar(Hebrew);
+        Self {
+            hebrew_date,
+            gregorian_date,
+        }
+    }
+    fn _get_molad(&self) -> Option<(JewishDate, MoladData)> {
         let chalakim_since_molad_tohu = self.get_chalakim_since_molad_tohu();
         let abs_date = Self::molad_to_abs_date(chalakim_since_molad_tohu);
         let mut gregorian_date = Self::abs_date_to_date(abs_date)?;
@@ -297,16 +211,6 @@ impl JewishDateTrait for JewishDate {
                 chalakim,
             },
         ))
-    }
-}
-
-impl JewishDate {
-    fn from_gregorian_date(gregorian_date: Date<Gregorian>) -> Self {
-        let hebrew_date = gregorian_date.to_calendar(Hebrew);
-        Self {
-            hebrew_date,
-            gregorian_date,
-        }
     }
     fn get_chalakim_since_molad_tohu_static(year: i32, month: i32) -> i64 {
         let month_of_year = Self::get_jewish_month_of_year(year, month);
@@ -497,4 +401,131 @@ pub(crate) mod date_constants {
     pub const CHALAKIM_PER_MONTH: i64 = 765433;
     pub const CHALAKIM_MOLAD_TOHU: i64 = 31524;
     pub const JEWISH_EPOCH: i64 = -1373429;
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[repr(u8)]
+pub enum JewishMonth {
+    NISSAN = 1,
+    IYAR = 2,
+    SIVAN = 3,
+    TAMMUZ = 4,
+    AV = 5,
+    ELUL = 6,
+    TISHREI = 7,
+    CHESHVAN = 8,
+    KISLEV = 9,
+    TEVES = 10,
+    SHEVAT = 11,
+    ADAR = 12,
+    ADARII = 13,
+}
+impl From<JewishMonth> for i32 {
+    fn from(month: JewishMonth) -> Self {
+        month as i32
+    }
+}
+impl From<i32> for JewishMonth {
+    fn from(month: i32) -> Self {
+        match month {
+            1 => JewishMonth::NISSAN,
+            2 => JewishMonth::IYAR,
+            3 => JewishMonth::SIVAN,
+            4 => JewishMonth::TAMMUZ,
+            5 => JewishMonth::AV,
+            6 => JewishMonth::ELUL,
+            7 => JewishMonth::TISHREI,
+            8 => JewishMonth::CHESHVAN,
+            9 => JewishMonth::KISLEV,
+            10 => JewishMonth::TEVES,
+            11 => JewishMonth::SHEVAT,
+            12 => JewishMonth::ADAR,
+            13 => JewishMonth::ADARII,
+            _ => panic!("Invalid Jewish month: {}", month),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[repr(u8)]
+pub enum YearLengthType {
+    CHASERIM = 0,
+    KESIDRAN = 1,
+    SHELAIMIM = 2,
+}
+impl From<i32> for YearLengthType {
+    fn from(year_length: i32) -> Self {
+        match year_length {
+            0 => YearLengthType::CHASERIM,
+            1 => YearLengthType::KESIDRAN,
+            2 => YearLengthType::SHELAIMIM,
+            _ => panic!("Invalid year length: {}", year_length),
+        }
+    }
+}
+impl From<YearLengthType> for i32 {
+    fn from(year_length: YearLengthType) -> Self {
+        year_length as i32
+    }
+}
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[repr(u8)]
+pub enum DayOfWeek {
+    Sunday = 1,
+    Monday = 2,
+    Tuesday = 3,
+    Wednesday = 4,
+    Thursday = 5,
+    Friday = 6,
+    Saturday = 7,
+}
+impl From<i32> for DayOfWeek {
+    fn from(day_of_week: i32) -> Self {
+        match day_of_week {
+            1 => DayOfWeek::Sunday,
+            2 => DayOfWeek::Monday,
+            3 => DayOfWeek::Tuesday,
+            4 => DayOfWeek::Wednesday,
+            5 => DayOfWeek::Thursday,
+            6 => DayOfWeek::Friday,
+            7 => DayOfWeek::Saturday,
+            _ => panic!("Invalid day of week: {}", day_of_week),
+        }
+    }
+}
+impl From<Weekday> for DayOfWeek {
+    fn from(weekday: Weekday) -> Self {
+        match weekday {
+            Weekday::Sunday => DayOfWeek::Sunday,
+            Weekday::Monday => DayOfWeek::Monday,
+            Weekday::Tuesday => DayOfWeek::Tuesday,
+            Weekday::Wednesday => DayOfWeek::Wednesday,
+            Weekday::Thursday => DayOfWeek::Thursday,
+            Weekday::Friday => DayOfWeek::Friday,
+            Weekday::Saturday => DayOfWeek::Saturday,
+        }
+    }
+}
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+pub struct MoladData {
+    pub hours: i64,
+    pub minutes: i64,
+    pub chalakim: i64,
+}
+
+#[cfg(feature = "uniffi")]
+#[uniffi::export]
+impl JewishDate {
+    pub fn get_molad_date(&self) -> Option<Arc<JewishDate>> {
+        let molad_data = self._get_molad().map(|(molad_date, _)| molad_date);
+        molad_data.map(|molad_date| Arc::new(molad_date))
+    }
+    pub fn get_molad_data(&self) -> Option<Arc<MoladData>> {
+        self._get_molad()
+            .map(|(_, molad_data)| Arc::new(molad_data))
+    }
 }

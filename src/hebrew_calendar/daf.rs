@@ -1,3 +1,4 @@
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum BavliTractate {
@@ -91,7 +92,7 @@ impl From<i32> for BavliTractate {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[repr(C)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 pub struct BavliDaf {
     pub masechta: BavliTractate,
     pub daf: i32,
