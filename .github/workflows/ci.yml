@@ -57,6 +57,6 @@ jobs:
       - name: Build
         run: cargo build --release --features="uniffi"
 
-      - name: Run tests with uniffi feature
+      - name: Run bindgen
         working-directory: uniffi-bindgen
         run: cargo run --bin uniffi-bindgen generate --library ../target/release/zmanim_core.so --language python --out-dir out

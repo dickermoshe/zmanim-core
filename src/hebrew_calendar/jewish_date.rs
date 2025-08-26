@@ -384,12 +384,14 @@ pub(crate) mod date_constants {
     pub const IYAR: u8 = 2;
     pub const SIVAN: u8 = 3;
     pub const TAMMUZ: u8 = 4;
+    #[allow(dead_code)]
     pub const AV: u8 = 5;
     pub const ELUL: u8 = 6;
     pub const TISHREI: u8 = 7;
     pub const CHESHVAN: u8 = 8;
     pub const KISLEV: u8 = 9;
     pub const TEVES: u8 = 10;
+    #[allow(dead_code)]
     pub const SHEVAT: u8 = 11;
     pub const ADAR: u8 = 12;
     pub const ADAR_II: u8 = 13;
