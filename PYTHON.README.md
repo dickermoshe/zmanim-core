@@ -72,7 +72,7 @@ For more information, see the [Rust API Docs](https://docs.rs/zmanim-core) and t
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Lesser General Public License v2.1 - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
