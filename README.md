@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/zmanim-core)](https://crates.io/crates/zmanim-core)
 [![Documentation](https://docs.rs/zmanim-core/badge.svg)](https://docs.rs/zmanim-core)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-LGPL2.1-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70+-blue.svg)](https://www.rust-lang.org)
 
 A high-performance, `no_std` Rust library for calculating Jewish religious times (zmanim) and astronomical events. This library provides accurate calculations for sunrise, sunset, prayer times, and Jewish calendar dates based on astronomical algorithms.
