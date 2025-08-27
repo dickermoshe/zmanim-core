@@ -1,0 +1,31 @@
+# Source files
+src/
+*.ts
+*.tsx
+
+# Build configuration
+vite.config.ts
+tsconfig.json
+tsconfig.*.json
+
+# Development files
+example/
+node_modules/
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md

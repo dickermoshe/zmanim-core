@@ -16,6 +16,7 @@ readme = "PYTHON.README.md"
 authors = [{ name = "Moshe Dicker", email = "dickermoshe@gmail.com" }]
 license = { file = "LICENSE" }
 keywords = ["zmanim", "jewish", "calendar", "astronomy", "time", "zmanim-core"]
+urls = { Homepage = "https://github.com/dickermoshe/zmanim-core/blob/main/PYTHON.README.md" }
 
 
 [tool.maturin]

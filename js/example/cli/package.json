@@ -1,0 +1,26 @@
+{
+  "name": "zmanim-core-cli-example",
+  "version": "1.0.0",
+  "description": "CLI example showing sunset times using zmanim-core",
+  "type": "module",
+  "main": "sunset.js",
+  "bin": {
+    "sunset": "./sunset.js"
+  },
+  "scripts": {
+    "start": "node sunset.js",
+    "sunset": "node sunset.js"
+  },
+  "dependencies": {
+    "zmanim-core-bindings": "file:../.."
+  },
+  "keywords": [
+    "zmanim",
+    "sunset",
+    "cli",
+    "astronomy",
+    "jewish-calendar"
+  ],
+  "author": "",
+  "license": "MIT"
+}
