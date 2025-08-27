@@ -16,8 +16,7 @@
     "type": "git",
     "url": "git+https://github.com/dickermoshe/zmanim-core.git"
   },
-  "homepage": "https://github.com/dickermoshe/zmanim-core/blob/main/JS.README.md",
-  "readme": "../JS.README.md",
+  "homepage": "https://github.com/dickermoshe/zmanim-core/blob/main/js/README.md",
   "bugs": {
     "url": "https://github.com/dickermoshe/zmanim-core/issues"
   },
@@ -36,6 +35,7 @@
     "dist"
   ],
   "scripts": {
+    "build:rust": "ubrn build web",
     "build": "vite build && tsc --emitDeclarationOnly"
   },
   "devDependencies": {

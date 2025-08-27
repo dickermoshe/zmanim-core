@@ -1,0 +1,9 @@
+rust:
+  directory: ../
+  manifestPath: Cargo.toml
+  uniffiToml: ./uniffi.toml
+  ts: ts/bindings
+web:
+  features: ["uniffi"]
+  wasmCrateName: zmanim-core-bindings
+  entrypoint: "src/index.ts"

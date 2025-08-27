@@ -104,6 +104,41 @@ This library is a JavaScript port of the [Zmanim Core](https://github.com/dicker
 - [Zmanim Core Python](https://github.com/dickermoshe/zmanim-core) - Python bindings
 - [KosherJava](https://github.com/KosherJava/KosherJava) - Original Java implementation
 
+## Building
+
+To build this project, you must have rust installed and be on a linux machine.
+
+Install the wasm target with:
+```
+rustup target add wasm32-unknown-unknown
+```
+You must also have the wasm-bindgen-cli installed.
+
+```bash
+cargo install wasm-bindgen-cli
+```
+
+Then, from the root of the project, run:
+```bash
+npm run build:rust
+```
+Then replace this line in `index.ts` with the following:
+```typescript
+import wasmPath from './generated/wasm-bindgen/index_bg.wasm';
+```
+with the following:
+```typescript
+import wasmPath from './generated/wasm-bindgen/index_bg.wasm?url';
+```
+Then build the project with:
+```bash
+npm run build
+```
+
+
+
+
+
 ---
 
 **Made with ❤️ for the Jewish community and JavaScript developers**

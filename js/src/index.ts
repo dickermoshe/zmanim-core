@@ -2,9 +2,9 @@
 // Export the generated bindings to the app.
 export * from "./generated/zmanim_core";
 
-// // Now import the bindings so we can:
-// // - intialize them
-// // - export them as namespaced objects as the default export.
+// Now import the bindings so we can:
+// - intialize them
+// - export them as namespaced objects as the default export.
 import * as zmanim_core from "./generated/zmanim_core";
 
 import initAsync from "./generated/wasm-bindgen/index.js";
