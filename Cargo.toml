@@ -33,4 +33,4 @@ uniffi = { workspace = true, features = ["build"], optional = true }
 
 
 [workspace.dependencies]
-uniffi = { version = "0.29.2" }
+uniffi = { version = "0.28.0" }
