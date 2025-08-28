@@ -29,15 +29,20 @@ Go bindings for the Zmanim Core library, providing Jewish calendar calculations 
 package main
 
 import (
-    "fmt"
-    "time"
-    "github.com/dickermoshe/zmanim-core/go"
+	"fmt"
+	"time"
+
+	"github.com/dickermoshe/zmanim-core/go/zmanim_core"
 )
 
 func main() {
-    // Example: Get sunrise time
-    sunriseTime := zmanim_core.GetSunriseTime()
-    fmt.Printf("Sunrise time: %v\n", sunriseTime)
+	msSinceEpoch := time.Now().UnixMilli()
+	location := zmanim_core.NewGeolocation(31.768319, 35.213711, 0)
+	calendar := zmanim_core.NewAstronomicalCalendar(msSinceEpoch, *location)
+	sunrise := calendar.GetSunrise()
+	// Parse the sunrise time to a time.Time ms since epoch
+	sunriseTime := time.UnixMilli(*sunrise)
+	fmt.Println("Sunrise time:", sunriseTime)
 }
 ```
 
