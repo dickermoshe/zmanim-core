@@ -67,39 +67,20 @@ jobs:
           target: ${{ matrix.target }}
           args: "--release --features=uniffi"
           strip: true
-      - name: Upload build artifacts (Linux & Mac)
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: zmanim-core-${{ matrix.target }}
-          path: |
-            target/${{ matrix.target }}/release/libzmanim_core.*
-            target/${{ matrix.target }}/release/zmanim_core.*
-          retention-days: 1
-  upload-release:
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    needs: [rs-build]
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
+      - name: Rename artifacts
+        shell: bash
+        run: |
+          mkdir -p upload
+          shopt -s nullglob
+
+          for f in target/${{ matrix.target }}/release/{libzmanim_core*,zmanim_core*}; do
+            filename=$(basename "$f")
+            newname="${{ matrix.target }}-$filename"
+            cp "$f" "upload/$newname"
+          done
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/*/libzmanim_core.*
-            artifacts/*/zmanim_core.*
-          fail_on_unmatched_files: false
-
-    # - name: Upload to Release
-    #   uses: softprops/action-gh-release@v2
-    #   with:
-    #     files: | # For Linux and Windows
-    #       target/${{ matrix.target }}/release/libzmanim_core.*
-    #       target/${{ matrix.target }}/release/zmanim_core.*
-    #     fail_on_unmatched_files: false
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: upload/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
