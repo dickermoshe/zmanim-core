@@ -33,6 +33,8 @@ jobs:
         run: cargo test --features="uniffi"
 
   rs-build:
+    permissions:
+      contents: write
     runs-on: ${{ matrix.os }}
     needs: [test]
     strategy:
