@@ -267,3 +267,13 @@ jobs:
           files: upload/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  rs-release:
+    runs-on: ubuntu-latest
+    needs: [rs-build]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - uses: katyo/publish-crates@v2
+        with:
+          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          ignore-unpublished-changes: true
