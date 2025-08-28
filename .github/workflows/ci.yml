@@ -19,8 +19,10 @@ permissions:
   contents: read
 
 jobs:
-  linux:
+  # Python wheels
+  py-linux:
     runs-on: ${{ matrix.platform.runner }}
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     strategy:
       matrix:
         platform:
@@ -59,8 +61,9 @@ jobs:
           name: wheels-linux-${{ matrix.platform.target }}
           path: dist
 
-  musllinux:
+  py-musllinux:
     runs-on: ${{ matrix.platform.runner }}
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     strategy:
       matrix:
         platform:
@@ -92,8 +95,9 @@ jobs:
           name: wheels-musllinux-${{ matrix.platform.target }}
           path: dist
 
-  windows:
+  py-windows:
     runs-on: ${{ matrix.platform.runner }}
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     strategy:
       matrix:
         platform:
@@ -121,8 +125,9 @@ jobs:
           name: wheels-windows-${{ matrix.platform.target }}
           path: dist
 
-  macos:
+  py-macos:
     runs-on: ${{ matrix.platform.runner }}
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     strategy:
       matrix:
         platform:
@@ -149,8 +154,9 @@ jobs:
           name: wheels-macos-${{ matrix.platform.target }}
           path: dist
 
-  sdist:
+  py-sdist:
     runs-on: ubuntu-latest
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v4
       - name: Build sdist
@@ -164,11 +170,11 @@ jobs:
           name: wheels-sdist
           path: dist
 
-  release:
+  py-release:
     name: Release
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
-    needs: [linux, musllinux, windows, macos, sdist]
+    needs: [py-linux, py-musllinux, py-windows, py-macos, py-sdist]
     permissions:
       # Use to sign the release artifacts
       id-token: write
@@ -190,3 +196,25 @@ jobs:
         with:
           command: upload
           args: --non-interactive --skip-existing wheels-*/*
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - name: Run tests
+        run: cargo test
+      - name: Run tests with uniffi feature
+        run: cargo test --features="uniffi"
