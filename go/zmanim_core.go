@@ -7,7 +7,7 @@
 //
 // # Basic Usage
 //
-//	import zmanim_core "github.com/dickermoshe/zmanim_core"
+//	import zmanim_core "github.com/dickermoshe/zmanim-core/zmanim_core"
 //
 //	// Calculate sunrise time for a specific location and date
 //	sunrise := zmanim_core.GetSunriseTime(latitude, longitude, date)
@@ -25,7 +25,7 @@
 //
 // # Installation
 //
-//	go get github.com/dickermoshe/zmanim_core
+//	go get github.com/dickermoshe/zmanim-core/zmanim_core
 //
 // Then download the dynamic library for your platform from the releases page.
 //
