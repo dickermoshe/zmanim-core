@@ -1,3 +1,3 @@
-module github.com/dickermoshe/go
+module github.com/dickermoshe/zmanim-core/go
 
 go 1.20
