@@ -1,0 +1,8333 @@
+package zmanim_core
+
+//
+// #include <zmanim_core.h>
+import "C"
+
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"io"
+	"math"
+	"runtime"
+	"sync/atomic"
+	"unsafe"
+)
+
+// This is needed, because as of go 1.24
+// type RustBuffer C.RustBuffer cannot have methods,
+// RustBuffer is treated as non-local type
+type GoRustBuffer struct {
+	inner C.RustBuffer
+}
+
+type RustBufferI interface {
+	AsReader() *bytes.Reader
+	Free()
+	ToGoBytes() []byte
+	Data() unsafe.Pointer
+	Len() uint64
+	Capacity() uint64
+}
+
+func RustBufferFromExternal(b RustBufferI) GoRustBuffer {
+	return GoRustBuffer{
+		inner: C.RustBuffer{
+			capacity: C.uint64_t(b.Capacity()),
+			len:      C.uint64_t(b.Len()),
+			data:     (*C.uchar)(b.Data()),
+		},
+	}
+}
+
+func (cb GoRustBuffer) Capacity() uint64 {
+	return uint64(cb.inner.capacity)
+}
+
+func (cb GoRustBuffer) Len() uint64 {
+	return uint64(cb.inner.len)
+}
+
+func (cb GoRustBuffer) Data() unsafe.Pointer {
+	return unsafe.Pointer(cb.inner.data)
+}
+
+func (cb GoRustBuffer) AsReader() *bytes.Reader {
+	b := unsafe.Slice((*byte)(cb.inner.data), C.uint64_t(cb.inner.len))
+	return bytes.NewReader(b)
+}
+
+func (cb GoRustBuffer) Free() {
+	rustCall(func(status *C.RustCallStatus) bool {
+		C.ffi_zmanim_core_rustbuffer_free(cb.inner, status)
+		return false
+	})
+}
+
+func (cb GoRustBuffer) ToGoBytes() []byte {
+	return C.GoBytes(unsafe.Pointer(cb.inner.data), C.int(cb.inner.len))
+}
+
+func stringToRustBuffer(str string) C.RustBuffer {
+	return bytesToRustBuffer([]byte(str))
+}
+
+func bytesToRustBuffer(b []byte) C.RustBuffer {
+	if len(b) == 0 {
+		return C.RustBuffer{}
+	}
+	// We can pass the pointer along here, as it is pinned
+	// for the duration of this call
+	foreign := C.ForeignBytes{
+		len:  C.int(len(b)),
+		data: (*C.uchar)(unsafe.Pointer(&b[0])),
+	}
+
+	return rustCall(func(status *C.RustCallStatus) C.RustBuffer {
+		return C.ffi_zmanim_core_rustbuffer_from_bytes(foreign, status)
+	})
+}
+
+type BufLifter[GoType any] interface {
+	Lift(value RustBufferI) GoType
+}
+
+type BufLowerer[GoType any] interface {
+	Lower(value GoType) C.RustBuffer
+}
+
+type BufReader[GoType any] interface {
+	Read(reader io.Reader) GoType
+}
+
+type BufWriter[GoType any] interface {
+	Write(writer io.Writer, value GoType)
+}
+
+func LowerIntoRustBuffer[GoType any](bufWriter BufWriter[GoType], value GoType) C.RustBuffer {
+	// This might be not the most efficient way but it does not require knowing allocation size
+	// beforehand
+	var buffer bytes.Buffer
+	bufWriter.Write(&buffer, value)
+
+	bytes, err := io.ReadAll(&buffer)
+	if err != nil {
+		panic(fmt.Errorf("reading written data: %w", err))
+	}
+	return bytesToRustBuffer(bytes)
+}
+
+func LiftFromRustBuffer[GoType any](bufReader BufReader[GoType], rbuf RustBufferI) GoType {
+	defer rbuf.Free()
+	reader := rbuf.AsReader()
+	item := bufReader.Read(reader)
+	if reader.Len() > 0 {
+		// TODO: Remove this
+		leftover, _ := io.ReadAll(reader)
+		panic(fmt.Errorf("Junk remaining in buffer after lifting: %s", string(leftover)))
+	}
+	return item
+}
+
+func rustCallWithError[E any, U any](converter BufReader[*E], callback func(*C.RustCallStatus) U) (U, *E) {
+	var status C.RustCallStatus
+	returnValue := callback(&status)
+	err := checkCallStatus(converter, status)
+	return returnValue, err
+}
+
+func checkCallStatus[E any](converter BufReader[*E], status C.RustCallStatus) *E {
+	switch status.code {
+	case 0:
+		return nil
+	case 1:
+		return LiftFromRustBuffer(converter, GoRustBuffer{inner: status.errorBuf})
+	case 2:
+		// when the rust code sees a panic, it tries to construct a rustBuffer
+		// with the message.  but if that code panics, then it just sends back
+		// an empty buffer.
+		if status.errorBuf.len > 0 {
+			panic(fmt.Errorf("%s", FfiConverterStringINSTANCE.Lift(GoRustBuffer{inner: status.errorBuf})))
+		} else {
+			panic(fmt.Errorf("Rust panicked while handling Rust panic"))
+		}
+	default:
+		panic(fmt.Errorf("unknown status code: %d", status.code))
+	}
+}
+
+func checkCallStatusUnknown(status C.RustCallStatus) error {
+	switch status.code {
+	case 0:
+		return nil
+	case 1:
+		panic(fmt.Errorf("function not returning an error returned an error"))
+	case 2:
+		// when the rust code sees a panic, it tries to construct a C.RustBuffer
+		// with the message.  but if that code panics, then it just sends back
+		// an empty buffer.
+		if status.errorBuf.len > 0 {
+			panic(fmt.Errorf("%s", FfiConverterStringINSTANCE.Lift(GoRustBuffer{
+				inner: status.errorBuf,
+			})))
+		} else {
+			panic(fmt.Errorf("Rust panicked while handling Rust panic"))
+		}
+	default:
+		return fmt.Errorf("unknown status code: %d", status.code)
+	}
+}
+
+func rustCall[U any](callback func(*C.RustCallStatus) U) U {
+	returnValue, err := rustCallWithError[error](nil, callback)
+	if err != nil {
+		panic(err)
+	}
+	return returnValue
+}
+
+type NativeError interface {
+	AsError() error
+}
+
+func writeInt8(writer io.Writer, value int8) {
+	if err := binary.Write(writer, binary.BigEndian, value); err != nil {
+		panic(err)
+	}
+}
+
+func writeUint8(writer io.Writer, value uint8) {
+	if err := binary.Write(writer, binary.BigEndian, value); err != nil {
+		panic(err)
+	}
+}
+
+func writeInt16(writer io.Writer, value int16) {
+	if err := binary.Write(writer, binary.BigEndian, value); err != nil {
+		panic(err)
+	}
+}
+
+func writeUint16(writer io.Writer, value uint16) {
+	if err := binary.Write(writer, binary.BigEndian, value); err != nil {
+		panic(err)
+	}
+}
+
+func writeInt32(writer io.Writer, value int32) {
+	if err := binary.Write(writer, binary.BigEndian, value); err != nil {
+		panic(err)
+	}
+}
+
+func writeUint32(writer io.Writer, value uint32) {
+	if err := binary.Write(writer, binary.BigEndian, value); err != nil {
+		panic(err)
+	}
+}
+
+func writeInt64(writer io.Writer, value int64) {
+	if err := binary.Write(writer, binary.BigEndian, value); err != nil {
+		panic(err)
+	}
+}
+
+func writeUint64(writer io.Writer, value uint64) {
+	if err := binary.Write(writer, binary.BigEndian, value); err != nil {
+		panic(err)
+	}
+}
+
+func writeFloat32(writer io.Writer, value float32) {
+	if err := binary.Write(writer, binary.BigEndian, value); err != nil {
+		panic(err)
+	}
+}
+
+func writeFloat64(writer io.Writer, value float64) {
+	if err := binary.Write(writer, binary.BigEndian, value); err != nil {
+		panic(err)
+	}
+}
+
+func readInt8(reader io.Reader) int8 {
+	var result int8
+	if err := binary.Read(reader, binary.BigEndian, &result); err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func readUint8(reader io.Reader) uint8 {
+	var result uint8
+	if err := binary.Read(reader, binary.BigEndian, &result); err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func readInt16(reader io.Reader) int16 {
+	var result int16
+	if err := binary.Read(reader, binary.BigEndian, &result); err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func readUint16(reader io.Reader) uint16 {
+	var result uint16
+	if err := binary.Read(reader, binary.BigEndian, &result); err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func readInt32(reader io.Reader) int32 {
+	var result int32
+	if err := binary.Read(reader, binary.BigEndian, &result); err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func readUint32(reader io.Reader) uint32 {
+	var result uint32
+	if err := binary.Read(reader, binary.BigEndian, &result); err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func readInt64(reader io.Reader) int64 {
+	var result int64
+	if err := binary.Read(reader, binary.BigEndian, &result); err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func readUint64(reader io.Reader) uint64 {
+	var result uint64
+	if err := binary.Read(reader, binary.BigEndian, &result); err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func readFloat32(reader io.Reader) float32 {
+	var result float32
+	if err := binary.Read(reader, binary.BigEndian, &result); err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func readFloat64(reader io.Reader) float64 {
+	var result float64
+	if err := binary.Read(reader, binary.BigEndian, &result); err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func init() {
+
+	uniffiCheckChecksums()
+}
+
+func uniffiCheckChecksums() {
+	// Get the bindings contract version from our ComponentInterface
+	bindingsContractVersion := 26
+	// Get the scaffolding contract version by calling the into the dylib
+	scaffoldingContractVersion := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint32_t {
+		return C.ffi_zmanim_core_uniffi_contract_version()
+	})
+	if bindingsContractVersion != int(scaffoldingContractVersion) {
+		// If this happens try cleaning and rebuilding your project
+		panic("zmanim_core: UniFFI contract version mismatch")
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_func_new_astronomical_calendar()
+		})
+		if checksum != 41832 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_func_new_astronomical_calendar: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_func_new_complex_zmanim_calendar()
+		})
+		if checksum != 15780 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_func_new_complex_zmanim_calendar: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_func_new_geolocation()
+		})
+		if checksum != 28616 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_func_new_geolocation: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_func_new_jewish_date()
+		})
+		if checksum != 23873 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_func_new_jewish_date: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_func_new_noaa_calculator()
+		})
+		if checksum != 1127 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_func_new_noaa_calculator: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_func_new_zmanim_calendar()
+		})
+		if checksum != 19700 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_func_new_zmanim_calendar: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_begin_astronomical_twilight()
+		})
+		if checksum != 62489 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_begin_astronomical_twilight: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_begin_civil_twilight()
+		})
+		if checksum != 56856 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_begin_civil_twilight: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_begin_nautical_twilight()
+		})
+		if checksum != 60352 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_begin_nautical_twilight: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_end_astronomical_twilight()
+		})
+		if checksum != 7254 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_end_astronomical_twilight: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_end_civil_twilight()
+		})
+		if checksum != 53502 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_end_civil_twilight: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_end_nautical_twilight()
+		})
+		if checksum != 7547 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_end_nautical_twilight: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_geo_location()
+		})
+		if checksum != 8696 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_geo_location: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_noaa_calculator()
+		})
+		if checksum != 20877 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_noaa_calculator: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sea_level_sunrise()
+		})
+		if checksum != 64373 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sea_level_sunrise: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sea_level_sunset()
+		})
+		if checksum != 39697 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sea_level_sunset: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_solar_midnight()
+		})
+		if checksum != 11473 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_solar_midnight: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sun_transit()
+		})
+		if checksum != 33500 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sun_transit: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sun_transit_with_start_and_end_times()
+		})
+		if checksum != 18808 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sun_transit_with_start_and_end_times: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sunrise()
+		})
+		if checksum != 26285 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sunrise: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sunrise_offset_by_degrees()
+		})
+		if checksum != 63651 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sunrise_offset_by_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sunset()
+		})
+		if checksum != 36772 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sunset: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sunset_offset_by_degrees()
+		})
+		if checksum != 31916 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_sunset_offset_by_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_temporal_hour()
+		})
+		if checksum != 50743 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_temporal_hour: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_temporal_hour_with_start_and_end_times()
+		})
+		if checksum != 49651 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_temporal_hour_with_start_and_end_times: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_timestamp()
+		})
+		if checksum != 5457 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_timestamp: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_utc_sea_level_sunrise()
+		})
+		if checksum != 22630 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_utc_sea_level_sunrise: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_utc_sea_level_sunset()
+		})
+		if checksum != 23783 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_utc_sea_level_sunset: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_utc_sunrise()
+		})
+		if checksum != 22626 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_utc_sunrise: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_utc_sunset()
+		})
+		if checksum != 29434 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_astronomicalcalendar_get_utc_sunset: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_120()
+		})
+		if checksum != 48582 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_120: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_120_zmanis()
+		})
+		if checksum != 25920 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_120_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_16_point_1_degrees()
+		})
+		if checksum != 20901 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_16_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_18_degrees()
+		})
+		if checksum != 23652 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_18_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_19_degrees()
+		})
+		if checksum != 55481 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_19_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_19_point_8_degrees()
+		})
+		if checksum != 4080 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_19_point_8_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_26_degrees()
+		})
+		if checksum != 64809 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_26_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_60()
+		})
+		if checksum != 47303 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_60: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_72_zmanis()
+		})
+		if checksum != 50364 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_72_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_90()
+		})
+		if checksum != 19837 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_90: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_90_zmanis()
+		})
+		if checksum != 12400 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_90_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_96()
+		})
+		if checksum != 21524 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_96: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_96_zmanis()
+		})
+		if checksum != 36004 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_96_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_baal_hatanya()
+		})
+		if checksum != 12575 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_alos_baal_hatanya: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_astronomical_calendar()
+		})
+		if checksum != 13876 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_astronomical_calendar: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_ateret_torah_sunset_offset()
+		})
+		if checksum != 7175 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_ateret_torah_sunset_offset: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_rt_13_point_24_degrees()
+		})
+		if checksum != 2134 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_rt_13_point_24_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_rt_13_point_5_minutes_before_7_point_083_degrees()
+		})
+		if checksum != 35449 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_rt_13_point_5_minutes_before_7_point_083_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_rt_2_stars()
+		})
+		if checksum != 21245 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_rt_2_stars: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_rt_58_point_5_minutes()
+		})
+		if checksum != 60329 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_rt_58_point_5_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_yereim_13_point_5_minutes()
+		})
+		if checksum != 49609 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_yereim_13_point_5_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_yereim_16_point_875_minutes()
+		})
+		if checksum != 57416 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_yereim_16_point_875_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_yereim_18_minutes()
+		})
+		if checksum != 21764 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_yereim_18_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_yereim_2_point_1_degrees()
+		})
+		if checksum != 31971 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_yereim_2_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_yereim_2_point_8_degrees()
+		})
+		if checksum != 52603 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_yereim_2_point_8_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_yereim_3_point_05_degrees()
+		})
+		if checksum != 23744 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hashmashos_yereim_3_point_05_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosrt_13_point_24_degrees()
+		})
+		if checksum != 52444 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosrt_13_point_24_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosrt_13_point_5_minutes_before_7_point_083_degrees()
+		})
+		if checksum != 47710 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosrt_13_point_5_minutes_before_7_point_083_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosrt_2_stars()
+		})
+		if checksum != 37031 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosrt_2_stars: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosrt_58_point_5_minutes()
+		})
+		if checksum != 30994 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosrt_58_point_5_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosyereim_13_point_5_minutes()
+		})
+		if checksum != 32816 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosyereim_13_point_5_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosyereim_16_point_875_minutes()
+		})
+		if checksum != 2477 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosyereim_16_point_875_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosyereim_18_minutes()
+		})
+		if checksum != 45356 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosyereim_18_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosyereim_2_point_1_degrees()
+		})
+		if checksum != 54242 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosyereim_2_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosyereim_2_point_8_degrees()
+		})
+		if checksum != 34750 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosyereim_2_point_8_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosyereim_3_point_05_degrees()
+		})
+		if checksum != 42404 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_bain_hasmashosyereim_3_point_05_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_candle_lighting_offset()
+		})
+		if checksum != 26485 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_candle_lighting_offset: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_fixed_local_chatzos()
+		})
+		if checksum != 18084 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_fixed_local_chatzos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_fixed_local_chatzos_based_zmanim()
+		})
+		if checksum != 3083 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_fixed_local_chatzos_based_zmanim: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_16_point_1_degrees()
+		})
+		if checksum != 46680 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_16_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_30_minutes()
+		})
+		if checksum != 29504 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_30_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_72_minutes()
+		})
+		if checksum != 35627 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_72_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_ahavat_shalom()
+		})
+		if checksum != 30157 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_ahavat_shalom: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_ateret_torah()
+		})
+		if checksum != 17467 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_ateret_torah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_baal_hatanya()
+		})
+		if checksum != 49576 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_baal_hatanya: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_baal_hatanya_greater_than_30()
+		})
+		if checksum != 13677 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_baal_hatanya_greater_than_30: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_gra_fixed_local_chatzos_30_minutes()
+		})
+		if checksum != 56007 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_gra_fixed_local_chatzos_30_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_greater_than_30()
+		})
+		if checksum != 14350 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_gedola_greater_than_30: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_ketana_16_point_1_degrees()
+		})
+		if checksum != 51580 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_ketana_16_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_ketana_72_minutes()
+		})
+		if checksum != 49765 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_ketana_72_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_ketana_ahavat_shalom()
+		})
+		if checksum != 51101 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_ketana_ahavat_shalom: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_ketana_ateret_torah()
+		})
+		if checksum != 52689 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_ketana_ateret_torah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_ketana_baal_hatanya()
+		})
+		if checksum != 12508 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_ketana_baal_hatanya: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_ketana_gra_fixed_local_chatzos_to_sunset()
+		})
+		if checksum != 9807 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_mincha_ketana_gra_fixed_local_chatzos_to_sunset: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_misheyakir_10_point_2_degrees()
+		})
+		if checksum != 58955 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_misheyakir_10_point_2_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_misheyakir_11_degrees()
+		})
+		if checksum != 48093 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_misheyakir_11_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_misheyakir_11_point_5_degrees()
+		})
+		if checksum != 47599 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_misheyakir_11_point_5_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_misheyakir_7_point_65_degrees()
+		})
+		if checksum != 40310 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_misheyakir_7_point_65_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_misheyakir_9_point_5_degrees()
+		})
+		if checksum != 605 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_misheyakir_9_point_5_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_ahavat_shalom()
+		})
+		if checksum != 62525 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_ahavat_shalom: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_alos_16_point_1_to_tzais_geonim_7_point_083_degrees()
+		})
+		if checksum != 64193 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_alos_16_point_1_to_tzais_geonim_7_point_083_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_alos_to_sunset()
+		})
+		if checksum != 59347 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_alos_to_sunset: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_120_minutes()
+		})
+		if checksum != 48573 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_120_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_120_minutes_zmanis()
+		})
+		if checksum != 51079 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_120_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_16_point_1_degrees()
+		})
+		if checksum != 41190 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_16_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_18_degrees()
+		})
+		if checksum != 16664 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_18_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_19_point_8_degrees()
+		})
+		if checksum != 53540 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_19_point_8_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_26_degrees()
+		})
+		if checksum != 25526 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_26_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_60_minutes()
+		})
+		if checksum != 558 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_60_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_72_minutes()
+		})
+		if checksum != 25979 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_72_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_72_minutes_zmanis()
+		})
+		if checksum != 57762 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_72_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_90_minutes()
+		})
+		if checksum != 18702 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_90_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_90_minutes_zmanis()
+		})
+		if checksum != 2976 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_90_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_96_minutes()
+		})
+		if checksum != 52628 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_96_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_96_minutes_zmanis()
+		})
+		if checksum != 32732 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_96_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_ateret_torah()
+		})
+		if checksum != 41470 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_ateret_torah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_baal_hatanya()
+		})
+		if checksum != 6323 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_baal_hatanya: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_gra_fixed_local_chatzos_to_sunset()
+		})
+		if checksum != 13895 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_plag_hamincha_gra_fixed_local_chatzos_to_sunset: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_samuch_le_mincha_ketana_16_point_1_degrees()
+		})
+		if checksum != 35373 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_samuch_le_mincha_ketana_16_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_samuch_le_mincha_ketana_72_minutes()
+		})
+		if checksum != 4572 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_samuch_le_mincha_ketana_72_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_samuch_le_mincha_ketana_gra()
+		})
+		if checksum != 38016 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_samuch_le_mincha_ketana_gra: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_120_minutes()
+		})
+		if checksum != 10814 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_120_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_120_minutes_zmanis()
+		})
+		if checksum != 62946 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_120_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_16_point_1_degrees()
+		})
+		if checksum != 43475 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_16_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_18_degrees()
+		})
+		if checksum != 52852 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_18_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_19_point_8_degrees()
+		})
+		if checksum != 30492 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_19_point_8_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_26_degrees()
+		})
+		if checksum != 3749 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_26_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_60_minutes()
+		})
+		if checksum != 42906 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_60_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_72_minutes()
+		})
+		if checksum != 2556 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_72_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_72_minutes_zmanis()
+		})
+		if checksum != 40431 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_72_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_90_minutes()
+		})
+		if checksum != 43283 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_90_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_90_minutes_zmanis()
+		})
+		if checksum != 34655 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_90_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_96_minutes()
+		})
+		if checksum != 64111 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_96_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_96_minutes_zmanis()
+		})
+		if checksum != 49232 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_96_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_alos_16_point_1_to_tzais_3_point_7()
+		})
+		if checksum != 42532 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_alos_16_point_1_to_tzais_3_point_7: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_alos_16_point_1_to_tzais_3_point_8()
+		})
+		if checksum != 4104 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_alos_16_point_1_to_tzais_3_point_8: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_ateret_torah()
+		})
+		if checksum != 18786 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_ateret_torah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_baal_hatanya()
+		})
+		if checksum != 7832 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_shaah_zmanis_baal_hatanya: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_baal_hatanya()
+		})
+		if checksum != 9370 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_baal_hatanya: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_gra()
+		})
+		if checksum != 8758 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_gra: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_mga_16_point_1_degrees()
+		})
+		if checksum != 27003 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_mga_16_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_mga_72_minutes()
+		})
+		if checksum != 52878 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_mga_72_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_mga_72_minutes_zmanis()
+		})
+		if checksum != 8958 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_mga_72_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_biur_chametz_baal_hatanya()
+		})
+		if checksum != 54751 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_biur_chametz_baal_hatanya: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_biur_chametz_gra()
+		})
+		if checksum != 26192 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_biur_chametz_gra: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_biur_chametz_mga_16_point_1_degrees()
+		})
+		if checksum != 55899 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_biur_chametz_mga_16_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_biur_chametz_mga_72_minutes()
+		})
+		if checksum != 14723 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_biur_chametz_mga_72_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_biur_chametz_mga_72_minutes_zmanis()
+		})
+		if checksum != 46863 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_biur_chametz_mga_72_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_kidush_levana_15_days()
+		})
+		if checksum != 40848 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_kidush_levana_15_days: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_kidush_levana_15_days_default()
+		})
+		if checksum != 40468 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_kidush_levana_15_days_default: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_kidush_levana_between_moldos()
+		})
+		if checksum != 20960 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_kidush_levana_between_moldos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_kidush_levana_between_moldos_default()
+		})
+		if checksum != 8680 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_kidush_levana_between_moldos_default: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_3_hours_before_chatzos()
+		})
+		if checksum != 7200 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_3_hours_before_chatzos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_alos_16_point_1_to_sunset()
+		})
+		if checksum != 37150 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_alos_16_point_1_to_sunset: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_alos_16_point_1_to_tzais_geonim_7_point_083_degrees()
+		})
+		if checksum != 8206 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_alos_16_point_1_to_tzais_geonim_7_point_083_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_ateret_torah()
+		})
+		if checksum != 8518 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_ateret_torah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_baal_hatanya()
+		})
+		if checksum != 18486 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_baal_hatanya: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_fixed_local()
+		})
+		if checksum != 16063 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_fixed_local: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_gra_sunrise_to_fixed_local_chatzos()
+		})
+		if checksum != 58695 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_gra_sunrise_to_fixed_local_chatzos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_kol_eliyahu()
+		})
+		if checksum != 17817 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_kol_eliyahu: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_120_minutes()
+		})
+		if checksum != 51894 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_120_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_16_point_1_degrees()
+		})
+		if checksum != 62121 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_16_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_16_point_1_degrees_to_fixed_local_chatzos()
+		})
+		if checksum != 24402 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_16_point_1_degrees_to_fixed_local_chatzos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_18_degrees()
+		})
+		if checksum != 25825 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_18_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_18_degrees_to_fixed_local_chatzos()
+		})
+		if checksum != 4464 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_18_degrees_to_fixed_local_chatzos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_19_point_8_degrees()
+		})
+		if checksum != 41385 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_19_point_8_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_72_minutes()
+		})
+		if checksum != 40558 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_72_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_72_minutes_to_fixed_local_chatzos()
+		})
+		if checksum != 16594 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_72_minutes_to_fixed_local_chatzos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_72_minutes_zmanis()
+		})
+		if checksum != 19288 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_72_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_90_minutes()
+		})
+		if checksum != 28107 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_90_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_90_minutes_to_fixed_local_chatzos()
+		})
+		if checksum != 50933 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_90_minutes_to_fixed_local_chatzos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_90_minutes_zmanis()
+		})
+		if checksum != 2652 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_90_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_96_minutes()
+		})
+		if checksum != 20485 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_96_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_96_minutes_zmanis()
+		})
+		if checksum != 62040 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_shma_mga_96_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_2_hours_before_chatzos()
+		})
+		if checksum != 54480 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_2_hours_before_chatzos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_ateret_torah()
+		})
+		if checksum != 34025 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_ateret_torah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_baal_hatanya()
+		})
+		if checksum != 59083 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_baal_hatanya: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_fixed_local()
+		})
+		if checksum != 44319 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_fixed_local: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_gra_sunrise_to_fixed_local_chatzos()
+		})
+		if checksum != 54477 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_gra_sunrise_to_fixed_local_chatzos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_120_minutes()
+		})
+		if checksum != 3137 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_120_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_16_point_1_degrees()
+		})
+		if checksum != 55912 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_16_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_18_degrees()
+		})
+		if checksum != 39612 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_18_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_19_point_8_degrees()
+		})
+		if checksum != 309 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_19_point_8_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_72_minutes()
+		})
+		if checksum != 54692 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_72_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_72_minutes_zmanis()
+		})
+		if checksum != 51829 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_72_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_90_minutes()
+		})
+		if checksum != 22866 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_90_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_90_minutes_zmanis()
+		})
+		if checksum != 41522 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_90_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_96_minutes()
+		})
+		if checksum != 62775 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_96_minutes: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_96_minutes_zmanis()
+		})
+		if checksum != 25086 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfila_mga_96_minutes_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfilah_ateret_torah()
+		})
+		if checksum != 62677 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_sof_zman_tfilah_ateret_torah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tchilas_zman_kidush_levana_3_days()
+		})
+		if checksum != 27286 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tchilas_zman_kidush_levana_3_days: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tchilas_zman_kidush_levana_3_days_with_times()
+		})
+		if checksum != 31605 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tchilas_zman_kidush_levana_3_days_with_times: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tchilas_zman_kidush_levana_7_days()
+		})
+		if checksum != 45982 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tchilas_zman_kidush_levana_7_days: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tchilas_zman_kidush_levana_7_days_default()
+		})
+		if checksum != 38286 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tchilas_zman_kidush_levana_7_days_default: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_120()
+		})
+		if checksum != 52832 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_120: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_120_zmanis()
+		})
+		if checksum != 61796 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_120_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_16_point_1_degrees()
+		})
+		if checksum != 49788 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_16_point_1_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_18_degrees()
+		})
+		if checksum != 45922 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_18_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_19_point_8_degrees()
+		})
+		if checksum != 5829 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_19_point_8_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_26_degrees()
+		})
+		if checksum != 11870 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_26_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_50()
+		})
+		if checksum != 17943 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_50: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_60()
+		})
+		if checksum != 31840 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_60: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_72_zmanis()
+		})
+		if checksum != 34591 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_72_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_90()
+		})
+		if checksum != 41989 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_90: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_90_zmanis()
+		})
+		if checksum != 5800 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_90_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_96()
+		})
+		if checksum != 11807 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_96: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_96_zmanis()
+		})
+		if checksum != 2711 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_96_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_ateret_torah()
+		})
+		if checksum != 59206 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_ateret_torah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_baal_hatanya()
+		})
+		if checksum != 16596 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_baal_hatanya: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_3_point_65_degrees()
+		})
+		if checksum != 43653 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_3_point_65_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_3_point_676_degrees()
+		})
+		if checksum != 23197 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_3_point_676_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_3_point_7_degrees()
+		})
+		if checksum != 23058 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_3_point_7_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_3_point_8_degrees()
+		})
+		if checksum != 18091 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_3_point_8_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_4_point_37_degrees()
+		})
+		if checksum != 64877 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_4_point_37_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_4_point_61_degrees()
+		})
+		if checksum != 25702 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_4_point_61_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_4_point_8_degrees()
+		})
+		if checksum != 11242 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_4_point_8_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_5_point_88_degrees()
+		})
+		if checksum != 44153 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_5_point_88_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_5_point_95_degrees()
+		})
+		if checksum != 31751 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_5_point_95_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_6_point_45_degrees()
+		})
+		if checksum != 59135 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_6_point_45_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_7_point_083_degrees()
+		})
+		if checksum != 48808 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_7_point_083_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_7_point_67_degrees()
+		})
+		if checksum != 18226 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_7_point_67_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_8_point_5_degrees()
+		})
+		if checksum != 65499 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_8_point_5_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_9_point_3_degrees()
+		})
+		if checksum != 60242 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_9_point_3_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_9_point_75_degrees()
+		})
+		if checksum != 61681 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_tzais_geonim_9_point_75_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_use_astronomical_chatzos()
+		})
+		if checksum != 35399 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_use_astronomical_chatzos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_use_astronomical_chatzos_for_other_zmanim()
+		})
+		if checksum != 14721 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_use_astronomical_chatzos_for_other_zmanim: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_zman_molad()
+		})
+		if checksum != 44122 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_complexzmanimcalendar_get_zman_molad: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_geolocation_geodesic_distance()
+		})
+		if checksum != 62033 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_geolocation_geodesic_distance: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_geolocation_geodesic_final_bearing()
+		})
+		if checksum != 27490 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_geolocation_geodesic_final_bearing: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_geolocation_geodesic_initial_bearing()
+		})
+		if checksum != 36808 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_geolocation_geodesic_initial_bearing: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_geolocation_get_elevation()
+		})
+		if checksum != 53256 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_geolocation_get_elevation: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_geolocation_get_latitude()
+		})
+		if checksum != 11900 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_geolocation_get_latitude: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_geolocation_get_longitude()
+		})
+		if checksum != 53669 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_geolocation_get_longitude: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_geolocation_rhumb_line_bearing()
+		})
+		if checksum != 21906 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_geolocation_rhumb_line_bearing: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_geolocation_rhumb_line_distance()
+		})
+		if checksum != 18055 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_geolocation_rhumb_line_distance: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_geolocation_vincenty_inverse_formula()
+		})
+		if checksum != 57718 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_geolocation_vincenty_inverse_formula: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_get_bavli_daf_yomi()
+		})
+		if checksum != 54974 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_get_bavli_daf_yomi: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_get_day_of_chanukah()
+		})
+		if checksum != 52566 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_get_day_of_chanukah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_get_day_of_omer()
+		})
+		if checksum != 26068 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_get_day_of_omer: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_get_in_israel()
+		})
+		if checksum != 20250 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_get_in_israel: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_get_jewish_date()
+		})
+		if checksum != 39592 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_get_jewish_date: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_get_parshah()
+		})
+		if checksum != 3074 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_get_parshah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_get_use_modern_holidays()
+		})
+		if checksum != 23527 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_get_use_modern_holidays: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_get_yom_tov_index()
+		})
+		if checksum != 50909 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_get_yom_tov_index: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_has_candle_lighting()
+		})
+		if checksum != 40482 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_has_candle_lighting: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_aseres_yemei_teshuva()
+		})
+		if checksum != 64432 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_aseres_yemei_teshuva: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_assur_bemelacha()
+		})
+		if checksum != 11688 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_assur_bemelacha: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_chanukah()
+		})
+		if checksum != 12392 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_chanukah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_chol_hamoed()
+		})
+		if checksum != 32230 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_chol_hamoed: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_chol_hamoed_pesach()
+		})
+		if checksum != 26780 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_chol_hamoed_pesach: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_chol_hamoed_succos()
+		})
+		if checksum != 7096 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_chol_hamoed_succos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_erev_yom_tov()
+		})
+		if checksum != 49090 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_erev_yom_tov: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_erev_yom_tov_sheni()
+		})
+		if checksum != 14387 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_erev_yom_tov_sheni: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_hoshana_rabba()
+		})
+		if checksum != 1316 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_hoshana_rabba: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_isru_chag()
+		})
+		if checksum != 35283 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_isru_chag: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_pesach()
+		})
+		if checksum != 3826 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_pesach: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_purim()
+		})
+		if checksum != 16100 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_purim: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_rosh_chodesh()
+		})
+		if checksum != 8221 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_rosh_chodesh: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_rosh_hashana()
+		})
+		if checksum != 15876 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_rosh_hashana: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_shavuos()
+		})
+		if checksum != 51728 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_shavuos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_shemini_atzeres()
+		})
+		if checksum != 17118 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_shemini_atzeres: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_simchas_torah()
+		})
+		if checksum != 48466 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_simchas_torah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_succos()
+		})
+		if checksum != 36900 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_succos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_taanis()
+		})
+		if checksum != 12867 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_taanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_taanis_bechoros()
+		})
+		if checksum != 44134 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_taanis_bechoros: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_tisha_beav()
+		})
+		if checksum != 65009 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_tisha_beav: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_tomorrow_shabbos_or_yom_tov()
+		})
+		if checksum != 52722 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_tomorrow_shabbos_or_yom_tov: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_yom_kippur()
+		})
+		if checksum != 7664 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_yom_kippur: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_yom_tov()
+		})
+		if checksum != 41380 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_yom_tov: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishcalendar_is_yom_tov_assur_bemelacha()
+		})
+		if checksum != 15967 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishcalendar_is_yom_tov_assur_bemelacha: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_chalakim_since_molad_tohu()
+		})
+		if checksum != 56202 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_chalakim_since_molad_tohu: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_cheshvan_kislev_kviah()
+		})
+		if checksum != 51674 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_cheshvan_kislev_kviah: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_day_of_week()
+		})
+		if checksum != 55271 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_day_of_week: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_days_in_jewish_month()
+		})
+		if checksum != 19694 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_days_in_jewish_month: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_days_in_jewish_year()
+		})
+		if checksum != 19713 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_days_in_jewish_year: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_days_since_start_of_jewish_year()
+		})
+		if checksum != 50707 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_days_since_start_of_jewish_year: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_gregorian_day_of_month()
+		})
+		if checksum != 22662 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_gregorian_day_of_month: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_gregorian_month()
+		})
+		if checksum != 18768 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_gregorian_month: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_gregorian_year()
+		})
+		if checksum != 24044 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_gregorian_year: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_jewish_day_of_month()
+		})
+		if checksum != 32340 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_jewish_day_of_month: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_jewish_month()
+		})
+		if checksum != 59238 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_jewish_month: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_jewish_year()
+		})
+		if checksum != 39347 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_jewish_year: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_molad_data()
+		})
+		if checksum != 29846 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_molad_data: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_get_molad_date()
+		})
+		if checksum != 32020 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_get_molad_date: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_is_cheshvan_long()
+		})
+		if checksum != 42144 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_is_cheshvan_long: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_is_jewish_leap_year()
+		})
+		if checksum != 49033 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_is_jewish_leap_year: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_jewishdate_is_kislev_short()
+		})
+		if checksum != 44688 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_jewishdate_is_kislev_short: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_noaacalculator_get_solar_azimuth()
+		})
+		if checksum != 65501 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_noaacalculator_get_solar_azimuth: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_noaacalculator_get_solar_elevation()
+		})
+		if checksum != 36899 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_noaacalculator_get_solar_elevation: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_noaacalculator_get_utc_midnight()
+		})
+		if checksum != 14576 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_noaacalculator_get_utc_midnight: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_noaacalculator_get_utc_noon()
+		})
+		if checksum != 43731 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_noaacalculator_get_utc_noon: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_noaacalculator_get_utc_sunrise()
+		})
+		if checksum != 10089 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_noaacalculator_get_utc_sunrise: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_noaacalculator_get_utc_sunset()
+		})
+		if checksum != 58722 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_noaacalculator_get_utc_sunset: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar__get_mincha_gedola()
+		})
+		if checksum != 6028 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar__get_mincha_gedola: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar__get_mincha_ketana()
+		})
+		if checksum != 60269 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar__get_mincha_ketana: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar__get_plag_hamincha()
+		})
+		if checksum != 63219 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar__get_plag_hamincha: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar__get_samuch_le_mincha_ketana()
+		})
+		if checksum != 3882 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar__get_samuch_le_mincha_ketana: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar__get_sof_zman_shma()
+		})
+		if checksum != 10834 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar__get_sof_zman_shma: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar__get_sof_zman_tfila()
+		})
+		if checksum != 9134 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar__get_sof_zman_tfila: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_alos72()
+		})
+		if checksum != 36744 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_alos72: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_alos_hashachar()
+		})
+		if checksum != 57562 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_alos_hashachar: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_astronomical_calendar()
+		})
+		if checksum != 28643 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_astronomical_calendar: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_candle_lighting()
+		})
+		if checksum != 57067 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_candle_lighting: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_candle_lighting_offset()
+		})
+		if checksum != 18649 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_candle_lighting_offset: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_chatzos()
+		})
+		if checksum != 28341 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_chatzos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_chatzos_as_half_day()
+		})
+		if checksum != 2021 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_chatzos_as_half_day: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_half_day_based_shaah_zmanis()
+		})
+		if checksum != 64353 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_half_day_based_shaah_zmanis: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_half_day_based_zman()
+		})
+		if checksum != 38483 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_half_day_based_zman: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_mincha_gedola_default()
+		})
+		if checksum != 43718 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_mincha_gedola_default: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_mincha_gedola_simple()
+		})
+		if checksum != 25011 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_mincha_gedola_simple: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_mincha_ketana_default()
+		})
+		if checksum != 1744 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_mincha_ketana_default: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_mincha_ketana_simple()
+		})
+		if checksum != 55145 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_mincha_ketana_simple: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_percent_of_shaah_zmanis_from_degrees()
+		})
+		if checksum != 65181 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_percent_of_shaah_zmanis_from_degrees: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_plag_hamincha_default()
+		})
+		if checksum != 6441 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_plag_hamincha_default: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_plag_hamincha_simple()
+		})
+		if checksum != 25025 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_plag_hamincha_simple: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_samuch_le_mincha_ketana_simple()
+		})
+		if checksum != 57139 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_samuch_le_mincha_ketana_simple: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_shaah_zmanis_based_zman()
+		})
+		if checksum != 28559 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_shaah_zmanis_based_zman: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_shaah_zmanis_gra()
+		})
+		if checksum != 63034 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_shaah_zmanis_gra: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_shaah_zmanis_mga()
+		})
+		if checksum != 20604 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_shaah_zmanis_mga: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_sof_zman_shma_gra()
+		})
+		if checksum != 48994 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_sof_zman_shma_gra: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_sof_zman_shma_mga()
+		})
+		if checksum != 47235 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_sof_zman_shma_mga: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_sof_zman_shma_simple()
+		})
+		if checksum != 18087 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_sof_zman_shma_simple: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_sof_zman_tfila_gra()
+		})
+		if checksum != 3389 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_sof_zman_tfila_gra: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_sof_zman_tfila_mga()
+		})
+		if checksum != 23676 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_sof_zman_tfila_mga: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_sof_zman_tfila_simple()
+		})
+		if checksum != 63288 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_sof_zman_tfila_simple: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_tzais()
+		})
+		if checksum != 24640 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_tzais: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_tzais72()
+		})
+		if checksum != 51548 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_tzais72: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_use_astronomical_chatzos()
+		})
+		if checksum != 27733 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_use_astronomical_chatzos: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_zmanim_core_checksum_method_zmanimcalendar_get_use_astronomical_chatzos_for_other_zmanim()
+		})
+		if checksum != 58719 {
+			// If this happens try cleaning and rebuilding your project
+			panic("zmanim_core: uniffi_zmanim_core_checksum_method_zmanimcalendar_get_use_astronomical_chatzos_for_other_zmanim: UniFFI API checksum mismatch")
+		}
+	}
+}
+
+type FfiConverterInt32 struct{}
+
+var FfiConverterInt32INSTANCE = FfiConverterInt32{}
+
+func (FfiConverterInt32) Lower(value int32) C.int32_t {
+	return C.int32_t(value)
+}
+
+func (FfiConverterInt32) Write(writer io.Writer, value int32) {
+	writeInt32(writer, value)
+}
+
+func (FfiConverterInt32) Lift(value C.int32_t) int32 {
+	return int32(value)
+}
+
+func (FfiConverterInt32) Read(reader io.Reader) int32 {
+	return readInt32(reader)
+}
+
+type FfiDestroyerInt32 struct{}
+
+func (FfiDestroyerInt32) Destroy(_ int32) {}
+
+type FfiConverterInt64 struct{}
+
+var FfiConverterInt64INSTANCE = FfiConverterInt64{}
+
+func (FfiConverterInt64) Lower(value int64) C.int64_t {
+	return C.int64_t(value)
+}
+
+func (FfiConverterInt64) Write(writer io.Writer, value int64) {
+	writeInt64(writer, value)
+}
+
+func (FfiConverterInt64) Lift(value C.int64_t) int64 {
+	return int64(value)
+}
+
+func (FfiConverterInt64) Read(reader io.Reader) int64 {
+	return readInt64(reader)
+}
+
+type FfiDestroyerInt64 struct{}
+
+func (FfiDestroyerInt64) Destroy(_ int64) {}
+
+type FfiConverterFloat64 struct{}
+
+var FfiConverterFloat64INSTANCE = FfiConverterFloat64{}
+
+func (FfiConverterFloat64) Lower(value float64) C.double {
+	return C.double(value)
+}
+
+func (FfiConverterFloat64) Write(writer io.Writer, value float64) {
+	writeFloat64(writer, value)
+}
+
+func (FfiConverterFloat64) Lift(value C.double) float64 {
+	return float64(value)
+}
+
+func (FfiConverterFloat64) Read(reader io.Reader) float64 {
+	return readFloat64(reader)
+}
+
+type FfiDestroyerFloat64 struct{}
+
+func (FfiDestroyerFloat64) Destroy(_ float64) {}
+
+type FfiConverterBool struct{}
+
+var FfiConverterBoolINSTANCE = FfiConverterBool{}
+
+func (FfiConverterBool) Lower(value bool) C.int8_t {
+	if value {
+		return C.int8_t(1)
+	}
+	return C.int8_t(0)
+}
+
+func (FfiConverterBool) Write(writer io.Writer, value bool) {
+	if value {
+		writeInt8(writer, 1)
+	} else {
+		writeInt8(writer, 0)
+	}
+}
+
+func (FfiConverterBool) Lift(value C.int8_t) bool {
+	return value != 0
+}
+
+func (FfiConverterBool) Read(reader io.Reader) bool {
+	return readInt8(reader) != 0
+}
+
+type FfiDestroyerBool struct{}
+
+func (FfiDestroyerBool) Destroy(_ bool) {}
+
+type FfiConverterString struct{}
+
+var FfiConverterStringINSTANCE = FfiConverterString{}
+
+func (FfiConverterString) Lift(rb RustBufferI) string {
+	defer rb.Free()
+	reader := rb.AsReader()
+	b, err := io.ReadAll(reader)
+	if err != nil {
+		panic(fmt.Errorf("reading reader: %w", err))
+	}
+	return string(b)
+}
+
+func (FfiConverterString) Read(reader io.Reader) string {
+	length := readInt32(reader)
+	buffer := make([]byte, length)
+	read_length, err := reader.Read(buffer)
+	if err != nil && err != io.EOF {
+		panic(err)
+	}
+	if read_length != int(length) {
+		panic(fmt.Errorf("bad read length when reading string, expected %d, read %d", length, read_length))
+	}
+	return string(buffer)
+}
+
+func (FfiConverterString) Lower(value string) C.RustBuffer {
+	return stringToRustBuffer(value)
+}
+
+func (FfiConverterString) Write(writer io.Writer, value string) {
+	if len(value) > math.MaxInt32 {
+		panic("String is too large to fit into Int32")
+	}
+
+	writeInt32(writer, int32(len(value)))
+	write_length, err := io.WriteString(writer, value)
+	if err != nil {
+		panic(err)
+	}
+	if write_length != len(value) {
+		panic(fmt.Errorf("bad write length when writing string, expected %d, written %d", len(value), write_length))
+	}
+}
+
+type FfiDestroyerString struct{}
+
+func (FfiDestroyerString) Destroy(_ string) {}
+
+// Below is an implementation of synchronization requirements outlined in the link.
+// https://github.com/mozilla/uniffi-rs/blob/0dc031132d9493ca812c3af6e7dd60ad2ea95bf0/uniffi_bindgen/src/bindings/kotlin/templates/ObjectRuntime.kt#L31
+
+type FfiObject struct {
+	pointer       unsafe.Pointer
+	callCounter   atomic.Int64
+	cloneFunction func(unsafe.Pointer, *C.RustCallStatus) unsafe.Pointer
+	freeFunction  func(unsafe.Pointer, *C.RustCallStatus)
+	destroyed     atomic.Bool
+}
+
+func newFfiObject(
+	pointer unsafe.Pointer,
+	cloneFunction func(unsafe.Pointer, *C.RustCallStatus) unsafe.Pointer,
+	freeFunction func(unsafe.Pointer, *C.RustCallStatus),
+) FfiObject {
+	return FfiObject{
+		pointer:       pointer,
+		cloneFunction: cloneFunction,
+		freeFunction:  freeFunction,
+	}
+}
+
+func (ffiObject *FfiObject) incrementPointer(debugName string) unsafe.Pointer {
+	for {
+		counter := ffiObject.callCounter.Load()
+		if counter <= -1 {
+			panic(fmt.Errorf("%v object has already been destroyed", debugName))
+		}
+		if counter == math.MaxInt64 {
+			panic(fmt.Errorf("%v object call counter would overflow", debugName))
+		}
+		if ffiObject.callCounter.CompareAndSwap(counter, counter+1) {
+			break
+		}
+	}
+
+	return rustCall(func(status *C.RustCallStatus) unsafe.Pointer {
+		return ffiObject.cloneFunction(ffiObject.pointer, status)
+	})
+}
+
+func (ffiObject *FfiObject) decrementPointer() {
+	if ffiObject.callCounter.Add(-1) == -1 {
+		ffiObject.freeRustArcPtr()
+	}
+}
+
+func (ffiObject *FfiObject) destroy() {
+	if ffiObject.destroyed.CompareAndSwap(false, true) {
+		if ffiObject.callCounter.Add(-1) == -1 {
+			ffiObject.freeRustArcPtr()
+		}
+	}
+}
+
+func (ffiObject *FfiObject) freeRustArcPtr() {
+	rustCall(func(status *C.RustCallStatus) int32 {
+		ffiObject.freeFunction(ffiObject.pointer, status)
+		return 0
+	})
+}
+
+type AstronomicalCalculatorInterface interface {
+}
+type AstronomicalCalculator struct {
+	ffiObject FfiObject
+}
+
+func (object *AstronomicalCalculator) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterAstronomicalCalculator struct{}
+
+var FfiConverterAstronomicalCalculatorINSTANCE = FfiConverterAstronomicalCalculator{}
+
+func (c FfiConverterAstronomicalCalculator) Lift(pointer unsafe.Pointer) *AstronomicalCalculator {
+	result := &AstronomicalCalculator{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_zmanim_core_fn_clone_astronomicalcalculator(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_zmanim_core_fn_free_astronomicalcalculator(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*AstronomicalCalculator).Destroy)
+	return result
+}
+
+func (c FfiConverterAstronomicalCalculator) Read(reader io.Reader) *AstronomicalCalculator {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterAstronomicalCalculator) Lower(value *AstronomicalCalculator) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*AstronomicalCalculator")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterAstronomicalCalculator) Write(writer io.Writer, value *AstronomicalCalculator) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerAstronomicalCalculator struct{}
+
+func (_ FfiDestroyerAstronomicalCalculator) Destroy(value *AstronomicalCalculator) {
+	value.Destroy()
+}
+
+type AstronomicalCalendarInterface interface {
+	GetBeginAstronomicalTwilight() *int64
+	GetBeginCivilTwilight() *int64
+	GetBeginNauticalTwilight() *int64
+	GetEndAstronomicalTwilight() *int64
+	GetEndCivilTwilight() *int64
+	GetEndNauticalTwilight() *int64
+	GetGeoLocation() *GeoLocation
+	GetNoaaCalculator() *NoaaCalculator
+	GetSeaLevelSunrise() *int64
+	GetSeaLevelSunset() *int64
+	GetSolarMidnight() *int64
+	GetSunTransit() *int64
+	GetSunTransitWithStartAndEndTimes(startTime int64, endTime int64) *int64
+	GetSunrise() *int64
+	GetSunriseOffsetByDegrees(degrees float64) *int64
+	GetSunset() *int64
+	GetSunsetOffsetByDegrees(degrees float64) *int64
+	GetTemporalHour() *int64
+	GetTemporalHourWithStartAndEndTimes(startTime int64, endTime int64) *int64
+	GetTimestamp() int64
+	GetUtcSeaLevelSunrise(zenith float64) *float64
+	GetUtcSeaLevelSunset(zenith float64) *float64
+	GetUtcSunrise(zenith float64) *float64
+	GetUtcSunset(zenith float64) *float64
+}
+type AstronomicalCalendar struct {
+	ffiObject FfiObject
+}
+
+func (_self *AstronomicalCalendar) GetBeginAstronomicalTwilight() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_begin_astronomical_twilight(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetBeginCivilTwilight() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_begin_civil_twilight(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetBeginNauticalTwilight() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_begin_nautical_twilight(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetEndAstronomicalTwilight() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_end_astronomical_twilight(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetEndCivilTwilight() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_end_civil_twilight(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetEndNauticalTwilight() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_end_nautical_twilight(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetGeoLocation() *GeoLocation {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterGeoLocationINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_geo_location(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetNoaaCalculator() *NoaaCalculator {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterNoaaCalculatorINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_noaa_calculator(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetSeaLevelSunrise() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_sea_level_sunrise(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetSeaLevelSunset() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_sea_level_sunset(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetSolarMidnight() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_solar_midnight(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetSunTransit() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_sun_transit(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetSunTransitWithStartAndEndTimes(startTime int64, endTime int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_sun_transit_with_start_and_end_times(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startTime), FfiConverterInt64INSTANCE.Lower(endTime), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetSunrise() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_sunrise(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetSunriseOffsetByDegrees(degrees float64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_sunrise_offset_by_degrees(
+				_pointer, FfiConverterFloat64INSTANCE.Lower(degrees), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetSunset() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_sunset(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetSunsetOffsetByDegrees(degrees float64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_sunset_offset_by_degrees(
+				_pointer, FfiConverterFloat64INSTANCE.Lower(degrees), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetTemporalHour() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_temporal_hour(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetTemporalHourWithStartAndEndTimes(startTime int64, endTime int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_temporal_hour_with_start_and_end_times(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startTime), FfiConverterInt64INSTANCE.Lower(endTime), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetTimestamp() int64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int64_t {
+		return C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_timestamp(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetUtcSeaLevelSunrise(zenith float64) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_utc_sea_level_sunrise(
+				_pointer, FfiConverterFloat64INSTANCE.Lower(zenith), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetUtcSeaLevelSunset(zenith float64) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_utc_sea_level_sunset(
+				_pointer, FfiConverterFloat64INSTANCE.Lower(zenith), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetUtcSunrise(zenith float64) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_utc_sunrise(
+				_pointer, FfiConverterFloat64INSTANCE.Lower(zenith), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *AstronomicalCalendar) GetUtcSunset(zenith float64) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_astronomicalcalendar_get_utc_sunset(
+				_pointer, FfiConverterFloat64INSTANCE.Lower(zenith), _uniffiStatus),
+		}
+	}))
+}
+func (object *AstronomicalCalendar) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterAstronomicalCalendar struct{}
+
+var FfiConverterAstronomicalCalendarINSTANCE = FfiConverterAstronomicalCalendar{}
+
+func (c FfiConverterAstronomicalCalendar) Lift(pointer unsafe.Pointer) *AstronomicalCalendar {
+	result := &AstronomicalCalendar{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_zmanim_core_fn_clone_astronomicalcalendar(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_zmanim_core_fn_free_astronomicalcalendar(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*AstronomicalCalendar).Destroy)
+	return result
+}
+
+func (c FfiConverterAstronomicalCalendar) Read(reader io.Reader) *AstronomicalCalendar {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterAstronomicalCalendar) Lower(value *AstronomicalCalendar) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*AstronomicalCalendar")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterAstronomicalCalendar) Write(writer io.Writer, value *AstronomicalCalendar) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerAstronomicalCalendar struct{}
+
+func (_ FfiDestroyerAstronomicalCalendar) Destroy(value *AstronomicalCalendar) {
+	value.Destroy()
+}
+
+type BavliDafInterface interface {
+}
+type BavliDaf struct {
+	ffiObject FfiObject
+}
+
+func (object *BavliDaf) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterBavliDaf struct{}
+
+var FfiConverterBavliDafINSTANCE = FfiConverterBavliDaf{}
+
+func (c FfiConverterBavliDaf) Lift(pointer unsafe.Pointer) *BavliDaf {
+	result := &BavliDaf{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_zmanim_core_fn_clone_bavlidaf(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_zmanim_core_fn_free_bavlidaf(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*BavliDaf).Destroy)
+	return result
+}
+
+func (c FfiConverterBavliDaf) Read(reader io.Reader) *BavliDaf {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterBavliDaf) Lower(value *BavliDaf) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*BavliDaf")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterBavliDaf) Write(writer io.Writer, value *BavliDaf) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerBavliDaf struct{}
+
+func (_ FfiDestroyerBavliDaf) Destroy(value *BavliDaf) {
+	value.Destroy()
+}
+
+type ComplexZmanimCalendarInterface interface {
+	GetAlos120() *int64
+	GetAlos120Zmanis() *int64
+	GetAlos16Point1Degrees() *int64
+	GetAlos18Degrees() *int64
+	GetAlos19Degrees() *int64
+	GetAlos19Point8Degrees() *int64
+	GetAlos26Degrees() *int64
+	GetAlos60() *int64
+	GetAlos72Zmanis() *int64
+	GetAlos90() *int64
+	GetAlos90Zmanis() *int64
+	GetAlos96() *int64
+	GetAlos96Zmanis() *int64
+	GetAlosBaalHatanya() *int64
+	GetAstronomicalCalendar() *AstronomicalCalendar
+	GetAteretTorahSunsetOffset() int64
+	GetBainHashmashosRt13Point24Degrees() *int64
+	GetBainHashmashosRt13Point5MinutesBefore7Point083Degrees() *int64
+	GetBainHashmashosRt2Stars() *int64
+	GetBainHashmashosRt58Point5Minutes() *int64
+	GetBainHashmashosYereim13Point5Minutes() *int64
+	GetBainHashmashosYereim16Point875Minutes() *int64
+	GetBainHashmashosYereim18Minutes() *int64
+	GetBainHashmashosYereim2Point1Degrees() *int64
+	GetBainHashmashosYereim2Point8Degrees() *int64
+	GetBainHashmashosYereim3Point05Degrees() *int64
+	GetBainHasmashosrt13Point24Degrees() *int64
+	GetBainHasmashosrt13Point5MinutesBefore7Point083Degrees() *int64
+	GetBainHasmashosrt2Stars() *int64
+	GetBainHasmashosrt58Point5Minutes() *int64
+	GetBainHasmashosyereim13Point5Minutes() *int64
+	GetBainHasmashosyereim16Point875Minutes() *int64
+	GetBainHasmashosyereim18Minutes() *int64
+	GetBainHasmashosyereim2Point1Degrees() *int64
+	GetBainHasmashosyereim2Point8Degrees() *int64
+	GetBainHasmashosyereim3Point05Degrees() *int64
+	GetCandleLightingOffset() int64
+	GetFixedLocalChatzos() *int64
+	GetFixedLocalChatzosBasedZmanim(startOfHalfDay int64, endOfHalfDay int64, hours float64) *int64
+	GetMinchaGedola16Point1Degrees() *int64
+	GetMinchaGedola30Minutes() *int64
+	GetMinchaGedola72Minutes() *int64
+	GetMinchaGedolaAhavatShalom() *int64
+	GetMinchaGedolaAteretTorah() *int64
+	GetMinchaGedolaBaalHatanya() *int64
+	GetMinchaGedolaBaalHatanyaGreaterThan30() *int64
+	GetMinchaGedolaGraFixedLocalChatzos30Minutes() *int64
+	GetMinchaGedolaGreaterThan30() *int64
+	GetMinchaKetana16Point1Degrees() *int64
+	GetMinchaKetana72Minutes() *int64
+	GetMinchaKetanaAhavatShalom() *int64
+	GetMinchaKetanaAteretTorah() *int64
+	GetMinchaKetanaBaalHatanya() *int64
+	GetMinchaKetanaGraFixedLocalChatzosToSunset() *int64
+	GetMisheyakir10Point2Degrees() *int64
+	GetMisheyakir11Degrees() *int64
+	GetMisheyakir11Point5Degrees() *int64
+	GetMisheyakir7Point65Degrees() *int64
+	GetMisheyakir9Point5Degrees() *int64
+	GetPlagAhavatShalom() *int64
+	GetPlagAlos16Point1ToTzaisGeonim7Point083Degrees() *int64
+	GetPlagAlosToSunset() *int64
+	GetPlagHamincha120Minutes() *int64
+	GetPlagHamincha120MinutesZmanis() *int64
+	GetPlagHamincha16Point1Degrees() *int64
+	GetPlagHamincha18Degrees() *int64
+	GetPlagHamincha19Point8Degrees() *int64
+	GetPlagHamincha26Degrees() *int64
+	GetPlagHamincha60Minutes() *int64
+	GetPlagHamincha72Minutes() *int64
+	GetPlagHamincha72MinutesZmanis() *int64
+	GetPlagHamincha90Minutes() *int64
+	GetPlagHamincha90MinutesZmanis() *int64
+	GetPlagHamincha96Minutes() *int64
+	GetPlagHamincha96MinutesZmanis() *int64
+	GetPlagHaminchaAteretTorah() *int64
+	GetPlagHaminchaBaalHatanya() *int64
+	GetPlagHaminchaGraFixedLocalChatzosToSunset() *int64
+	GetSamuchLeMinchaKetana16Point1Degrees() *int64
+	GetSamuchLeMinchaKetana72Minutes() *int64
+	GetSamuchLeMinchaKetanaGra() *int64
+	GetShaahZmanis120Minutes() *int64
+	GetShaahZmanis120MinutesZmanis() *int64
+	GetShaahZmanis16Point1Degrees() *int64
+	GetShaahZmanis18Degrees() *int64
+	GetShaahZmanis19Point8Degrees() *int64
+	GetShaahZmanis26Degrees() *int64
+	GetShaahZmanis60Minutes() *int64
+	GetShaahZmanis72Minutes() *int64
+	GetShaahZmanis72MinutesZmanis() *int64
+	GetShaahZmanis90Minutes() *int64
+	GetShaahZmanis90MinutesZmanis() *int64
+	GetShaahZmanis96Minutes() *int64
+	GetShaahZmanis96MinutesZmanis() *int64
+	GetShaahZmanisAlos16Point1ToTzais3Point7() *int64
+	GetShaahZmanisAlos16Point1ToTzais3Point8() *int64
+	GetShaahZmanisAteretTorah() *int64
+	GetShaahZmanisBaalHatanya() *int64
+	GetSofZmanAchilasChametzBaalHatanya() *int64
+	GetSofZmanAchilasChametzGra() *int64
+	GetSofZmanAchilasChametzMga16Point1Degrees() *int64
+	GetSofZmanAchilasChametzMga72Minutes() *int64
+	GetSofZmanAchilasChametzMga72MinutesZmanis() *int64
+	GetSofZmanBiurChametzBaalHatanya() *int64
+	GetSofZmanBiurChametzGra() *int64
+	GetSofZmanBiurChametzMga16Point1Degrees() *int64
+	GetSofZmanBiurChametzMga72Minutes() *int64
+	GetSofZmanBiurChametzMga72MinutesZmanis() *int64
+	GetSofZmanKidushLevana15Days(alos *int64, tzais *int64) *int64
+	GetSofZmanKidushLevana15DaysDefault() *int64
+	GetSofZmanKidushLevanaBetweenMoldos(alos *int64, tzais *int64) *int64
+	GetSofZmanKidushLevanaBetweenMoldosDefault() *int64
+	GetSofZmanShma3HoursBeforeChatzos() *int64
+	GetSofZmanShmaAlos16Point1ToSunset() *int64
+	GetSofZmanShmaAlos16Point1ToTzaisGeonim7Point083Degrees() *int64
+	GetSofZmanShmaAteretTorah() *int64
+	GetSofZmanShmaBaalHatanya() *int64
+	GetSofZmanShmaFixedLocal() *int64
+	GetSofZmanShmaGraSunriseToFixedLocalChatzos() *int64
+	GetSofZmanShmaKolEliyahu() *int64
+	GetSofZmanShmaMga120Minutes() *int64
+	GetSofZmanShmaMga16Point1Degrees() *int64
+	GetSofZmanShmaMga16Point1DegreesToFixedLocalChatzos() *int64
+	GetSofZmanShmaMga18Degrees() *int64
+	GetSofZmanShmaMga18DegreesToFixedLocalChatzos() *int64
+	GetSofZmanShmaMga19Point8Degrees() *int64
+	GetSofZmanShmaMga72Minutes() *int64
+	GetSofZmanShmaMga72MinutesToFixedLocalChatzos() *int64
+	GetSofZmanShmaMga72MinutesZmanis() *int64
+	GetSofZmanShmaMga90Minutes() *int64
+	GetSofZmanShmaMga90MinutesToFixedLocalChatzos() *int64
+	GetSofZmanShmaMga90MinutesZmanis() *int64
+	GetSofZmanShmaMga96Minutes() *int64
+	GetSofZmanShmaMga96MinutesZmanis() *int64
+	GetSofZmanTfila2HoursBeforeChatzos() *int64
+	GetSofZmanTfilaAteretTorah() *int64
+	GetSofZmanTfilaBaalHatanya() *int64
+	GetSofZmanTfilaFixedLocal() *int64
+	GetSofZmanTfilaGraSunriseToFixedLocalChatzos() *int64
+	GetSofZmanTfilaMga120Minutes() *int64
+	GetSofZmanTfilaMga16Point1Degrees() *int64
+	GetSofZmanTfilaMga18Degrees() *int64
+	GetSofZmanTfilaMga19Point8Degrees() *int64
+	GetSofZmanTfilaMga72Minutes() *int64
+	GetSofZmanTfilaMga72MinutesZmanis() *int64
+	GetSofZmanTfilaMga90Minutes() *int64
+	GetSofZmanTfilaMga90MinutesZmanis() *int64
+	GetSofZmanTfilaMga96Minutes() *int64
+	GetSofZmanTfilaMga96MinutesZmanis() *int64
+	GetSofZmanTfilahAteretTorah() *int64
+	GetTchilasZmanKidushLevana3Days() *int64
+	GetTchilasZmanKidushLevana3DaysWithTimes(alos *int64, tzais *int64) *int64
+	GetTchilasZmanKidushLevana7Days(alos *int64, tzais *int64) *int64
+	GetTchilasZmanKidushLevana7DaysDefault() *int64
+	GetTzais120() *int64
+	GetTzais120Zmanis() *int64
+	GetTzais16Point1Degrees() *int64
+	GetTzais18Degrees() *int64
+	GetTzais19Point8Degrees() *int64
+	GetTzais26Degrees() *int64
+	GetTzais50() *int64
+	GetTzais60() *int64
+	GetTzais72Zmanis() *int64
+	GetTzais90() *int64
+	GetTzais90Zmanis() *int64
+	GetTzais96() *int64
+	GetTzais96Zmanis() *int64
+	GetTzaisAteretTorah() *int64
+	GetTzaisBaalHatanya() *int64
+	GetTzaisGeonim3Point65Degrees() *int64
+	GetTzaisGeonim3Point676Degrees() *int64
+	GetTzaisGeonim3Point7Degrees() *int64
+	GetTzaisGeonim3Point8Degrees() *int64
+	GetTzaisGeonim4Point37Degrees() *int64
+	GetTzaisGeonim4Point61Degrees() *int64
+	GetTzaisGeonim4Point8Degrees() *int64
+	GetTzaisGeonim5Point88Degrees() *int64
+	GetTzaisGeonim5Point95Degrees() *int64
+	GetTzaisGeonim6Point45Degrees() *int64
+	GetTzaisGeonim7Point083Degrees() *int64
+	GetTzaisGeonim7Point67Degrees() *int64
+	GetTzaisGeonim8Point5Degrees() *int64
+	GetTzaisGeonim9Point3Degrees() *int64
+	GetTzaisGeonim9Point75Degrees() *int64
+	GetUseAstronomicalChatzos() bool
+	GetUseAstronomicalChatzosForOtherZmanim() bool
+	GetZmanMolad() *int64
+}
+type ComplexZmanimCalendar struct {
+	ffiObject FfiObject
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos120() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_120(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos120Zmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_120_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos16Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_16_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos18Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_18_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos19Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_19_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos19Point8Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_19_point_8_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos26Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_26_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos60() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_60(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos72Zmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_72_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos90() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_90(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos90Zmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_90_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos96() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_96(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlos96Zmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_96_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAlosBaalHatanya() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_alos_baal_hatanya(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAstronomicalCalendar() *AstronomicalCalendar {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterAstronomicalCalendarINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_astronomical_calendar(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetAteretTorahSunsetOffset() int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int64_t {
+		return C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_ateret_torah_sunset_offset(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHashmashosRt13Point24Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hashmashos_rt_13_point_24_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHashmashosRt13Point5MinutesBefore7Point083Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hashmashos_rt_13_point_5_minutes_before_7_point_083_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHashmashosRt2Stars() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hashmashos_rt_2_stars(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHashmashosRt58Point5Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hashmashos_rt_58_point_5_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHashmashosYereim13Point5Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hashmashos_yereim_13_point_5_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHashmashosYereim16Point875Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hashmashos_yereim_16_point_875_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHashmashosYereim18Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hashmashos_yereim_18_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHashmashosYereim2Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hashmashos_yereim_2_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHashmashosYereim2Point8Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hashmashos_yereim_2_point_8_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHashmashosYereim3Point05Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hashmashos_yereim_3_point_05_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHasmashosrt13Point24Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hasmashosrt_13_point_24_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHasmashosrt13Point5MinutesBefore7Point083Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hasmashosrt_13_point_5_minutes_before_7_point_083_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHasmashosrt2Stars() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hasmashosrt_2_stars(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHasmashosrt58Point5Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hasmashosrt_58_point_5_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHasmashosyereim13Point5Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hasmashosyereim_13_point_5_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHasmashosyereim16Point875Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hasmashosyereim_16_point_875_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHasmashosyereim18Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hasmashosyereim_18_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHasmashosyereim2Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hasmashosyereim_2_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHasmashosyereim2Point8Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hasmashosyereim_2_point_8_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetBainHasmashosyereim3Point05Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_bain_hasmashosyereim_3_point_05_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetCandleLightingOffset() int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int64_t {
+		return C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_candle_lighting_offset(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetFixedLocalChatzos() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_fixed_local_chatzos(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetFixedLocalChatzosBasedZmanim(startOfHalfDay int64, endOfHalfDay int64, hours float64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_fixed_local_chatzos_based_zmanim(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startOfHalfDay), FfiConverterInt64INSTANCE.Lower(endOfHalfDay), FfiConverterFloat64INSTANCE.Lower(hours), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaGedola16Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_gedola_16_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaGedola30Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_gedola_30_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaGedola72Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_gedola_72_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaGedolaAhavatShalom() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_gedola_ahavat_shalom(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaGedolaAteretTorah() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_gedola_ateret_torah(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaGedolaBaalHatanya() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_gedola_baal_hatanya(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaGedolaBaalHatanyaGreaterThan30() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_gedola_baal_hatanya_greater_than_30(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaGedolaGraFixedLocalChatzos30Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_gedola_gra_fixed_local_chatzos_30_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaGedolaGreaterThan30() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_gedola_greater_than_30(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaKetana16Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_ketana_16_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaKetana72Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_ketana_72_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaKetanaAhavatShalom() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_ketana_ahavat_shalom(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaKetanaAteretTorah() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_ketana_ateret_torah(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaKetanaBaalHatanya() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_ketana_baal_hatanya(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMinchaKetanaGraFixedLocalChatzosToSunset() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_mincha_ketana_gra_fixed_local_chatzos_to_sunset(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMisheyakir10Point2Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_misheyakir_10_point_2_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMisheyakir11Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_misheyakir_11_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMisheyakir11Point5Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_misheyakir_11_point_5_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMisheyakir7Point65Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_misheyakir_7_point_65_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetMisheyakir9Point5Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_misheyakir_9_point_5_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagAhavatShalom() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_ahavat_shalom(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagAlos16Point1ToTzaisGeonim7Point083Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagAlosToSunset() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_alos_to_sunset(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha120Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_120_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha120MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_120_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha16Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_16_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha18Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_18_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha19Point8Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_19_point_8_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha26Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_26_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha60Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_60_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha72Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_72_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha72MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_72_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha90Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_90_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha90MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_90_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha96Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_96_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHamincha96MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_96_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHaminchaAteretTorah() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_ateret_torah(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHaminchaBaalHatanya() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_baal_hatanya(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetPlagHaminchaGraFixedLocalChatzosToSunset() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_plag_hamincha_gra_fixed_local_chatzos_to_sunset(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSamuchLeMinchaKetana16Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_samuch_le_mincha_ketana_16_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSamuchLeMinchaKetana72Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_samuch_le_mincha_ketana_72_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSamuchLeMinchaKetanaGra() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_samuch_le_mincha_ketana_gra(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis120Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_120_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis120MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_120_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis16Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_16_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis18Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_18_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis19Point8Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_19_point_8_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis26Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_26_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis60Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_60_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis72Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_72_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis72MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_72_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis90Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_90_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis90MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_90_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis96Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_96_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanis96MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_96_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanisAlos16Point1ToTzais3Point7() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_alos_16_point_1_to_tzais_3_point_7(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanisAlos16Point1ToTzais3Point8() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_alos_16_point_1_to_tzais_3_point_8(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanisAteretTorah() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_ateret_torah(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetShaahZmanisBaalHatanya() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_shaah_zmanis_baal_hatanya(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanAchilasChametzBaalHatanya() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_baal_hatanya(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanAchilasChametzGra() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_gra(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanAchilasChametzMga16Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_mga_16_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanAchilasChametzMga72Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_mga_72_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanAchilasChametzMga72MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_achilas_chametz_mga_72_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanBiurChametzBaalHatanya() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_biur_chametz_baal_hatanya(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanBiurChametzGra() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_biur_chametz_gra(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanBiurChametzMga16Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_biur_chametz_mga_16_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanBiurChametzMga72Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_biur_chametz_mga_72_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanBiurChametzMga72MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_biur_chametz_mga_72_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanKidushLevana15Days(alos *int64, tzais *int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_kidush_levana_15_days(
+				_pointer, FfiConverterOptionalInt64INSTANCE.Lower(alos), FfiConverterOptionalInt64INSTANCE.Lower(tzais), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanKidushLevana15DaysDefault() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_kidush_levana_15_days_default(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanKidushLevanaBetweenMoldos(alos *int64, tzais *int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_kidush_levana_between_moldos(
+				_pointer, FfiConverterOptionalInt64INSTANCE.Lower(alos), FfiConverterOptionalInt64INSTANCE.Lower(tzais), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanKidushLevanaBetweenMoldosDefault() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_kidush_levana_between_moldos_default(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShma3HoursBeforeChatzos() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_3_hours_before_chatzos(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaAlos16Point1ToSunset() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_alos_16_point_1_to_sunset(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaAlos16Point1ToTzaisGeonim7Point083Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_alos_16_point_1_to_tzais_geonim_7_point_083_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaAteretTorah() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_ateret_torah(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaBaalHatanya() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_baal_hatanya(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaFixedLocal() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_fixed_local(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaGraSunriseToFixedLocalChatzos() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_gra_sunrise_to_fixed_local_chatzos(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaKolEliyahu() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_kol_eliyahu(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga120Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_120_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga16Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_16_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga16Point1DegreesToFixedLocalChatzos() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_16_point_1_degrees_to_fixed_local_chatzos(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga18Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_18_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga18DegreesToFixedLocalChatzos() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_18_degrees_to_fixed_local_chatzos(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga19Point8Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_19_point_8_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga72Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_72_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga72MinutesToFixedLocalChatzos() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_72_minutes_to_fixed_local_chatzos(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga72MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_72_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga90Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_90_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga90MinutesToFixedLocalChatzos() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_90_minutes_to_fixed_local_chatzos(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga90MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_90_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga96Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_96_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanShmaMga96MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_shma_mga_96_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfila2HoursBeforeChatzos() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_2_hours_before_chatzos(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaAteretTorah() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_ateret_torah(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaBaalHatanya() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_baal_hatanya(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaFixedLocal() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_fixed_local(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaGraSunriseToFixedLocalChatzos() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_gra_sunrise_to_fixed_local_chatzos(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaMga120Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_mga_120_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaMga16Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_mga_16_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaMga18Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_mga_18_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaMga19Point8Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_mga_19_point_8_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaMga72Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_mga_72_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaMga72MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_mga_72_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaMga90Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_mga_90_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaMga90MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_mga_90_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaMga96Minutes() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_mga_96_minutes(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilaMga96MinutesZmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfila_mga_96_minutes_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetSofZmanTfilahAteretTorah() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_sof_zman_tfilah_ateret_torah(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTchilasZmanKidushLevana3Days() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tchilas_zman_kidush_levana_3_days(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTchilasZmanKidushLevana3DaysWithTimes(alos *int64, tzais *int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tchilas_zman_kidush_levana_3_days_with_times(
+				_pointer, FfiConverterOptionalInt64INSTANCE.Lower(alos), FfiConverterOptionalInt64INSTANCE.Lower(tzais), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTchilasZmanKidushLevana7Days(alos *int64, tzais *int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tchilas_zman_kidush_levana_7_days(
+				_pointer, FfiConverterOptionalInt64INSTANCE.Lower(alos), FfiConverterOptionalInt64INSTANCE.Lower(tzais), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTchilasZmanKidushLevana7DaysDefault() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tchilas_zman_kidush_levana_7_days_default(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais120() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_120(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais120Zmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_120_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais16Point1Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_16_point_1_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais18Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_18_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais19Point8Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_19_point_8_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais26Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_26_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais50() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_50(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais60() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_60(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais72Zmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_72_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais90() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_90(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais90Zmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_90_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais96() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_96(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzais96Zmanis() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_96_zmanis(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisAteretTorah() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_ateret_torah(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisBaalHatanya() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_baal_hatanya(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim3Point65Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_3_point_65_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim3Point676Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_3_point_676_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim3Point7Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_3_point_7_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim3Point8Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_3_point_8_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim4Point37Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_4_point_37_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim4Point61Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_4_point_61_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim4Point8Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_4_point_8_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim5Point88Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_5_point_88_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim5Point95Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_5_point_95_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim6Point45Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_6_point_45_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim7Point083Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_7_point_083_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim7Point67Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_7_point_67_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim8Point5Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_8_point_5_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim9Point3Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_9_point_3_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetTzaisGeonim9Point75Degrees() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_tzais_geonim_9_point_75_degrees(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetUseAstronomicalChatzos() bool {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_use_astronomical_chatzos(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetUseAstronomicalChatzosForOtherZmanim() bool {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_use_astronomical_chatzos_for_other_zmanim(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *ComplexZmanimCalendar) GetZmanMolad() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_complexzmanimcalendar_get_zman_molad(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+func (object *ComplexZmanimCalendar) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterComplexZmanimCalendar struct{}
+
+var FfiConverterComplexZmanimCalendarINSTANCE = FfiConverterComplexZmanimCalendar{}
+
+func (c FfiConverterComplexZmanimCalendar) Lift(pointer unsafe.Pointer) *ComplexZmanimCalendar {
+	result := &ComplexZmanimCalendar{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_zmanim_core_fn_clone_complexzmanimcalendar(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_zmanim_core_fn_free_complexzmanimcalendar(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*ComplexZmanimCalendar).Destroy)
+	return result
+}
+
+func (c FfiConverterComplexZmanimCalendar) Read(reader io.Reader) *ComplexZmanimCalendar {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterComplexZmanimCalendar) Lower(value *ComplexZmanimCalendar) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*ComplexZmanimCalendar")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterComplexZmanimCalendar) Write(writer io.Writer, value *ComplexZmanimCalendar) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerComplexZmanimCalendar struct{}
+
+func (_ FfiDestroyerComplexZmanimCalendar) Destroy(value *ComplexZmanimCalendar) {
+	value.Destroy()
+}
+
+type GeoLocationInterface interface {
+	GeodesicDistance(location *GeoLocation) *float64
+	GeodesicFinalBearing(location *GeoLocation) *float64
+	GeodesicInitialBearing(location *GeoLocation) *float64
+	GetElevation() float64
+	GetLatitude() float64
+	GetLongitude() float64
+	RhumbLineBearing(location *GeoLocation) float64
+	RhumbLineDistance(location *GeoLocation) float64
+	VincentyInverseFormula(location *GeoLocation, formula Formula) *float64
+}
+type GeoLocation struct {
+	ffiObject FfiObject
+}
+
+func (_self *GeoLocation) GeodesicDistance(location *GeoLocation) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*GeoLocation")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_geolocation_geodesic_distance(
+				_pointer, FfiConverterGeoLocationINSTANCE.Lower(location), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *GeoLocation) GeodesicFinalBearing(location *GeoLocation) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*GeoLocation")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_geolocation_geodesic_final_bearing(
+				_pointer, FfiConverterGeoLocationINSTANCE.Lower(location), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *GeoLocation) GeodesicInitialBearing(location *GeoLocation) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*GeoLocation")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_geolocation_geodesic_initial_bearing(
+				_pointer, FfiConverterGeoLocationINSTANCE.Lower(location), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *GeoLocation) GetElevation() float64 {
+	_pointer := _self.ffiObject.incrementPointer("*GeoLocation")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.double {
+		return C.uniffi_zmanim_core_fn_method_geolocation_get_elevation(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *GeoLocation) GetLatitude() float64 {
+	_pointer := _self.ffiObject.incrementPointer("*GeoLocation")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.double {
+		return C.uniffi_zmanim_core_fn_method_geolocation_get_latitude(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *GeoLocation) GetLongitude() float64 {
+	_pointer := _self.ffiObject.incrementPointer("*GeoLocation")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.double {
+		return C.uniffi_zmanim_core_fn_method_geolocation_get_longitude(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *GeoLocation) RhumbLineBearing(location *GeoLocation) float64 {
+	_pointer := _self.ffiObject.incrementPointer("*GeoLocation")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.double {
+		return C.uniffi_zmanim_core_fn_method_geolocation_rhumb_line_bearing(
+			_pointer, FfiConverterGeoLocationINSTANCE.Lower(location), _uniffiStatus)
+	}))
+}
+
+func (_self *GeoLocation) RhumbLineDistance(location *GeoLocation) float64 {
+	_pointer := _self.ffiObject.incrementPointer("*GeoLocation")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.double {
+		return C.uniffi_zmanim_core_fn_method_geolocation_rhumb_line_distance(
+			_pointer, FfiConverterGeoLocationINSTANCE.Lower(location), _uniffiStatus)
+	}))
+}
+
+func (_self *GeoLocation) VincentyInverseFormula(location *GeoLocation, formula Formula) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*GeoLocation")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_geolocation_vincenty_inverse_formula(
+				_pointer, FfiConverterGeoLocationINSTANCE.Lower(location), FfiConverterFormulaINSTANCE.Lower(formula), _uniffiStatus),
+		}
+	}))
+}
+func (object *GeoLocation) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterGeoLocation struct{}
+
+var FfiConverterGeoLocationINSTANCE = FfiConverterGeoLocation{}
+
+func (c FfiConverterGeoLocation) Lift(pointer unsafe.Pointer) *GeoLocation {
+	result := &GeoLocation{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_zmanim_core_fn_clone_geolocation(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_zmanim_core_fn_free_geolocation(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*GeoLocation).Destroy)
+	return result
+}
+
+func (c FfiConverterGeoLocation) Read(reader io.Reader) *GeoLocation {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterGeoLocation) Lower(value *GeoLocation) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*GeoLocation")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterGeoLocation) Write(writer io.Writer, value *GeoLocation) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerGeoLocation struct{}
+
+func (_ FfiDestroyerGeoLocation) Destroy(value *GeoLocation) {
+	value.Destroy()
+}
+
+type JewishCalendarInterface interface {
+	GetBavliDafYomi() **BavliDaf
+	GetDayOfChanukah() int32
+	GetDayOfOmer() int32
+	GetInIsrael() bool
+	GetJewishDate() *JewishDate
+	GetParshah() Parsha
+	GetUseModernHolidays() bool
+	GetYomTovIndex() *JewishHoliday
+	HasCandleLighting() bool
+	IsAseresYemeiTeshuva() bool
+	IsAssurBemelacha() bool
+	IsChanukah() bool
+	IsCholHamoed() bool
+	IsCholHamoedPesach() bool
+	IsCholHamoedSuccos() bool
+	IsErevYomTov() bool
+	IsErevYomTovSheni() bool
+	IsHoshanaRabba() bool
+	IsIsruChag() bool
+	IsPesach() bool
+	IsPurim() bool
+	IsRoshChodesh() bool
+	IsRoshHashana() bool
+	IsShavuos() bool
+	IsSheminiAtzeres() bool
+	IsSimchasTorah() bool
+	IsSuccos() bool
+	IsTaanis() bool
+	IsTaanisBechoros() bool
+	IsTishaBeav() bool
+	IsTomorrowShabbosOrYomTov() bool
+	IsYomKippur() bool
+	IsYomTov() bool
+	IsYomTovAssurBemelacha() bool
+}
+type JewishCalendar struct {
+	ffiObject FfiObject
+}
+
+func (_self *JewishCalendar) GetBavliDafYomi() **BavliDaf {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalBavliDafINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_jewishcalendar_get_bavli_daf_yomi(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *JewishCalendar) GetDayOfChanukah() int32 {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt32INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int32_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_get_day_of_chanukah(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) GetDayOfOmer() int32 {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt32INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int32_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_get_day_of_omer(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) GetInIsrael() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_get_in_israel(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) GetJewishDate() *JewishDate {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterJewishDateINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_get_jewish_date(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) GetParshah() Parsha {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterParshaINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_jewishcalendar_get_parshah(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *JewishCalendar) GetUseModernHolidays() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_get_use_modern_holidays(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) GetYomTovIndex() *JewishHoliday {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalJewishHolidayINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_jewishcalendar_get_yom_tov_index(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *JewishCalendar) HasCandleLighting() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_has_candle_lighting(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsAseresYemeiTeshuva() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_aseres_yemei_teshuva(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsAssurBemelacha() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_assur_bemelacha(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsChanukah() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_chanukah(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsCholHamoed() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_chol_hamoed(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsCholHamoedPesach() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_chol_hamoed_pesach(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsCholHamoedSuccos() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_chol_hamoed_succos(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsErevYomTov() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_erev_yom_tov(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsErevYomTovSheni() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_erev_yom_tov_sheni(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsHoshanaRabba() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_hoshana_rabba(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsIsruChag() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_isru_chag(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsPesach() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_pesach(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsPurim() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_purim(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsRoshChodesh() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_rosh_chodesh(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsRoshHashana() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_rosh_hashana(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsShavuos() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_shavuos(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsSheminiAtzeres() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_shemini_atzeres(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsSimchasTorah() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_simchas_torah(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsSuccos() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_succos(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsTaanis() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_taanis(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsTaanisBechoros() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_taanis_bechoros(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsTishaBeav() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_tisha_beav(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsTomorrowShabbosOrYomTov() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_tomorrow_shabbos_or_yom_tov(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsYomKippur() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_yom_kippur(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsYomTov() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_yom_tov(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishCalendar) IsYomTovAssurBemelacha() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishcalendar_is_yom_tov_assur_bemelacha(
+			_pointer, _uniffiStatus)
+	}))
+}
+func (object *JewishCalendar) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterJewishCalendar struct{}
+
+var FfiConverterJewishCalendarINSTANCE = FfiConverterJewishCalendar{}
+
+func (c FfiConverterJewishCalendar) Lift(pointer unsafe.Pointer) *JewishCalendar {
+	result := &JewishCalendar{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_zmanim_core_fn_clone_jewishcalendar(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_zmanim_core_fn_free_jewishcalendar(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*JewishCalendar).Destroy)
+	return result
+}
+
+func (c FfiConverterJewishCalendar) Read(reader io.Reader) *JewishCalendar {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterJewishCalendar) Lower(value *JewishCalendar) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*JewishCalendar")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterJewishCalendar) Write(writer io.Writer, value *JewishCalendar) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerJewishCalendar struct{}
+
+func (_ FfiDestroyerJewishCalendar) Destroy(value *JewishCalendar) {
+	value.Destroy()
+}
+
+type JewishDateInterface interface {
+	GetChalakimSinceMoladTohu() int64
+	GetCheshvanKislevKviah() YearLengthType
+	GetDayOfWeek() DayOfWeek
+	GetDaysInJewishMonth() int32
+	GetDaysInJewishYear() int32
+	GetDaysSinceStartOfJewishYear() int32
+	GetGregorianDayOfMonth() int32
+	GetGregorianMonth() int32
+	GetGregorianYear() int32
+	GetJewishDayOfMonth() int32
+	GetJewishMonth() JewishMonth
+	GetJewishYear() int32
+	GetMoladData() **MoladData
+	GetMoladDate() **JewishDate
+	IsCheshvanLong() bool
+	IsJewishLeapYear() bool
+	IsKislevShort() bool
+}
+type JewishDate struct {
+	ffiObject FfiObject
+}
+
+func (_self *JewishDate) GetChalakimSinceMoladTohu() int64 {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int64_t {
+		return C.uniffi_zmanim_core_fn_method_jewishdate_get_chalakim_since_molad_tohu(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishDate) GetCheshvanKislevKviah() YearLengthType {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterYearLengthTypeINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_jewishdate_get_cheshvan_kislev_kviah(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *JewishDate) GetDayOfWeek() DayOfWeek {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterDayOfWeekINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_jewishdate_get_day_of_week(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *JewishDate) GetDaysInJewishMonth() int32 {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt32INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int32_t {
+		return C.uniffi_zmanim_core_fn_method_jewishdate_get_days_in_jewish_month(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishDate) GetDaysInJewishYear() int32 {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt32INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int32_t {
+		return C.uniffi_zmanim_core_fn_method_jewishdate_get_days_in_jewish_year(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishDate) GetDaysSinceStartOfJewishYear() int32 {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt32INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int32_t {
+		return C.uniffi_zmanim_core_fn_method_jewishdate_get_days_since_start_of_jewish_year(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishDate) GetGregorianDayOfMonth() int32 {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt32INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int32_t {
+		return C.uniffi_zmanim_core_fn_method_jewishdate_get_gregorian_day_of_month(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishDate) GetGregorianMonth() int32 {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt32INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int32_t {
+		return C.uniffi_zmanim_core_fn_method_jewishdate_get_gregorian_month(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishDate) GetGregorianYear() int32 {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt32INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int32_t {
+		return C.uniffi_zmanim_core_fn_method_jewishdate_get_gregorian_year(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishDate) GetJewishDayOfMonth() int32 {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt32INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int32_t {
+		return C.uniffi_zmanim_core_fn_method_jewishdate_get_jewish_day_of_month(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishDate) GetJewishMonth() JewishMonth {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterJewishMonthINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_jewishdate_get_jewish_month(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *JewishDate) GetJewishYear() int32 {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt32INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int32_t {
+		return C.uniffi_zmanim_core_fn_method_jewishdate_get_jewish_year(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishDate) GetMoladData() **MoladData {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalMoladDataINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_jewishdate_get_molad_data(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *JewishDate) GetMoladDate() **JewishDate {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalJewishDateINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_jewishdate_get_molad_date(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *JewishDate) IsCheshvanLong() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishdate_is_cheshvan_long(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishDate) IsJewishLeapYear() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishdate_is_jewish_leap_year(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *JewishDate) IsKislevShort() bool {
+	_pointer := _self.ffiObject.incrementPointer("*JewishDate")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_jewishdate_is_kislev_short(
+			_pointer, _uniffiStatus)
+	}))
+}
+func (object *JewishDate) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterJewishDate struct{}
+
+var FfiConverterJewishDateINSTANCE = FfiConverterJewishDate{}
+
+func (c FfiConverterJewishDate) Lift(pointer unsafe.Pointer) *JewishDate {
+	result := &JewishDate{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_zmanim_core_fn_clone_jewishdate(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_zmanim_core_fn_free_jewishdate(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*JewishDate).Destroy)
+	return result
+}
+
+func (c FfiConverterJewishDate) Read(reader io.Reader) *JewishDate {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterJewishDate) Lower(value *JewishDate) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*JewishDate")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterJewishDate) Write(writer io.Writer, value *JewishDate) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerJewishDate struct{}
+
+func (_ FfiDestroyerJewishDate) Destroy(value *JewishDate) {
+	value.Destroy()
+}
+
+type MoladDataInterface interface {
+}
+type MoladData struct {
+	ffiObject FfiObject
+}
+
+func (object *MoladData) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterMoladData struct{}
+
+var FfiConverterMoladDataINSTANCE = FfiConverterMoladData{}
+
+func (c FfiConverterMoladData) Lift(pointer unsafe.Pointer) *MoladData {
+	result := &MoladData{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_zmanim_core_fn_clone_moladdata(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_zmanim_core_fn_free_moladdata(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*MoladData).Destroy)
+	return result
+}
+
+func (c FfiConverterMoladData) Read(reader io.Reader) *MoladData {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterMoladData) Lower(value *MoladData) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*MoladData")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterMoladData) Write(writer io.Writer, value *MoladData) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerMoladData struct{}
+
+func (_ FfiDestroyerMoladData) Destroy(value *MoladData) {
+	value.Destroy()
+}
+
+type NoaaCalculatorInterface interface {
+	GetSolarAzimuth(timestamp int64, geoLocation *GeoLocation) *float64
+	GetSolarElevation(timestamp int64, geoLocation *GeoLocation) *float64
+	GetUtcMidnight(timestamp int64, geoLocation *GeoLocation) *float64
+	GetUtcNoon(timestamp int64, geoLocation *GeoLocation) *float64
+	GetUtcSunrise(timestamp int64, geoLocation *GeoLocation, zenith float64, adjustForElevation bool) *float64
+	GetUtcSunset(timestamp int64, geoLocation *GeoLocation, zenith float64, adjustForElevation bool) *float64
+}
+type NoaaCalculator struct {
+	ffiObject FfiObject
+}
+
+func (_self *NoaaCalculator) GetSolarAzimuth(timestamp int64, geoLocation *GeoLocation) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*NoaaCalculator")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_noaacalculator_get_solar_azimuth(
+				_pointer, FfiConverterInt64INSTANCE.Lower(timestamp), FfiConverterGeoLocationINSTANCE.Lower(geoLocation), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *NoaaCalculator) GetSolarElevation(timestamp int64, geoLocation *GeoLocation) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*NoaaCalculator")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_noaacalculator_get_solar_elevation(
+				_pointer, FfiConverterInt64INSTANCE.Lower(timestamp), FfiConverterGeoLocationINSTANCE.Lower(geoLocation), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *NoaaCalculator) GetUtcMidnight(timestamp int64, geoLocation *GeoLocation) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*NoaaCalculator")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_noaacalculator_get_utc_midnight(
+				_pointer, FfiConverterInt64INSTANCE.Lower(timestamp), FfiConverterGeoLocationINSTANCE.Lower(geoLocation), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *NoaaCalculator) GetUtcNoon(timestamp int64, geoLocation *GeoLocation) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*NoaaCalculator")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_noaacalculator_get_utc_noon(
+				_pointer, FfiConverterInt64INSTANCE.Lower(timestamp), FfiConverterGeoLocationINSTANCE.Lower(geoLocation), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *NoaaCalculator) GetUtcSunrise(timestamp int64, geoLocation *GeoLocation, zenith float64, adjustForElevation bool) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*NoaaCalculator")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_noaacalculator_get_utc_sunrise(
+				_pointer, FfiConverterInt64INSTANCE.Lower(timestamp), FfiConverterGeoLocationINSTANCE.Lower(geoLocation), FfiConverterFloat64INSTANCE.Lower(zenith), FfiConverterBoolINSTANCE.Lower(adjustForElevation), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *NoaaCalculator) GetUtcSunset(timestamp int64, geoLocation *GeoLocation, zenith float64, adjustForElevation bool) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*NoaaCalculator")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_noaacalculator_get_utc_sunset(
+				_pointer, FfiConverterInt64INSTANCE.Lower(timestamp), FfiConverterGeoLocationINSTANCE.Lower(geoLocation), FfiConverterFloat64INSTANCE.Lower(zenith), FfiConverterBoolINSTANCE.Lower(adjustForElevation), _uniffiStatus),
+		}
+	}))
+}
+func (object *NoaaCalculator) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterNoaaCalculator struct{}
+
+var FfiConverterNoaaCalculatorINSTANCE = FfiConverterNoaaCalculator{}
+
+func (c FfiConverterNoaaCalculator) Lift(pointer unsafe.Pointer) *NoaaCalculator {
+	result := &NoaaCalculator{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_zmanim_core_fn_clone_noaacalculator(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_zmanim_core_fn_free_noaacalculator(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*NoaaCalculator).Destroy)
+	return result
+}
+
+func (c FfiConverterNoaaCalculator) Read(reader io.Reader) *NoaaCalculator {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterNoaaCalculator) Lower(value *NoaaCalculator) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*NoaaCalculator")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterNoaaCalculator) Write(writer io.Writer, value *NoaaCalculator) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerNoaaCalculator struct{}
+
+func (_ FfiDestroyerNoaaCalculator) Destroy(value *NoaaCalculator) {
+	value.Destroy()
+}
+
+type ZmanimCalendarInterface interface {
+	GetMinchaGedola(startOfDay *int64, endOfDay int64, synchronous bool) *int64
+	GetMinchaKetana(startOfDay *int64, endOfDay int64, synchronous bool) *int64
+	GetPlagHamincha(startOfDay *int64, endOfDay int64, synchronous bool) *int64
+	GetSamuchLeMinchaKetana(startOfDay *int64, endOfDay int64, synchronous bool) *int64
+	GetSofZmanShma(startOfDay int64, endOfDay *int64, synchronous bool) *int64
+	GetSofZmanTfila(startOfDay int64, endOfDay *int64, synchronous bool) *int64
+	GetAlos72() *int64
+	GetAlosHashachar() *int64
+	GetAstronomicalCalendar() *AstronomicalCalendar
+	GetCandleLighting() *int64
+	GetCandleLightingOffset() int64
+	GetChatzos() *int64
+	GetChatzosAsHalfDay() *int64
+	GetHalfDayBasedShaahZmanis(startOfHalfDay int64, endOfHalfDay int64) *int64
+	GetHalfDayBasedZman(startOfHalfDay int64, endOfHalfDay int64, hours float64) *int64
+	GetMinchaGedolaDefault() *int64
+	GetMinchaGedolaSimple(startOfDay int64, endOfDay int64) *int64
+	GetMinchaKetanaDefault() *int64
+	GetMinchaKetanaSimple(startOfDay int64, endOfDay int64) *int64
+	GetPercentOfShaahZmanisFromDegrees(degrees float64, sunset bool) *float64
+	GetPlagHaminchaDefault() *int64
+	GetPlagHaminchaSimple(startOfDay int64, endOfDay int64) *int64
+	GetSamuchLeMinchaKetanaSimple(startOfDay int64, endOfDay int64) *int64
+	GetShaahZmanisBasedZman(startOfDay int64, endOfDay int64, hours float64) *int64
+	GetShaahZmanisGra() *int64
+	GetShaahZmanisMga() *int64
+	GetSofZmanShmaGra() *int64
+	GetSofZmanShmaMga() *int64
+	GetSofZmanShmaSimple(startOfDay int64, endOfDay int64) *int64
+	GetSofZmanTfilaGra() *int64
+	GetSofZmanTfilaMga() *int64
+	GetSofZmanTfilaSimple(startOfDay int64, endOfDay int64) *int64
+	GetTzais() *int64
+	GetTzais72() *int64
+	GetUseAstronomicalChatzos() bool
+	GetUseAstronomicalChatzosForOtherZmanim() bool
+}
+type ZmanimCalendar struct {
+	ffiObject FfiObject
+}
+
+func (_self *ZmanimCalendar) GetMinchaGedola(startOfDay *int64, endOfDay int64, synchronous bool) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar__get_mincha_gedola(
+				_pointer, FfiConverterOptionalInt64INSTANCE.Lower(startOfDay), FfiConverterInt64INSTANCE.Lower(endOfDay), FfiConverterBoolINSTANCE.Lower(synchronous), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetMinchaKetana(startOfDay *int64, endOfDay int64, synchronous bool) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar__get_mincha_ketana(
+				_pointer, FfiConverterOptionalInt64INSTANCE.Lower(startOfDay), FfiConverterInt64INSTANCE.Lower(endOfDay), FfiConverterBoolINSTANCE.Lower(synchronous), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetPlagHamincha(startOfDay *int64, endOfDay int64, synchronous bool) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar__get_plag_hamincha(
+				_pointer, FfiConverterOptionalInt64INSTANCE.Lower(startOfDay), FfiConverterInt64INSTANCE.Lower(endOfDay), FfiConverterBoolINSTANCE.Lower(synchronous), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetSamuchLeMinchaKetana(startOfDay *int64, endOfDay int64, synchronous bool) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar__get_samuch_le_mincha_ketana(
+				_pointer, FfiConverterOptionalInt64INSTANCE.Lower(startOfDay), FfiConverterInt64INSTANCE.Lower(endOfDay), FfiConverterBoolINSTANCE.Lower(synchronous), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetSofZmanShma(startOfDay int64, endOfDay *int64, synchronous bool) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar__get_sof_zman_shma(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startOfDay), FfiConverterOptionalInt64INSTANCE.Lower(endOfDay), FfiConverterBoolINSTANCE.Lower(synchronous), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetSofZmanTfila(startOfDay int64, endOfDay *int64, synchronous bool) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar__get_sof_zman_tfila(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startOfDay), FfiConverterOptionalInt64INSTANCE.Lower(endOfDay), FfiConverterBoolINSTANCE.Lower(synchronous), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetAlos72() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_alos72(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetAlosHashachar() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_alos_hashachar(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetAstronomicalCalendar() *AstronomicalCalendar {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterAstronomicalCalendarINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_astronomical_calendar(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *ZmanimCalendar) GetCandleLighting() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_candle_lighting(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetCandleLightingOffset() int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int64_t {
+		return C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_candle_lighting_offset(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *ZmanimCalendar) GetChatzos() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_chatzos(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetChatzosAsHalfDay() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_chatzos_as_half_day(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetHalfDayBasedShaahZmanis(startOfHalfDay int64, endOfHalfDay int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_half_day_based_shaah_zmanis(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startOfHalfDay), FfiConverterInt64INSTANCE.Lower(endOfHalfDay), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetHalfDayBasedZman(startOfHalfDay int64, endOfHalfDay int64, hours float64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_half_day_based_zman(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startOfHalfDay), FfiConverterInt64INSTANCE.Lower(endOfHalfDay), FfiConverterFloat64INSTANCE.Lower(hours), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetMinchaGedolaDefault() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_mincha_gedola_default(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetMinchaGedolaSimple(startOfDay int64, endOfDay int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_mincha_gedola_simple(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startOfDay), FfiConverterInt64INSTANCE.Lower(endOfDay), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetMinchaKetanaDefault() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_mincha_ketana_default(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetMinchaKetanaSimple(startOfDay int64, endOfDay int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_mincha_ketana_simple(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startOfDay), FfiConverterInt64INSTANCE.Lower(endOfDay), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetPercentOfShaahZmanisFromDegrees(degrees float64, sunset bool) *float64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalFloat64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_percent_of_shaah_zmanis_from_degrees(
+				_pointer, FfiConverterFloat64INSTANCE.Lower(degrees), FfiConverterBoolINSTANCE.Lower(sunset), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetPlagHaminchaDefault() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_plag_hamincha_default(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetPlagHaminchaSimple(startOfDay int64, endOfDay int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_plag_hamincha_simple(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startOfDay), FfiConverterInt64INSTANCE.Lower(endOfDay), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetSamuchLeMinchaKetanaSimple(startOfDay int64, endOfDay int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_samuch_le_mincha_ketana_simple(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startOfDay), FfiConverterInt64INSTANCE.Lower(endOfDay), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetShaahZmanisBasedZman(startOfDay int64, endOfDay int64, hours float64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_shaah_zmanis_based_zman(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startOfDay), FfiConverterInt64INSTANCE.Lower(endOfDay), FfiConverterFloat64INSTANCE.Lower(hours), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetShaahZmanisGra() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_shaah_zmanis_gra(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetShaahZmanisMga() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_shaah_zmanis_mga(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetSofZmanShmaGra() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_sof_zman_shma_gra(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetSofZmanShmaMga() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_sof_zman_shma_mga(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetSofZmanShmaSimple(startOfDay int64, endOfDay int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_sof_zman_shma_simple(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startOfDay), FfiConverterInt64INSTANCE.Lower(endOfDay), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetSofZmanTfilaGra() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_sof_zman_tfila_gra(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetSofZmanTfilaMga() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_sof_zman_tfila_mga(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetSofZmanTfilaSimple(startOfDay int64, endOfDay int64) *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_sof_zman_tfila_simple(
+				_pointer, FfiConverterInt64INSTANCE.Lower(startOfDay), FfiConverterInt64INSTANCE.Lower(endOfDay), _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetTzais() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_tzais(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetTzais72() *int64 {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterOptionalInt64INSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_tzais72(
+				_pointer, _uniffiStatus),
+		}
+	}))
+}
+
+func (_self *ZmanimCalendar) GetUseAstronomicalChatzos() bool {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_use_astronomical_chatzos(
+			_pointer, _uniffiStatus)
+	}))
+}
+
+func (_self *ZmanimCalendar) GetUseAstronomicalChatzosForOtherZmanim() bool {
+	_pointer := _self.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer _self.ffiObject.decrementPointer()
+	return FfiConverterBoolINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) C.int8_t {
+		return C.uniffi_zmanim_core_fn_method_zmanimcalendar_get_use_astronomical_chatzos_for_other_zmanim(
+			_pointer, _uniffiStatus)
+	}))
+}
+func (object *ZmanimCalendar) Destroy() {
+	runtime.SetFinalizer(object, nil)
+	object.ffiObject.destroy()
+}
+
+type FfiConverterZmanimCalendar struct{}
+
+var FfiConverterZmanimCalendarINSTANCE = FfiConverterZmanimCalendar{}
+
+func (c FfiConverterZmanimCalendar) Lift(pointer unsafe.Pointer) *ZmanimCalendar {
+	result := &ZmanimCalendar{
+		newFfiObject(
+			pointer,
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) unsafe.Pointer {
+				return C.uniffi_zmanim_core_fn_clone_zmanimcalendar(pointer, status)
+			},
+			func(pointer unsafe.Pointer, status *C.RustCallStatus) {
+				C.uniffi_zmanim_core_fn_free_zmanimcalendar(pointer, status)
+			},
+		),
+	}
+	runtime.SetFinalizer(result, (*ZmanimCalendar).Destroy)
+	return result
+}
+
+func (c FfiConverterZmanimCalendar) Read(reader io.Reader) *ZmanimCalendar {
+	return c.Lift(unsafe.Pointer(uintptr(readUint64(reader))))
+}
+
+func (c FfiConverterZmanimCalendar) Lower(value *ZmanimCalendar) unsafe.Pointer {
+	// TODO: this is bad - all synchronization from ObjectRuntime.go is discarded here,
+	// because the pointer will be decremented immediately after this function returns,
+	// and someone will be left holding onto a non-locked pointer.
+	pointer := value.ffiObject.incrementPointer("*ZmanimCalendar")
+	defer value.ffiObject.decrementPointer()
+	return pointer
+
+}
+
+func (c FfiConverterZmanimCalendar) Write(writer io.Writer, value *ZmanimCalendar) {
+	writeUint64(writer, uint64(uintptr(c.Lower(value))))
+}
+
+type FfiDestroyerZmanimCalendar struct{}
+
+func (_ FfiDestroyerZmanimCalendar) Destroy(value *ZmanimCalendar) {
+	value.Destroy()
+}
+
+type BavliTractate uint8
+
+const (
+	BavliTractateBerachos    BavliTractate = 0
+	BavliTractateShabbos     BavliTractate = 1
+	BavliTractateEruvin      BavliTractate = 2
+	BavliTractatePesachim    BavliTractate = 3
+	BavliTractateShekalim    BavliTractate = 4
+	BavliTractateYoma        BavliTractate = 5
+	BavliTractateSukkah      BavliTractate = 6
+	BavliTractateBeitzah     BavliTractate = 7
+	BavliTractateRoshHashana BavliTractate = 8
+	BavliTractateTaanis      BavliTractate = 9
+	BavliTractateMegillah    BavliTractate = 10
+	BavliTractateMoedKatan   BavliTractate = 11
+	BavliTractateChagigah    BavliTractate = 12
+	BavliTractateYevamos     BavliTractate = 13
+	BavliTractateKesubos     BavliTractate = 14
+	BavliTractateNedarim     BavliTractate = 15
+	BavliTractateNazir       BavliTractate = 16
+	BavliTractateSotah       BavliTractate = 17
+	BavliTractateGitin       BavliTractate = 18
+	BavliTractateKiddushin   BavliTractate = 19
+	BavliTractateBavaKamma   BavliTractate = 20
+	BavliTractateBavaMetzia  BavliTractate = 21
+	BavliTractateBavaBasra   BavliTractate = 22
+	BavliTractateSanhedrin   BavliTractate = 23
+	BavliTractateMakkos      BavliTractate = 24
+	BavliTractateShevuos     BavliTractate = 25
+	BavliTractateAvodahZarah BavliTractate = 26
+	BavliTractateHoriyos     BavliTractate = 27
+	BavliTractateZevachim    BavliTractate = 28
+	BavliTractateMenachos    BavliTractate = 29
+	BavliTractateChullin     BavliTractate = 30
+	BavliTractateBechoros    BavliTractate = 31
+	BavliTractateArachin     BavliTractate = 32
+	BavliTractateTemurah     BavliTractate = 33
+	BavliTractateKerisos     BavliTractate = 34
+	BavliTractateMeilah      BavliTractate = 35
+	BavliTractateKinnim      BavliTractate = 36
+	BavliTractateTamid       BavliTractate = 37
+	BavliTractateMidos       BavliTractate = 38
+	BavliTractateNiddah      BavliTractate = 39
+)
+
+type FfiConverterBavliTractate struct{}
+
+var FfiConverterBavliTractateINSTANCE = FfiConverterBavliTractate{}
+
+func (c FfiConverterBavliTractate) Lift(rb RustBufferI) BavliTractate {
+	return LiftFromRustBuffer[BavliTractate](c, rb)
+}
+
+func (c FfiConverterBavliTractate) Lower(value BavliTractate) C.RustBuffer {
+	return LowerIntoRustBuffer[BavliTractate](c, value)
+}
+func (FfiConverterBavliTractate) Read(reader io.Reader) BavliTractate {
+	id := readInt32(reader)
+	return BavliTractate(id)
+}
+
+func (FfiConverterBavliTractate) Write(writer io.Writer, value BavliTractate) {
+	writeInt32(writer, int32(value))
+}
+
+type FfiDestroyerBavliTractate struct{}
+
+func (_ FfiDestroyerBavliTractate) Destroy(value BavliTractate) {
+}
+
+type DayOfWeek uint8
+
+const (
+	DayOfWeekSunday    DayOfWeek = 1
+	DayOfWeekMonday    DayOfWeek = 2
+	DayOfWeekTuesday   DayOfWeek = 3
+	DayOfWeekWednesday DayOfWeek = 4
+	DayOfWeekThursday  DayOfWeek = 5
+	DayOfWeekFriday    DayOfWeek = 6
+	DayOfWeekSaturday  DayOfWeek = 7
+)
+
+type FfiConverterDayOfWeek struct{}
+
+var FfiConverterDayOfWeekINSTANCE = FfiConverterDayOfWeek{}
+
+func (c FfiConverterDayOfWeek) Lift(rb RustBufferI) DayOfWeek {
+	return LiftFromRustBuffer[DayOfWeek](c, rb)
+}
+
+func (c FfiConverterDayOfWeek) Lower(value DayOfWeek) C.RustBuffer {
+	return LowerIntoRustBuffer[DayOfWeek](c, value)
+}
+func (FfiConverterDayOfWeek) Read(reader io.Reader) DayOfWeek {
+	id := readInt32(reader)
+	return DayOfWeek(id)
+}
+
+func (FfiConverterDayOfWeek) Write(writer io.Writer, value DayOfWeek) {
+	writeInt32(writer, int32(value))
+}
+
+type FfiDestroyerDayOfWeek struct{}
+
+func (_ FfiDestroyerDayOfWeek) Destroy(value DayOfWeek) {
+}
+
+type Formula uint8
+
+const (
+	FormulaDistance       Formula = 0
+	FormulaInitialBearing Formula = 1
+	FormulaFinalBearing   Formula = 2
+)
+
+type FfiConverterFormula struct{}
+
+var FfiConverterFormulaINSTANCE = FfiConverterFormula{}
+
+func (c FfiConverterFormula) Lift(rb RustBufferI) Formula {
+	return LiftFromRustBuffer[Formula](c, rb)
+}
+
+func (c FfiConverterFormula) Lower(value Formula) C.RustBuffer {
+	return LowerIntoRustBuffer[Formula](c, value)
+}
+func (FfiConverterFormula) Read(reader io.Reader) Formula {
+	id := readInt32(reader)
+	return Formula(id)
+}
+
+func (FfiConverterFormula) Write(writer io.Writer, value Formula) {
+	writeInt32(writer, int32(value))
+}
+
+type FfiDestroyerFormula struct{}
+
+func (_ FfiDestroyerFormula) Destroy(value Formula) {
+}
+
+type JewishHoliday uint8
+
+const (
+	JewishHolidayErevPesach        JewishHoliday = 0
+	JewishHolidayPesach            JewishHoliday = 1
+	JewishHolidayCholHamoedPesach  JewishHoliday = 2
+	JewishHolidayPesachSheni       JewishHoliday = 3
+	JewishHolidayErevShavuos       JewishHoliday = 4
+	JewishHolidayShavuos           JewishHoliday = 5
+	JewishHolidaySeventeenOfTammuz JewishHoliday = 6
+	JewishHolidayTishaBeav         JewishHoliday = 7
+	JewishHolidayTuBeav            JewishHoliday = 8
+	JewishHolidayErevRoshHashana   JewishHoliday = 9
+	JewishHolidayRoshHashana       JewishHoliday = 10
+	JewishHolidayFastOfGedalyah    JewishHoliday = 11
+	JewishHolidayErevYomKippur     JewishHoliday = 12
+	JewishHolidayYomKippur         JewishHoliday = 13
+	JewishHolidayErevSuccos        JewishHoliday = 14
+	JewishHolidaySuccos            JewishHoliday = 15
+	JewishHolidayCholHamoedSuccos  JewishHoliday = 16
+	JewishHolidayHoshanaRabba      JewishHoliday = 17
+	JewishHolidaySheminiAtzeres    JewishHoliday = 18
+	JewishHolidaySimchasTorah      JewishHoliday = 19
+	JewishHolidayChanukah          JewishHoliday = 21
+	JewishHolidayTenthOfTeves      JewishHoliday = 22
+	JewishHolidayTuBeshvat         JewishHoliday = 23
+	JewishHolidayFastOfEsther      JewishHoliday = 24
+	JewishHolidayPurim             JewishHoliday = 25
+	JewishHolidayShushanPurim      JewishHoliday = 26
+	JewishHolidayPurimKatan        JewishHoliday = 27
+	JewishHolidayRoshChodesh       JewishHoliday = 28
+	JewishHolidayYomHashoah        JewishHoliday = 29
+	JewishHolidayYomHazikaron      JewishHoliday = 30
+	JewishHolidayYomHaatzmaut      JewishHoliday = 31
+	JewishHolidayYomYerushalayim   JewishHoliday = 32
+	JewishHolidayLagBaomer         JewishHoliday = 33
+	JewishHolidayShushanPurimKatan JewishHoliday = 34
+	JewishHolidayIsruChag          JewishHoliday = 35
+	JewishHolidayYomKippurKatan    JewishHoliday = 36
+	JewishHolidayBehab             JewishHoliday = 37
+)
+
+type FfiConverterJewishHoliday struct{}
+
+var FfiConverterJewishHolidayINSTANCE = FfiConverterJewishHoliday{}
+
+func (c FfiConverterJewishHoliday) Lift(rb RustBufferI) JewishHoliday {
+	return LiftFromRustBuffer[JewishHoliday](c, rb)
+}
+
+func (c FfiConverterJewishHoliday) Lower(value JewishHoliday) C.RustBuffer {
+	return LowerIntoRustBuffer[JewishHoliday](c, value)
+}
+func (FfiConverterJewishHoliday) Read(reader io.Reader) JewishHoliday {
+	id := readInt32(reader)
+	return JewishHoliday(id)
+}
+
+func (FfiConverterJewishHoliday) Write(writer io.Writer, value JewishHoliday) {
+	writeInt32(writer, int32(value))
+}
+
+type FfiDestroyerJewishHoliday struct{}
+
+func (_ FfiDestroyerJewishHoliday) Destroy(value JewishHoliday) {
+}
+
+type JewishMonth uint8
+
+const (
+	JewishMonthNissan   JewishMonth = 1
+	JewishMonthIyar     JewishMonth = 2
+	JewishMonthSivan    JewishMonth = 3
+	JewishMonthTammuz   JewishMonth = 4
+	JewishMonthAv       JewishMonth = 5
+	JewishMonthElul     JewishMonth = 6
+	JewishMonthTishrei  JewishMonth = 7
+	JewishMonthCheshvan JewishMonth = 8
+	JewishMonthKislev   JewishMonth = 9
+	JewishMonthTeves    JewishMonth = 10
+	JewishMonthShevat   JewishMonth = 11
+	JewishMonthAdar     JewishMonth = 12
+	JewishMonthAdarii   JewishMonth = 13
+)
+
+type FfiConverterJewishMonth struct{}
+
+var FfiConverterJewishMonthINSTANCE = FfiConverterJewishMonth{}
+
+func (c FfiConverterJewishMonth) Lift(rb RustBufferI) JewishMonth {
+	return LiftFromRustBuffer[JewishMonth](c, rb)
+}
+
+func (c FfiConverterJewishMonth) Lower(value JewishMonth) C.RustBuffer {
+	return LowerIntoRustBuffer[JewishMonth](c, value)
+}
+func (FfiConverterJewishMonth) Read(reader io.Reader) JewishMonth {
+	id := readInt32(reader)
+	return JewishMonth(id)
+}
+
+func (FfiConverterJewishMonth) Write(writer io.Writer, value JewishMonth) {
+	writeInt32(writer, int32(value))
+}
+
+type FfiDestroyerJewishMonth struct{}
+
+func (_ FfiDestroyerJewishMonth) Destroy(value JewishMonth) {
+}
+
+type Parsha uint8
+
+const (
+	ParshaNone              Parsha = 0
+	ParshaBereshis          Parsha = 1
+	ParshaNoach             Parsha = 2
+	ParshaLechLecha         Parsha = 3
+	ParshaVayera            Parsha = 4
+	ParshaChayeiSara        Parsha = 5
+	ParshaToldos            Parsha = 6
+	ParshaVayetzei          Parsha = 7
+	ParshaVayishlach        Parsha = 8
+	ParshaVayeshev          Parsha = 9
+	ParshaMiketz            Parsha = 10
+	ParshaVayigash          Parsha = 11
+	ParshaVayechi           Parsha = 12
+	ParshaShemos            Parsha = 13
+	ParshaVaera             Parsha = 14
+	ParshaBo                Parsha = 15
+	ParshaBeshalach         Parsha = 16
+	ParshaYisro             Parsha = 17
+	ParshaMishpatim         Parsha = 18
+	ParshaTerumah           Parsha = 19
+	ParshaTetzaveh          Parsha = 20
+	ParshaKiSisa            Parsha = 21
+	ParshaVayakhel          Parsha = 22
+	ParshaPekudei           Parsha = 23
+	ParshaVayikra           Parsha = 24
+	ParshaTzav              Parsha = 25
+	ParshaShmini            Parsha = 26
+	ParshaTazria            Parsha = 27
+	ParshaMetzora           Parsha = 28
+	ParshaAchreiMos         Parsha = 29
+	ParshaKedoshim          Parsha = 30
+	ParshaEmor              Parsha = 31
+	ParshaBehar             Parsha = 32
+	ParshaBechukosai        Parsha = 33
+	ParshaBamidbar          Parsha = 34
+	ParshaNasso             Parsha = 35
+	ParshaBehaaloscha       Parsha = 36
+	ParshaShlach            Parsha = 37
+	ParshaKorach            Parsha = 38
+	ParshaChukas            Parsha = 39
+	ParshaBalak             Parsha = 40
+	ParshaPinchas           Parsha = 41
+	ParshaMatos             Parsha = 42
+	ParshaMasei             Parsha = 43
+	ParshaDevarim           Parsha = 44
+	ParshaVaeschanan        Parsha = 45
+	ParshaEikev             Parsha = 46
+	ParshaReeh              Parsha = 47
+	ParshaShoftim           Parsha = 48
+	ParshaKiSeitzei         Parsha = 49
+	ParshaKiSavo            Parsha = 50
+	ParshaNitzavim          Parsha = 51
+	ParshaVayeilech         Parsha = 52
+	ParshaHaazinu           Parsha = 53
+	ParshaVzosHaberacha     Parsha = 54
+	ParshaVayakhelPekudei   Parsha = 55
+	ParshaTazriaMetzora     Parsha = 56
+	ParshaAchreiMosKedoshim Parsha = 57
+	ParshaBeharBechukosai   Parsha = 58
+	ParshaChukasBalak       Parsha = 59
+	ParshaMatosMasei        Parsha = 60
+	ParshaNitzavimVayeilech Parsha = 61
+	ParshaShkalim           Parsha = 62
+	ParshaZachor            Parsha = 63
+	ParshaPara              Parsha = 64
+	ParshaHachodesh         Parsha = 65
+	ParshaShuva             Parsha = 66
+	ParshaShira             Parsha = 67
+	ParshaHagadol           Parsha = 68
+	ParshaChazon            Parsha = 69
+	ParshaNachamu           Parsha = 70
+)
+
+type FfiConverterParsha struct{}
+
+var FfiConverterParshaINSTANCE = FfiConverterParsha{}
+
+func (c FfiConverterParsha) Lift(rb RustBufferI) Parsha {
+	return LiftFromRustBuffer[Parsha](c, rb)
+}
+
+func (c FfiConverterParsha) Lower(value Parsha) C.RustBuffer {
+	return LowerIntoRustBuffer[Parsha](c, value)
+}
+func (FfiConverterParsha) Read(reader io.Reader) Parsha {
+	id := readInt32(reader)
+	return Parsha(id)
+}
+
+func (FfiConverterParsha) Write(writer io.Writer, value Parsha) {
+	writeInt32(writer, int32(value))
+}
+
+type FfiDestroyerParsha struct{}
+
+func (_ FfiDestroyerParsha) Destroy(value Parsha) {
+}
+
+type SolarEvent uint8
+
+const (
+	SolarEventSunrise  SolarEvent = 1
+	SolarEventSunset   SolarEvent = 2
+	SolarEventNoon     SolarEvent = 3
+	SolarEventMidnight SolarEvent = 4
+)
+
+type FfiConverterSolarEvent struct{}
+
+var FfiConverterSolarEventINSTANCE = FfiConverterSolarEvent{}
+
+func (c FfiConverterSolarEvent) Lift(rb RustBufferI) SolarEvent {
+	return LiftFromRustBuffer[SolarEvent](c, rb)
+}
+
+func (c FfiConverterSolarEvent) Lower(value SolarEvent) C.RustBuffer {
+	return LowerIntoRustBuffer[SolarEvent](c, value)
+}
+func (FfiConverterSolarEvent) Read(reader io.Reader) SolarEvent {
+	id := readInt32(reader)
+	return SolarEvent(id)
+}
+
+func (FfiConverterSolarEvent) Write(writer io.Writer, value SolarEvent) {
+	writeInt32(writer, int32(value))
+}
+
+type FfiDestroyerSolarEvent struct{}
+
+func (_ FfiDestroyerSolarEvent) Destroy(value SolarEvent) {
+}
+
+type YearLengthType uint8
+
+const (
+	YearLengthTypeChaserim  YearLengthType = 0
+	YearLengthTypeKesidran  YearLengthType = 1
+	YearLengthTypeShelaimim YearLengthType = 2
+)
+
+type FfiConverterYearLengthType struct{}
+
+var FfiConverterYearLengthTypeINSTANCE = FfiConverterYearLengthType{}
+
+func (c FfiConverterYearLengthType) Lift(rb RustBufferI) YearLengthType {
+	return LiftFromRustBuffer[YearLengthType](c, rb)
+}
+
+func (c FfiConverterYearLengthType) Lower(value YearLengthType) C.RustBuffer {
+	return LowerIntoRustBuffer[YearLengthType](c, value)
+}
+func (FfiConverterYearLengthType) Read(reader io.Reader) YearLengthType {
+	id := readInt32(reader)
+	return YearLengthType(id)
+}
+
+func (FfiConverterYearLengthType) Write(writer io.Writer, value YearLengthType) {
+	writeInt32(writer, int32(value))
+}
+
+type FfiDestroyerYearLengthType struct{}
+
+func (_ FfiDestroyerYearLengthType) Destroy(value YearLengthType) {
+}
+
+type FfiConverterOptionalInt64 struct{}
+
+var FfiConverterOptionalInt64INSTANCE = FfiConverterOptionalInt64{}
+
+func (c FfiConverterOptionalInt64) Lift(rb RustBufferI) *int64 {
+	return LiftFromRustBuffer[*int64](c, rb)
+}
+
+func (_ FfiConverterOptionalInt64) Read(reader io.Reader) *int64 {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterInt64INSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalInt64) Lower(value *int64) C.RustBuffer {
+	return LowerIntoRustBuffer[*int64](c, value)
+}
+
+func (_ FfiConverterOptionalInt64) Write(writer io.Writer, value *int64) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterInt64INSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalInt64 struct{}
+
+func (_ FfiDestroyerOptionalInt64) Destroy(value *int64) {
+	if value != nil {
+		FfiDestroyerInt64{}.Destroy(*value)
+	}
+}
+
+type FfiConverterOptionalFloat64 struct{}
+
+var FfiConverterOptionalFloat64INSTANCE = FfiConverterOptionalFloat64{}
+
+func (c FfiConverterOptionalFloat64) Lift(rb RustBufferI) *float64 {
+	return LiftFromRustBuffer[*float64](c, rb)
+}
+
+func (_ FfiConverterOptionalFloat64) Read(reader io.Reader) *float64 {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterFloat64INSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalFloat64) Lower(value *float64) C.RustBuffer {
+	return LowerIntoRustBuffer[*float64](c, value)
+}
+
+func (_ FfiConverterOptionalFloat64) Write(writer io.Writer, value *float64) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterFloat64INSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalFloat64 struct{}
+
+func (_ FfiDestroyerOptionalFloat64) Destroy(value *float64) {
+	if value != nil {
+		FfiDestroyerFloat64{}.Destroy(*value)
+	}
+}
+
+type FfiConverterOptionalBavliDaf struct{}
+
+var FfiConverterOptionalBavliDafINSTANCE = FfiConverterOptionalBavliDaf{}
+
+func (c FfiConverterOptionalBavliDaf) Lift(rb RustBufferI) **BavliDaf {
+	return LiftFromRustBuffer[**BavliDaf](c, rb)
+}
+
+func (_ FfiConverterOptionalBavliDaf) Read(reader io.Reader) **BavliDaf {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterBavliDafINSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalBavliDaf) Lower(value **BavliDaf) C.RustBuffer {
+	return LowerIntoRustBuffer[**BavliDaf](c, value)
+}
+
+func (_ FfiConverterOptionalBavliDaf) Write(writer io.Writer, value **BavliDaf) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterBavliDafINSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalBavliDaf struct{}
+
+func (_ FfiDestroyerOptionalBavliDaf) Destroy(value **BavliDaf) {
+	if value != nil {
+		FfiDestroyerBavliDaf{}.Destroy(*value)
+	}
+}
+
+type FfiConverterOptionalGeoLocation struct{}
+
+var FfiConverterOptionalGeoLocationINSTANCE = FfiConverterOptionalGeoLocation{}
+
+func (c FfiConverterOptionalGeoLocation) Lift(rb RustBufferI) **GeoLocation {
+	return LiftFromRustBuffer[**GeoLocation](c, rb)
+}
+
+func (_ FfiConverterOptionalGeoLocation) Read(reader io.Reader) **GeoLocation {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterGeoLocationINSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalGeoLocation) Lower(value **GeoLocation) C.RustBuffer {
+	return LowerIntoRustBuffer[**GeoLocation](c, value)
+}
+
+func (_ FfiConverterOptionalGeoLocation) Write(writer io.Writer, value **GeoLocation) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterGeoLocationINSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalGeoLocation struct{}
+
+func (_ FfiDestroyerOptionalGeoLocation) Destroy(value **GeoLocation) {
+	if value != nil {
+		FfiDestroyerGeoLocation{}.Destroy(*value)
+	}
+}
+
+type FfiConverterOptionalJewishDate struct{}
+
+var FfiConverterOptionalJewishDateINSTANCE = FfiConverterOptionalJewishDate{}
+
+func (c FfiConverterOptionalJewishDate) Lift(rb RustBufferI) **JewishDate {
+	return LiftFromRustBuffer[**JewishDate](c, rb)
+}
+
+func (_ FfiConverterOptionalJewishDate) Read(reader io.Reader) **JewishDate {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterJewishDateINSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalJewishDate) Lower(value **JewishDate) C.RustBuffer {
+	return LowerIntoRustBuffer[**JewishDate](c, value)
+}
+
+func (_ FfiConverterOptionalJewishDate) Write(writer io.Writer, value **JewishDate) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterJewishDateINSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalJewishDate struct{}
+
+func (_ FfiDestroyerOptionalJewishDate) Destroy(value **JewishDate) {
+	if value != nil {
+		FfiDestroyerJewishDate{}.Destroy(*value)
+	}
+}
+
+type FfiConverterOptionalMoladData struct{}
+
+var FfiConverterOptionalMoladDataINSTANCE = FfiConverterOptionalMoladData{}
+
+func (c FfiConverterOptionalMoladData) Lift(rb RustBufferI) **MoladData {
+	return LiftFromRustBuffer[**MoladData](c, rb)
+}
+
+func (_ FfiConverterOptionalMoladData) Read(reader io.Reader) **MoladData {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterMoladDataINSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalMoladData) Lower(value **MoladData) C.RustBuffer {
+	return LowerIntoRustBuffer[**MoladData](c, value)
+}
+
+func (_ FfiConverterOptionalMoladData) Write(writer io.Writer, value **MoladData) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterMoladDataINSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalMoladData struct{}
+
+func (_ FfiDestroyerOptionalMoladData) Destroy(value **MoladData) {
+	if value != nil {
+		FfiDestroyerMoladData{}.Destroy(*value)
+	}
+}
+
+type FfiConverterOptionalJewishHoliday struct{}
+
+var FfiConverterOptionalJewishHolidayINSTANCE = FfiConverterOptionalJewishHoliday{}
+
+func (c FfiConverterOptionalJewishHoliday) Lift(rb RustBufferI) *JewishHoliday {
+	return LiftFromRustBuffer[*JewishHoliday](c, rb)
+}
+
+func (_ FfiConverterOptionalJewishHoliday) Read(reader io.Reader) *JewishHoliday {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterJewishHolidayINSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalJewishHoliday) Lower(value *JewishHoliday) C.RustBuffer {
+	return LowerIntoRustBuffer[*JewishHoliday](c, value)
+}
+
+func (_ FfiConverterOptionalJewishHoliday) Write(writer io.Writer, value *JewishHoliday) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterJewishHolidayINSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalJewishHoliday struct{}
+
+func (_ FfiDestroyerOptionalJewishHoliday) Destroy(value *JewishHoliday) {
+	if value != nil {
+		FfiDestroyerJewishHoliday{}.Destroy(*value)
+	}
+}
+
+func NewAstronomicalCalendar(timestamp int64, geoLocation *GeoLocation) *AstronomicalCalendar {
+	return FfiConverterAstronomicalCalendarINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_zmanim_core_fn_func_new_astronomical_calendar(FfiConverterInt64INSTANCE.Lower(timestamp), FfiConverterGeoLocationINSTANCE.Lower(geoLocation), _uniffiStatus)
+	}))
+}
+
+func NewComplexZmanimCalendar(timestamp int64, geoLocation *GeoLocation, useAstronomicalChatzos bool, useAstronomicalChatzosForOtherZmanim bool, candleLightingOffset int64, ateretTorahSunsetOffset int64) *ComplexZmanimCalendar {
+	return FfiConverterComplexZmanimCalendarINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_zmanim_core_fn_func_new_complex_zmanim_calendar(FfiConverterInt64INSTANCE.Lower(timestamp), FfiConverterGeoLocationINSTANCE.Lower(geoLocation), FfiConverterBoolINSTANCE.Lower(useAstronomicalChatzos), FfiConverterBoolINSTANCE.Lower(useAstronomicalChatzosForOtherZmanim), FfiConverterInt64INSTANCE.Lower(candleLightingOffset), FfiConverterInt64INSTANCE.Lower(ateretTorahSunsetOffset), _uniffiStatus)
+	}))
+}
+
+func NewGeolocation(latitude float64, longitude float64, elevation float64) **GeoLocation {
+	return FfiConverterOptionalGeoLocationINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_func_new_geolocation(FfiConverterFloat64INSTANCE.Lower(latitude), FfiConverterFloat64INSTANCE.Lower(longitude), FfiConverterFloat64INSTANCE.Lower(elevation), _uniffiStatus),
+		}
+	}))
+}
+
+func NewJewishDate(timestamp int64, tzOffset int64) **JewishDate {
+	return FfiConverterOptionalJewishDateINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_zmanim_core_fn_func_new_jewish_date(FfiConverterInt64INSTANCE.Lower(timestamp), FfiConverterInt64INSTANCE.Lower(tzOffset), _uniffiStatus),
+		}
+	}))
+}
+
+func NewNoaaCalculator() *NoaaCalculator {
+	return FfiConverterNoaaCalculatorINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_zmanim_core_fn_func_new_noaa_calculator(_uniffiStatus)
+	}))
+}
+
+func NewZmanimCalendar(timestamp int64, geoLocation *GeoLocation, useAstronomicalChatzos bool, useAstronomicalChatzosForOtherZmanim bool, candleLightingOffset int64) *ZmanimCalendar {
+	return FfiConverterZmanimCalendarINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) unsafe.Pointer {
+		return C.uniffi_zmanim_core_fn_func_new_zmanim_calendar(FfiConverterInt64INSTANCE.Lower(timestamp), FfiConverterGeoLocationINSTANCE.Lower(geoLocation), FfiConverterBoolINSTANCE.Lower(useAstronomicalChatzos), FfiConverterBoolINSTANCE.Lower(useAstronomicalChatzosForOtherZmanim), FfiConverterInt64INSTANCE.Lower(candleLightingOffset), _uniffiStatus)
+	}))
+}
