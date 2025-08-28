@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dickermoshe/zmanim-core/go/zmanim_core"
+	zmanim_core "github.com/dickermoshe/zmanim-core/go"
 )
 
 func main() {
