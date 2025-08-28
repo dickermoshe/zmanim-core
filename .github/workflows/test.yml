@@ -3,7 +3,7 @@
 #
 #    maturin generate-ci github --zig
 #
-name: CI
+name: Test
 
 on:
   push:

@@ -3,13 +3,11 @@
 #
 #    maturin generate-ci github --zig
 #
-name: CI
+name: Release
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
-  workflow_dispatch:
+  release:
+    types: [published, created]
 
 jobs:
   # Python wheels
