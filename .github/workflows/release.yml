@@ -74,15 +74,15 @@ jobs:
           mkdir -p upload
 
           # Copy Windows artifacts
-          cp target/${{ matrix.target }}/release/zmanim_core.dll upload/ || true
-          cp target/${{ matrix.target }}/release/zmanim_core.lib upload/ || true
+          cp target/${{ matrix.target }}/release/zmanim_core.dll upload/zmanim_core-${{ matrix.target }}.dll || true
+          cp target/${{ matrix.target }}/release/zmanim_core.lib upload/zmanim_core-${{ matrix.target }}.lib || true
 
           # Copy Mac artifacts
-          cp target/${{ matrix.target }}/release/libzmanim_core.dylib upload/ || true
+          cp target/${{ matrix.target }}/release/libzmanim_core.dylib upload/libzmanim_core-${{ matrix.target }}.dylib || true
 
           # Copy Linux artifacts
-          cp target/${{ matrix.target }}/release/libzmanim_core.so upload/ || true
-          cp target/${{ matrix.target }}/release/libzmanim_core.a upload/ || true
+          cp target/${{ matrix.target }}/release/libzmanim_core.so upload/libzmanim_core-${{ matrix.target }}.so || true
+          cp target/${{ matrix.target }}/release/libzmanim_core.a upload/libzmanim_core-${{ matrix.target }}.a || true
 
           # Ensure the upload directory is not empty
           if [ -z "$(ls -A upload)" ]; then
