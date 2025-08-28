@@ -13,7 +13,7 @@ Go bindings for the Zmanim Core library, providing Jewish calendar calculations 
 
 1. **Install the Go package**:
    ```bash
-   go get github.com/dickermoshe/zmanim-core/go
+   go get github.com/dickermoshe/zmanim_core
    ```
 
 2. **Download the dynamic libraries** from the [GitHub releases page](https://github.com/dickermoshe/zmanim-core/releases)
@@ -32,7 +32,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dickermoshe/zmanim-core/go/zmanim_core"
+	zmanim_core "github.com/dickermoshe/zmanim_core"
 )
 
 func main() {
