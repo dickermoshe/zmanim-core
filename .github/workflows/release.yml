@@ -38,6 +38,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: [test]
     strategy:
+      fail-fast: false
       matrix:
         include:
           # Linux
