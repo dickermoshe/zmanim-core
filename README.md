@@ -38,11 +38,9 @@ A high-performance, `no_std` Rust library for calculating Jewish religious times
 
 ### Installation
 
-Add this to your `Cargo.toml`:
-
+Run the following
 ```toml
-[dependencies]
-zmanim-core = "0.1.0"
+cargo add zmanim-core
 ```
 
 ### Basic Usage
