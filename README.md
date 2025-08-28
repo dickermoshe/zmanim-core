@@ -1,3 +1,8 @@
+> [!NOTE]
+>  If you are looking for the Python Readme, please see [zmanim-core-bindings](./PYTHON.README.md).
+If you are looking for the Rust Readme, please see [zmanim-core-bindings](./js/README.md).
+
+
 # Zmanim Core
 
 [![Crates.io](https://img.shields.io/crates/v/zmanim-core)](https://crates.io/crates/zmanim-core)
