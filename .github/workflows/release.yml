@@ -76,12 +76,30 @@ jobs:
             target/${{ matrix.target }}/release/libzmanim_core.*
             target/${{ matrix.target }}/release/zmanim_core.*
           retention-days: 1
-      # - name: Upload to Release
-      #   uses: softprops/action-gh-release@v2
-      #   with:
-      #     files: | # For Linux and Windows
-      #       target/${{ matrix.target }}/release/libzmanim_core.*
-      #       target/${{ matrix.target }}/release/zmanim_core.*
-      #     fail_on_unmatched_files: false
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  upload-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    needs: [rs-build]
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*/libzmanim_core.*
+            artifacts/*/zmanim_core.*
+          fail_on_unmatched_files: false
+
+    # - name: Upload to Release
+    #   uses: softprops/action-gh-release@v2
+    #   with:
+    #     files: | # For Linux and Windows
+    #       target/${{ matrix.target }}/release/libzmanim_core.*
+    #       target/${{ matrix.target }}/release/zmanim_core.*
+    #     fail_on_unmatched_files: false
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
