@@ -1,6 +1,6 @@
 > [!NOTE]
->  If you are looking for the Python Readme, please see [zmanim-core-bindings](./PYTHON.README.md).
-If you are looking for the Rust Readme, please see [zmanim-core-bindings](./js/README.md).
+>  If you are looking for the Python Readme, please see [zmanim-core-bindings](./PYTHON.README.md).  
+If you are looking for the Javascript Readme, please see [zmanim-core-bindings](./js/README.md).
 
 
 # Zmanim Core
@@ -33,6 +33,11 @@ A high-performance, `no_std` Rust library for calculating Jewish religious times
   - Embedded systems (thumbv7em-none-eabihf)
 - **High Performance**: Optimized Rust implementation with LTO and stripping
 - **No Standard Library**: `no_std` compatible for embedded and WASM use cases
+
+## Documentation
+
+This fork closely follows the original KosherJava api where possible.
+See the JavaDoc for documentation: https://kosherjava.com/zmanim/docs/api/index.html?overview-summary.html
 
 ## 🚀 Quick Start
 
