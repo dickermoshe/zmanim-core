@@ -107,6 +107,8 @@ impl AstronomicalCalendar {
             cal += chrono::Duration::days(1);
         } else if solar_event == SolarEvent::Midnight && local_time_hours + hours < 12 {
             cal += chrono::Duration::days(1);
+        } else if solar_event == SolarEvent::Noon && local_time_hours + hours > 12 {
+            cal -= chrono::Duration::days(1);
         }
 
         cal = cal
