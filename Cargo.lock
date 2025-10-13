@@ -1124,7 +1124,7 @@ dependencies = [
 
 [[package]]
 name = "zmanim-core"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "chrono",
  "heapless",
