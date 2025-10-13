@@ -530,3 +530,17 @@ impl JewishDate {
             .map(|(_, molad_data)| Arc::new(molad_data))
     }
 }
+
+#[cfg(feature = "uniffi")]
+#[uniffi::export]
+impl MoladData {
+    pub fn get_hours(&self) -> i64 {
+        self.hours
+    }
+    pub fn get_minutes(&self) -> i64 {
+        self.minutes
+    }
+    pub fn get_chalakim(&self) -> i64 {
+        self.chalakim
+    }
+}
