@@ -135,10 +135,6 @@ Then build the project with:
 npm run build
 ```
 
-
-
-
-
 ---
 
 **Made with ❤️ for the Jewish community and JavaScript developers**

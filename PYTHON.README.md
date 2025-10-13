@@ -78,7 +78,6 @@ This project is licensed under the Lesser General Public License v2.1 - see the 
 
 This library is a Rust port of the [KosherJava](https://github.com/KosherJava/KosherJava) library, which provides the reference implementation and testing framework. Special thanks to the KosherJava contributors for their excellent work.
 
-**Testing against KosherJava git hash**: `0ce858258bff15c11235b1f1063d2eb0ef22b994`
 
 ## 📞 Support
 
