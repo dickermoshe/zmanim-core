@@ -661,6 +661,7 @@ export function ubrn_uniffi_zmanim_core_checksum_method_zmanimcalendar_get_use_a
 export function ubrn_ffi_zmanim_core_uniffi_contract_version(): number;
 export class RustCallStatus {
   free(): void;
+  [Symbol.dispose](): void;
   constructor();
   code: number;
   get errorBuf(): Uint8Array | undefined;
