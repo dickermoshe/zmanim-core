@@ -1,48 +1,7 @@
-use chrono::{DateTime, Datelike, Timelike};
-use core::f64;
-use core::f64::consts::PI;
-use libm::{acos, asin, cos, floor, fmod, sin, tan};
-
-use crate::utils::{GeoLocation, GeoLocationTrait};
-
-#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
-pub struct AstronomicalCalculator {}
-#[derive(Copy, Clone)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
-pub struct NOAACalculator {}
-
-const JULIAN_DAY_JAN_1_2000: f64 = 2451545.0;
-const JULIAN_DAYS_PER_CENTURY: f64 = 36525.0;
-const EARTH_RADIUS: f64 = 6356.9;
-const GEOMETRIC_ZENITH: f64 = 90.0;
-const SOLAR_RADIUS: f64 = 16.0 / 60.0;
-const REFRACTION: f64 = 34.0 / 60.0;
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
-#[repr(u8)]
-pub enum SolarEvent {
-    Sunrise = 1,
-    Sunset = 2,
-    Noon = 3,
-    Midnight = 4,
-}
-
-impl Default for NOAACalculator {
-    #[cfg_attr(feature = "uniffi", uniffi::constructor)]
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl NOAACalculator {
-    pub fn new() -> Self {
-        Self {}
-    }
 
-    fn get_elevation_adjustment(&self, elevation: f64) -> f64 {
-        acos(EARTH_RADIUS / (EARTH_RADIUS + (elevation / 1000.0))).to_degrees()
-    }
+
     fn get_sun_rise_set_utc(
         &self,
         timestamp: i64,
@@ -132,120 +91,10 @@ impl NOAACalculator {
             Some(elevation)
         }
     }
-    fn adjust_zenith(&self, zenith: f64, elevation: f64) -> f64 {
-        let mut adjusted_zenith = zenith;
-        if zenith == GEOMETRIC_ZENITH {
-            adjusted_zenith =
-                zenith + (SOLAR_RADIUS + REFRACTION + self.get_elevation_adjustment(elevation));
-        }
-        adjusted_zenith
-    }
-    fn get_julian_day(&self, timestamp: i64) -> Option<f64> {
-        let dt = DateTime::from_timestamp_millis(timestamp)?;
-        let mut year: i32 = dt.year();
-        let mut month: i32 = dt.month() as i32;
-        let day: i32 = dt.day() as i32;
-        if month <= 2 {
-            year -= 1;
-            month += 12;
-        }
-        let a: i32 = year / 100;
-        let b: i32 = 2 - a + a / 4;
-        Some(
-            floor(365.25 * (year + 4716) as f64)
-                + floor(30.6001 * (month + 1) as f64)
-                + day as f64
-                + b as f64
-                - 1524.5,
-        )
-    }
-    fn get_julian_centuries_from_julian_day(&self, julian_day: f64) -> f64 {
-        (julian_day - JULIAN_DAY_JAN_1_2000) / JULIAN_DAYS_PER_CENTURY
-    }
-    fn get_sun_geometric_mean_longitude(&self, julian_centuries: f64) -> f64 {
-        let longitude = 280.46646 + julian_centuries * (36000.76983 + 0.0003032 * julian_centuries);
 
-        let mut r = fmod(longitude, 360.0);
-        if r < 0.0 {
-            r += 360.0;
-        }
-        r
-    }
 
-    fn get_sun_geometric_mean_anomaly(&self, julian_centuries: f64) -> f64 {
-        357.52911 + julian_centuries * (35999.05029 - 0.0001537 * julian_centuries)
-    }
 
-    fn get_earth_orbit_eccentricity(&self, julian_centuries: f64) -> f64 {
-        0.016708634 - julian_centuries * (0.000042037 + 0.0000001267 * julian_centuries)
-    }
 
-    fn get_sun_equation_of_center(&self, julian_centuries: f64) -> f64 {
-        let m = self.get_sun_geometric_mean_anomaly(julian_centuries);
-        let m_rad = m.to_radians();
-        let sin_m = sin(m_rad);
-        let sin_2m = sin(m_rad * 2.0);
-        let sin_3m = sin(m_rad * 3.0);
-
-        sin_m * (1.914602 - julian_centuries * (0.004817 + 0.000014 * julian_centuries))
-            + sin_2m * (0.019993 - 0.000101 * julian_centuries)
-            + sin_3m * 0.000289
-    }
-
-    fn get_sun_true_longitude(&self, julian_centuries: f64) -> f64 {
-        let sun_longitude = self.get_sun_geometric_mean_longitude(julian_centuries);
-        let center = self.get_sun_equation_of_center(julian_centuries);
-        sun_longitude + center
-    }
-
-    fn get_sun_apparent_longitude(&self, julian_centuries: f64) -> f64 {
-        let sun_true_longitude = self.get_sun_true_longitude(julian_centuries);
-        let omega = 125.04 - 1934.136 * julian_centuries;
-        sun_true_longitude - 0.00569 - 0.00478 * sin(omega.to_radians())
-    }
-
-    fn get_mean_obliquity_of_ecliptic(&self, julian_centuries: f64) -> f64 {
-        let seconds = 21.448
-            - julian_centuries
-                * (46.8150 + julian_centuries * (0.00059 - julian_centuries * (0.001813)));
-        23.0 + (26.0 + (seconds / 60.0)) / 60.0
-    }
-
-    fn get_obliquity_correction(&self, julian_centuries: f64) -> f64 {
-        let obliquity_of_ecliptic = self.get_mean_obliquity_of_ecliptic(julian_centuries);
-        let omega = 125.04 - 1934.136 * julian_centuries;
-        obliquity_of_ecliptic + 0.00256 * cos(omega.to_radians())
-    }
-
-    fn get_sun_declination(&self, julian_centuries: f64) -> f64 {
-        let obliquity_correction = self.get_obliquity_correction(julian_centuries);
-        let lambda = self.get_sun_apparent_longitude(julian_centuries);
-        let sin_t = sin(obliquity_correction.to_radians()) * sin(lambda.to_radians());
-        asin(sin_t).to_degrees()
-    }
-
-    fn get_equation_of_time(&self, julian_centuries: f64) -> f64 {
-        let epsilon = self.get_obliquity_correction(julian_centuries);
-        let geom_mean_long_sun = self.get_sun_geometric_mean_longitude(julian_centuries);
-        let eccentricity_earth_orbit = self.get_earth_orbit_eccentricity(julian_centuries);
-        let geom_mean_anomaly_sun = self.get_sun_geometric_mean_anomaly(julian_centuries);
-
-        let mut y = tan(epsilon.to_radians() / 2.0);
-        y *= y;
-
-        let sin_2l0 = sin(2.0 * geom_mean_long_sun.to_radians());
-        let sin_m = sin(geom_mean_anomaly_sun.to_radians());
-        let cos_2l0 = cos(2.0 * geom_mean_long_sun.to_radians());
-        let sin_4l0 = sin(4.0 * geom_mean_long_sun.to_radians());
-        let sin_2m = sin(2.0 * geom_mean_anomaly_sun.to_radians());
-
-        let equation_of_time = y * sin_2l0 - 2.0 * eccentricity_earth_orbit * sin_m
-            + 4.0 * eccentricity_earth_orbit * y * sin_m * cos_2l0
-            - 0.5 * y * y * sin_4l0
-            - 1.25 * eccentricity_earth_orbit * eccentricity_earth_orbit * sin_2m;
-
-        equation_of_time.to_degrees() * 4.0
-    }
 
     fn get_sun_hour_angle(
         &self,
@@ -297,27 +146,6 @@ impl NOAACalculator {
     }
 }
 
-pub trait NOAACalculatorTrait {
-    fn get_utc_sunrise(
-        &self,
-        timestamp: i64,
-        geo_location: &GeoLocation,
-        zenith: f64,
-        adjust_for_elevation: bool,
-    ) -> Option<f64>;
-    fn get_utc_sunset(
-        &self,
-        timestamp: i64,
-        geo_location: &GeoLocation,
-        zenith: f64,
-        adjust_for_elevation: bool,
-    ) -> Option<f64>;
-    fn get_solar_elevation(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64>;
-    fn get_solar_azimuth(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64>;
-    fn get_utc_noon(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64>;
-    fn get_utc_midnight(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64>;
-}
-#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl NOAACalculatorTrait for NOAACalculator {
     fn get_utc_noon(&self, timestamp: i64, geo_location: &GeoLocation) -> Option<f64> {
         let julian_day = self.get_julian_day(timestamp)?;
@@ -414,8 +242,3 @@ impl NOAACalculatorTrait for NOAACalculator {
     }
 }
 
-#[cfg(feature = "uniffi")]
-#[uniffi::export]
-pub fn new_noaa_calculator() -> NOAACalculator {
-    NOAACalculator::new()
-}
